@@ -1,3 +1,6 @@
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+#![allow(unused_doc_comments)]
 #![no_std]
 #![no_main]
 
@@ -9,10 +12,11 @@ use panic_semihosting as _; // logs messages to the host stderr; requires a debu
 
 // use cortex_m::asm;
 use cortex_m_rt::entry;
+use cortex_m_semihosting::hprintln;
 
 #[entry]
 fn main() -> ! {
-    // hprintln!("Hello, world!").unwrap();
+    hprintln!("Hello, world!");
 
     // // exit QEMU
     // // NOTE do not run this on hardware; it can corrupt OpenOCD state
