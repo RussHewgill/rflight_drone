@@ -34,29 +34,51 @@ fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
 fn main() -> ! {
     // hprintln!("Hello, world!, {}", 1);
 
-    // let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut ps = stm32f401::Peripherals::take().unwrap();
 
-    ps.RCC.apb2enr.modify(|_, w| w.tim9en().set_bit());
+    // ps.RCC.apb2enr.modify(|_, w| w.tim9en().set_bit());
+    // ps.TIM9.cr1.write(|w| w.opm().set_bit().cen().clear_bit());
+    // ps.TIM9.psc.write(|w| w.psc().bits(7_999));
+    //
+    // hprintln!("wat 0");
+    // delay(&ps.TIM9, 1000);
+    // hprintln!("wat 1");
+    // delay(&ps.TIM9, 1000);
+    // hprintln!("wat 2");
 
-    ps.TIM9.cr1.write(|w| w.opm().set_bit().cen().clear_bit());
-    ps.TIM9.psc.write(|w| w.psc().bits(7_999));
+    // enable TPIU and ITM
+    cp.DCB.enable_trace();
 
-    hprintln!("wat 0");
-    delay(&ps.TIM9, 1000);
+    // prescaler
+    let swo_freq = 2_000_000;
+    unsafe {
+        // cp.TPIU.acpr.write((stm32f4xx_hal::rcc::Clocks::sysclk().0 / swo_freq) - 1);
+    }
 
-    hprintln!("wat 1");
-    delay(&ps.TIM9, 1000);
+    unsafe {
+        cp.TPIU.sppr.write(2);
+        cp.TPIU.ffcr.modify(|r| r | (1 << 1));
+    }
 
-    hprintln!("wat 2");
+    // SWO NRZ
+    ps.DBGMCU.cr.modify(|_,w| w.trace_ioen().set_bit());
 
-    // cp.DCB.enable_trace();
+    unsafe {
+        cp.ITM.lar.write(0xC5ACCE55);
+    }
 
-    // let swo_freq = 8_000_000;
-    // cp.TPIU.acpr
+    unsafe {
+        cp.ITM.tcr.write(
+            // (1 << 3) //
+            (1 << 0) // Enable ITM
+        );
+    }
 
     // enable stimulus port 0
-    // cp.ITM.ter[0].write(1);
+    unsafe {
+        cp.ITM.ter[0].write(1);
+    }
 
     // iprintln!(&mut cp.ITM.stim[0], "wat");
 
@@ -76,7 +98,7 @@ fn main() -> ! {
     // }
 }
 
-pub fn init() -> ITM {
-    let p = cortex_m::Peripherals::take().unwrap();
-    p.ITM
-}
+// pub fn init() -> ITM {
+//     let p = cortex_m::Peripherals::take().unwrap();
+//     p.ITM
+// }
