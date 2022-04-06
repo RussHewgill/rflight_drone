@@ -1,5 +1,7 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
+#![allow(unused_mut)]
+#![allow(dead_code)]
 #![allow(unused_doc_comments)]
 #![no_std]
 #![no_main]
@@ -19,7 +21,10 @@ use stm32f4::stm32f401::{self, SPI2};
 
 use embedded_hal::spi::*;
 use embedded_time::rate::{Kilohertz, Megahertz};
-use stm32f4xx_hal::{gpio::NoPin, prelude::*};
+use stm32f4xx_hal::{
+    gpio::{Pin, PinExt},
+    prelude::*,
+};
 
 #[inline(never)]
 fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
@@ -43,13 +48,51 @@ fn main_imu() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
 
+    // #define STEVAL_FCU001_V1_LSM6DSL_SPI_CS_Port	          GPIOA
+    // #define STEVAL_FCU001_V1_LSM6DSL_SPI_CS_Pin     	  GPIO_PIN_8
+
     // // LED
     // dp.RCC.ahb1enr.write(|w| w.gpioben())
     // let mut gpiob = dp.GPIOB.split();
     // let mut pb5 = gpiob.pb5;
 
-    /// Enable SPI1
-    dp.RCC.apb2enr.write(|w| w.spi1en().set_bit());
+    // /// Enable SPI1
+    // dp.RCC.apb2enr.write(|w| w.spi1en().set_bit());
+
+    /// Enable SPI2
+    dp.RCC.apb1enr.write(|w| w.spi2en().set_bit());
+
+    /// Enable GPIOA + GPIOB
+    dp.RCC
+        .ahb1enr
+        .write(|w| w.gpioben().set_bit().gpioaen().set_bit());
+
+    // dp.GPIOA.ospeedr.write(|w| w.ospeedr8().high_speed());
+    // dp.GPIOA.pupdr.write(|w| w.pupdr8().floating());
+
+    let mut gpioa = dp.GPIOA.split();
+    let mut gpiob = dp.GPIOB.split();
+    // let mut pb8 = gpiob.pb8.into_floating_input();
+    // let mut pb8 = pb8.into_push_pull_output();
+    // pb8.set_high();
+
+    /// set CS line for IMU to high
+    let mut pa8 = gpioa.pa8.into_push_pull_output();
+    pa8.set_high();
+
+    let mode = Mode {
+        polarity: Polarity::IdleLow,
+        phase: Phase::CaptureOnFirstTransition,
+    };
+
+    let sck = gpiob.pb13;
+    // let miso =
+    // let mosi = gpiob.pb15;
+
+    let mut rcc = dp.RCC.constrain();
+    let clocks = rcc.cfgr.freeze();
+
+    // let spi = dp.SPI1.spi((sck, miso,mosi), mode, Megahertz(10), clocks);
 
     loop {}
 }
