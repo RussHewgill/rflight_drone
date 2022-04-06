@@ -18,6 +18,7 @@ use cortex_m_semihosting::hprintln;
 use stm32f4::stm32f401::{self, SPI2};
 
 use embedded_hal::spi::*;
+use embedded_time::rate::{Kilohertz, Megahertz};
 use stm32f4xx_hal::{gpio::NoPin, prelude::*};
 
 #[inline(never)]
@@ -38,18 +39,41 @@ fn enable_bt(spi2: &SPI2) {
 }
 
 #[entry]
+fn main_imu() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    // // LED
+    // dp.RCC.ahb1enr.write(|w| w.gpioben())
+    // let mut gpiob = dp.GPIOB.split();
+    // let mut pb5 = gpiob.pb5;
+
+    /// Enable SPI1
+    dp.RCC.apb2enr.write(|w| w.spi1en().set_bit());
+
+    loop {}
+}
+
+// #[entry]
 fn main() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    let mut ps = stm32f401::Peripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
 
     // hprintln!("Hello, world!, {}", 1);
 
     // let spi1 = ps.SPI1
 
-    // // let spi1 = Spi::new(ps.SPI2, ());
+    // let gpioa = dp.GPIOA.split();
+
+    // let mut rcc = dp.RCC.constrain();
+    // let clocks = rcc.cfgr.freeze();
+
+    // let spi1 = Spi::new(ps.SPI2, ());
     // let spi = ps.SPI1.spi(
-    //     (NoPin, NoPin, NoPin),
+    //     // (NoPin, NoPin, NoPin),
     // );
+
+    // let spi = dp.SPI1.spi(pins, mode, Megahertz(10), clocks);
 
     loop {}
 }
