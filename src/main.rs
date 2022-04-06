@@ -15,7 +15,10 @@ use cortex_m::{iprintln, peripheral::ITM};
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
-use stm32f4::stm32f401;
+use stm32f4::stm32f401::{self, SPI2};
+
+use embedded_hal::spi::*;
+use stm32f4xx_hal::{gpio::NoPin, prelude::*};
 
 #[inline(never)]
 fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
@@ -30,8 +33,29 @@ fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
     tim9.sr.modify(|_, w| w.uif().clear_bit());
 }
 
+fn enable_bt(spi2: &SPI2) {
+    unimplemented!()
+}
+
 #[entry]
 fn main() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut ps = stm32f401::Peripherals::take().unwrap();
+
+    // hprintln!("Hello, world!, {}", 1);
+
+    // let spi1 = ps.SPI1
+
+    // // let spi1 = Spi::new(ps.SPI2, ());
+    // let spi = ps.SPI1.spi(
+    //     (NoPin, NoPin, NoPin),
+    // );
+
+    loop {}
+}
+
+// #[entry]
+fn main2() -> ! {
     // hprintln!("Hello, world!, {}", 1);
 
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
@@ -54,33 +78,30 @@ fn main() -> ! {
     let swo_freq = 2_000_000;
     unsafe {
         // cp.TPIU.acpr.write((stm32f4xx_hal::rcc::Clocks::sysclk().0 / swo_freq) - 1);
-    }
 
-    unsafe {
+        // SWO NRZ
         cp.TPIU.sppr.write(2);
+
         cp.TPIU.ffcr.modify(|r| r | (1 << 1));
     }
 
     // SWO NRZ
-    ps.DBGMCU.cr.modify(|_,w| w.trace_ioen().set_bit());
+    ps.DBGMCU.cr.modify(|_, w| w.trace_ioen().set_bit());
 
     unsafe {
         cp.ITM.lar.write(0xC5ACCE55);
-    }
 
-    unsafe {
         cp.ITM.tcr.write(
-            // (1 << 3) //
-            (1 << 0) // Enable ITM
+            (0b000001 << 16) // TraceBusID
+            | (1 << 3) // enable SWO output ??
+            | (1 << 0), // Enable ITM
         );
-    }
 
-    // enable stimulus port 0
-    unsafe {
+        // enable stimulus port 0
         cp.ITM.ter[0].write(1);
     }
 
-    // iprintln!(&mut cp.ITM.stim[0], "wat");
+    iprintln!(&mut cp.ITM.stim[0], "wat");
 
     // let mut itm = init();
     // iprintln!(&mut itm.stim[0], "wat");
