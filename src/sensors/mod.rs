@@ -1,3 +1,3 @@
-mod barometer;
-mod imu;
-mod magneto;
+pub mod barometer;
+pub mod imu;
+pub mod magneto;

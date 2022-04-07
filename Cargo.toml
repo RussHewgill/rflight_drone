@@ -16,7 +16,7 @@ panic-semihosting = "0.6.0"
 
 embedded-hal = "0.2.7"
 nb = "1.0.0"
-embedded-time = "0.12.1"
+# embedded-time = "0.12.1"
 
 stm32f4 = { version = "0.14.0", features = ["stm32f401","rt"] }
 stm32f4xx-hal = { version = "0.13.0", features = ["stm32f401"] }

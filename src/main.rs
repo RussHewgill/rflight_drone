@@ -6,6 +6,10 @@
 #![no_std]
 #![no_main]
 
+pub mod sensors;
+
+use sensors::imu::*;
+
 // pick a panicking behavior
 // use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
 // use panic_abort as _; // requires nightly
@@ -20,10 +24,11 @@ use cortex_m_semihosting::hprintln;
 use stm32f4::stm32f401::{self, SPI2};
 
 use embedded_hal::spi::*;
-use embedded_time::rate::{Kilohertz, Megahertz};
+// use embedded_time::rate::{Kilohertz, Megahertz};
 use stm32f4xx_hal::{
     gpio::{Pin, PinExt},
     prelude::*,
+    time::*,
 };
 
 #[inline(never)]
@@ -43,23 +48,18 @@ fn enable_bt(spi2: &SPI2) {
     unimplemented!()
 }
 
-#[entry]
+// #[entry]
 fn main_imu() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
 
-    // #define STEVAL_FCU001_V1_LSM6DSL_SPI_CS_Port	          GPIOA
-    // #define STEVAL_FCU001_V1_LSM6DSL_SPI_CS_Pin     	  GPIO_PIN_8
+    // #define STEVAL_FCU001_V1_SENSORS_SPI               SPI2
+    // #define STEVAL_FCU001_V1_SENSORS_SPI_MOSI_Pin      GPIO_PIN_15 // pb15
+    // #define STEVAL_FCU001_V1_SENSORS_SPI_SCK_Pin       GPIO_PIN_13 // pb13
+    // #define STEVAL_FCU001_V1_LSM6DSL_SPI_CS_Port	      GPIOA
+    // #define STEVAL_FCU001_V1_LSM6DSL_SPI_CS_Pin     	  GPIO_PIN_8  // pa8
 
-    // // LED
-    // dp.RCC.ahb1enr.write(|w| w.gpioben())
-    // let mut gpiob = dp.GPIOB.split();
-    // let mut pb5 = gpiob.pb5;
-
-    // /// Enable SPI1
-    // dp.RCC.apb2enr.write(|w| w.spi1en().set_bit());
-
-    /// Enable SPI2
+    /// Enable SPI2 clock
     dp.RCC.apb1enr.write(|w| w.spi2en().set_bit());
 
     /// Enable GPIOA + GPIOB
@@ -76,31 +76,35 @@ fn main_imu() -> ! {
     // let mut pb8 = pb8.into_push_pull_output();
     // pb8.set_high();
 
-    /// set CS line for IMU to high
-    let mut pa8 = gpioa.pa8.into_push_pull_output();
-    pa8.set_high();
-
-    let mode = Mode {
-        polarity: Polarity::IdleLow,
-        phase: Phase::CaptureOnFirstTransition,
-    };
+    // let mode = Mode {
+    //     polarity: Polarity::IdleHigh,
+    //     phase: Phase::CaptureOnFirstTransition,
+    // };
+    let mode = MODE_3;
 
     let sck = gpiob.pb13;
-    // let miso =
-    // let mosi = gpiob.pb15;
+    let miso = gpiob.pb14.into_alternate();
+    // // maybe not needed unless also using i2c?
+    // let mosi = gpiob.pb15.into_alternate().internal_pull_up(true);
+    let mosi = gpiob.pb15.into_alternate();
 
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
-    // let spi = dp.SPI1.spi((sck, miso,mosi), mode, Megahertz(10), clocks);
+    let spi = dp.SPI2.spi((sck, miso, mosi), mode, 10.MHz(), &clocks);
+
+    let mut cs = gpioa.pa8.into_push_pull_output();
+    // let cs = pa8.set_high();
+
+    let mut imu = IMU::new(spi, cs);
 
     loop {}
 }
 
-// #[entry]
+#[entry]
 fn main() -> ! {
-    let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    let mut dp = stm32f401::Peripherals::take().unwrap();
+    // let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    // let mut dp = stm32f401::Peripherals::take().unwrap();
 
     // hprintln!("Hello, world!, {}", 1);
 
