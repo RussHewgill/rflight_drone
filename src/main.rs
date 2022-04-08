@@ -6,6 +6,7 @@
 #![no_std]
 #![no_main]
 
+pub mod pid;
 pub mod sensors;
 
 use sensors::imu::*;
@@ -48,7 +49,7 @@ fn enable_bt(spi2: &SPI2) {
     unimplemented!()
 }
 
-// #[entry]
+#[entry]
 fn main_imu() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -101,12 +102,12 @@ fn main_imu() -> ! {
     loop {}
 }
 
-#[entry]
+// #[entry]
 fn main() -> ! {
     // let mut cp = stm32f401::CorePeripherals::take().unwrap();
     // let mut dp = stm32f401::Peripherals::take().unwrap();
 
-    // hprintln!("Hello, world!, {}", 1);
+    hprintln!("Hello, world!, {}", 1);
 
     // let spi1 = ps.SPI1
 
