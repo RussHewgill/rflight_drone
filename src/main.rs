@@ -29,6 +29,7 @@ use embedded_hal::spi::*;
 use stm32f4xx_hal::{
     gpio::{Pin, PinExt},
     prelude::*,
+    spi::NoMiso,
     time::*,
 };
 
@@ -49,7 +50,28 @@ fn enable_bt(spi2: &SPI2) {
     unimplemented!()
 }
 
-#[entry]
+// #[entry]
+fn main_led() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    // #define LED1_PIN                         GPIO_PIN_5
+    // #define LED1_GPIO_PORT                   GPIOB
+    // #define LED1_GPIO_CLK_ENABLE()           __GPIOB_CLK_ENABLE()
+    // #define LED1_GPIO_CLK_DISABLE()          __GPIOB_CLK_DISABLE()
+
+    // dp.RCC
+    //     .ahb1enr
+    //     .write(|w| w.gpioben().set_bit());
+
+    // let mut gpiob = dp.GPIOB.split();
+
+    // dp.GPIOB.moder
+
+    loop {}
+}
+
+// #[entry]
 fn main_imu() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -60,22 +82,43 @@ fn main_imu() -> ! {
     // #define STEVAL_FCU001_V1_LSM6DSL_SPI_CS_Port	      GPIOA
     // #define STEVAL_FCU001_V1_LSM6DSL_SPI_CS_Pin     	  GPIO_PIN_8  // pa8
 
+    hprintln!("wat 0");
+
     /// Enable SPI2 clock
     dp.RCC.apb1enr.write(|w| w.spi2en().set_bit());
 
     /// Enable GPIOA + GPIOB
-    dp.RCC
-        .ahb1enr
-        .write(|w| w.gpioben().set_bit().gpioaen().set_bit());
+    dp.RCC.ahb1enr.write(|w| {
+        w.gpioben()
+            .set_bit()
+            .gpioaen()
+            .set_bit()
+            .gpiocen()
+            .set_bit()
+    });
 
-    // dp.GPIOA.ospeedr.write(|w| w.ospeedr8().high_speed());
-    // dp.GPIOA.pupdr.write(|w| w.pupdr8().floating());
+    dp.GPIOA.moder.modify(|r, w| w.moder8().output());
+    dp.GPIOB
+        .moder
+        .modify(|r, w| w.moder13().output().moder14().output().moder15().output());
+
+    dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr8().high_speed());
+    dp.GPIOB
+        .ospeedr
+        .modify(|r, w| w.ospeedr13().high_speed().ospeedr15().high_speed());
+    dp.GPIOC.ospeedr.modify(|r, w| w.ospeedr13().high_speed());
+
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| w.pupdr13().floating().pupdr15().floating());
+
+    dp.GPIOA.pupdr.modify(|r, w| w.pupdr8().floating()); // IMU CS
+    dp.GPIOB.pupdr.modify(|r, w| w.pupdr12().floating()); // Magno
+    dp.GPIOC.pupdr.modify(|r, w| w.pupdr13().floating()); // Baro
 
     let mut gpioa = dp.GPIOA.split();
     let mut gpiob = dp.GPIOB.split();
-    // let mut pb8 = gpiob.pb8.into_floating_input();
-    // let mut pb8 = pb8.into_push_pull_output();
-    // pb8.set_high();
+    let mut gpioc = dp.GPIOC.split();
 
     // let mode = Mode {
     //     polarity: Polarity::IdleHigh,
@@ -83,26 +126,65 @@ fn main_imu() -> ! {
     // };
     let mode = MODE_3;
 
-    let sck = gpiob.pb13;
-    let miso = gpiob.pb14.into_alternate();
-    // // maybe not needed unless also using i2c?
-    // let mosi = gpiob.pb15.into_alternate().internal_pull_up(true);
-    let mosi = gpiob.pb15.into_alternate();
+    let pb13 = gpiob.pb13.into_push_pull_output().into_alternate::<5>();
+    let pb15 = gpiob.pb15.into_push_pull_output().into_alternate::<5>();
+
+    let sck = pb13;
+
+    // let miso = gpiob.pb14.into_alternate();
+    let miso = NoMiso {};
+
+    let mosi = pb15;
 
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
-    let spi = dp.SPI2.spi((sck, miso, mosi), mode, 10.MHz(), &clocks);
+    hprintln!("wat 1");
 
-    let mut cs = gpioa.pa8.into_push_pull_output();
-    // let cs = pa8.set_high();
+    dp.SPI2.cr1.write(|w| {
+        w.bidimode()
+            .set_bit()
+            .br()
+            .div16()
+            .mstr()
+            .set_bit()
+            .ssm()
+            .set_bit()
+            .dff()
+            .eight_bit()
+            .lsbfirst()
+            .clear_bit()
+            .crcen()
+            .clear_bit()
+    });
 
-    let mut imu = IMU::new(spi, cs);
+    dp.SPI2.cr2.write(|w| w.ssoe().set_bit().frf().clear_bit());
+
+    // let spi = dp.SPI2.spi((sck, miso, mosi), mode, 10.MHz(), &clocks);
+    let spi = dp.SPI2.spi_bidi((sck, miso, mosi), mode, 10.MHz(), &clocks);
+
+    let mut cs_imu = gpioa.pa8.into_push_pull_output();
+    cs_imu.set_high();
+
+    let mut cs_magno = gpiob.pb12.into_push_pull_output();
+    cs_magno.set_high();
+
+    let mut cs_baro = gpioc.pc13.into_push_pull_output();
+    cs_baro.set_high();
+
+    let mut imu = IMU::new(spi, cs_imu);
+
+    /// Init done
+    let mut buf = [0u8; 1];
+
+    // imu.read_reg(0x0F, &mut buf);
+
+    hprintln!("result: {:#010b}", buf[0]);
 
     loop {}
 }
 
-// #[entry]
+#[entry]
 fn main() -> ! {
     // let mut cp = stm32f401::CorePeripherals::take().unwrap();
     // let mut dp = stm32f401::Peripherals::take().unwrap();
