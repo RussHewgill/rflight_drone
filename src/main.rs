@@ -71,6 +71,14 @@ fn main_led() -> ! {
     loop {}
 }
 
+#[entry]
+fn main_adc() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    loop {}
+}
+
 // #[entry]
 fn main_imu() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
@@ -141,7 +149,7 @@ fn main_imu() -> ! {
 
     hprintln!("wat 1");
 
-    dp.SPI2.cr1.write(|w| {
+    dp.SPI2.cr1.modify(|_, w| {
         w.bidimode()
             .set_bit()
             .br()
@@ -158,7 +166,9 @@ fn main_imu() -> ! {
             .clear_bit()
     });
 
-    dp.SPI2.cr2.write(|w| w.ssoe().set_bit().frf().clear_bit());
+    dp.SPI2
+        .cr2
+        .modify(|_, w| w.ssoe().set_bit().frf().clear_bit());
 
     // let spi = dp.SPI2.spi((sck, miso, mosi), mode, 10.MHz(), &clocks);
     let spi = dp.SPI2.spi_bidi((sck, miso, mosi), mode, 10.MHz(), &clocks);
@@ -184,7 +194,7 @@ fn main_imu() -> ! {
     loop {}
 }
 
-#[entry]
+// #[entry]
 fn main() -> ! {
     // let mut cp = stm32f401::CorePeripherals::take().unwrap();
     // let mut dp = stm32f401::Peripherals::take().unwrap();
