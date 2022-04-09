@@ -27,7 +27,8 @@ use cortex_m_semihosting::hprintln;
 
 use stm32f4::stm32f401::{self, SPI2};
 
-use embedded_hal::spi::*;
+use embedded_hal as hal;
+use hal::spi::*;
 use stm32f4xx_hal::{
     gpio::{Pin, PinExt},
     prelude::*,
@@ -99,10 +100,12 @@ fn main_imu_i2c() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
 
+    // dp.RCC.apb1enr.write(|w| w.i2c1en().set_bit());
+
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
-    // let i2c = dp.I2
+    // let i2c = dp.I2C
 
     let mut gpiob = dp.GPIOB.split();
 
@@ -248,28 +251,82 @@ fn main_imu() -> ! {
 
     let mut bytes0 = [(reg << 1) | IMU_SPI_WRITE, val];
 
+    // while spi.is_txe() {}
+
     /// start tx
     cs_imu.set_low();
 
-    /// send data
-    spi.write(&mut bytes0).ok();
+    // let e = hal::spi::nb::FullDuplex::write(&mut spi, bytes0[0]);
+    // hprintln!("e: {:?}", e);
+
+    // let e = hal::spi::nb::FullDuplex::write(&mut spi, bytes0[1]);
+    // hprintln!("e: {:?}", e);
+
+    // /// send data
+    // // spi.send(word)
+    // let e = spi.write(&mut bytes0).ok();
+    // // let e = hal::spi::blocking::Write::write(&mut spi, &mut bytes0).ok();
+    // // let e = hal::spi::blocking::TransferInplace::transfer_inplace(&mut spi, &mut bytes0).ok();
+    // // let e = ::nb::block!(spi.write(&mut bytes0).ok());
+    // hprintln!("e: {:?}", e);
+
+    // let e = hal::spi::blocking::Read::read(&mut spi, &mut bytes0);
+    // hprintln!("e: {:?}", e);
+
+    // while spi.is_txe() {}
 
     /// end tx
     cs_imu.set_high();
+
+    hprintln!("r0: {:#010b}", bytes0[0]);
+    hprintln!("r1: {:#010b}", bytes0[1]);
 
     let mut bytes1 = [(reg << 1) | IMU_SPI_READ, 0];
 
     cs_imu.set_low();
 
-    // spi.rea
-    // spi.transfer(words)
+    // let e = hal::spi::blocking::Read::read(&mut spi, &mut bytes1);
+    // hprintln!("e: {:?}", e);
 
     cs_imu.set_high();
 
-    hprintln!("result: {:#010b}", buf[0]);
+    hprintln!("r0: {:#010b}", bytes1[0]);
+    hprintln!("r1: {:#010b}", bytes1[1]);
 
     loop {}
 }
+
+// #[inline(always)]
+// fn check_send(spi: &mut SPI2, byte: u8) -> ::nb::Result<(), stm32f4xx_hal::spi::Error> {
+//     let sr = spi.sr.read();
+//     Err(if sr.ovr().bit_is_set() {
+//         // Read from the DR to clear the OVR bit
+//         let _ = spi.dr.read();
+//         stm32f4xx_hal::spi::Error::Overrun.into()
+//     } else if sr.modf().bit_is_set() {
+//         // Write to CR1 to clear MODF
+//         spi.cr1.modify(|_r, w| w);
+//         stm32f4xx_hal::spi::Error::ModeFault.into()
+//     } else if sr.crcerr().bit_is_set() {
+//         // Clear the CRCERR bit
+//         spi.sr.modify(|_r, w| {
+//             w.crcerr().clear_bit();
+//             w
+//         });
+//         stm32f4xx_hal::spi::Error::Crc.into()
+//     } else if sr.txe().bit_is_set() {
+//         send_u8(spi, byte);
+//         return Ok(());
+//     } else {
+//         ::nb::Error::WouldBlock
+//     })
+// }
+
+// #[inline(always)]
+// fn send_u8(spi: &mut SPI2, byte: u8) {
+//     // NOTE(write_volatile) see note above
+//     unsafe { core::ptr::write_volatile(&spi.dr as *const _ as *mut u8, byte) }
+// }
 
 // #[entry]
 fn main() -> ! {
