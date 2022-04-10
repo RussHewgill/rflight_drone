@@ -8,11 +8,11 @@
 
 pub mod pid;
 pub mod sensors;
-// pub mod spi;
+pub mod spi;
 
-// use spi::*;
 use sensors::barometer::*;
 use sensors::imu::*;
+use spi::*;
 
 // pick a panicking behavior
 // use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
@@ -115,6 +115,70 @@ fn main_imu_i2c() -> ! {
 }
 
 #[entry]
+fn main_imu2() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    /// Enable GPIOA
+    dp.RCC.ahb1enr.write(|w| w.gpioaen().set_bit());
+
+    /// set PA8 to output
+    dp.GPIOA.moder.modify(|r, w| w.moder8().output());
+    /// set PA8 to high speed
+    dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr8().high_speed());
+    /// set CS pins to No PUPD
+    dp.GPIOA.pupdr.modify(|r, w| w.pupdr8().floating()); // IMU CS
+
+    let mut gpioa = dp.GPIOA.split();
+
+    let mut cs_imu = gpioa.pa8.into_push_pull_output();
+    cs_imu.set_high();
+
+    let mut spi = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, MODE_3, 10.MHz());
+
+    let reg = IMURegisters::CTRL3_C.to_addr();
+
+    /// SIM = 1, 3 wire mode
+    let val = 0b0000_0100 | 0b1000;
+
+    // /// BLE = 1, use data MSB @ lower address
+    // let val = val | 0b0010;
+
+    const IMU_SPI_READ: u8 = 0x01;
+    const IMU_SPI_WRITE: u8 = 0x00;
+
+    // let mut bytes0 = [(reg << 1) | IMU_SPI_WRITE, val];
+    let mut bytes0 = [reg | (IMU_SPI_WRITE << 7), val];
+
+    cs_imu.set_low();
+    let e = spi.send(&bytes0);
+    cs_imu.set_high();
+
+    hprintln!("e: {:?}", e);
+
+    let reg = IMURegisters::WHO_AM_I.to_addr();
+
+    // let bytes1 = [(reg << 1) | IMU_SPI_READ];
+    let bytes1 = [reg | (IMU_SPI_READ << 7)];
+    let mut bytes2 = [0];
+
+    cs_imu.set_low();
+    // cortex_m::asm::delay(200);
+    let e1 = spi.send(&bytes1);
+    // cortex_m::asm::delay(200);
+    let e2 = spi.read(&mut bytes2);
+    // cortex_m::asm::delay(200);
+    cs_imu.set_high();
+
+    hprintln!("e1: {:?}", e1);
+    hprintln!("e2: {:?}", e2);
+
+    hprintln!("b2: {:#010b}", bytes2[0]);
+
+    loop {}
+}
+
+// #[entry]
 fn main_imu() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -262,13 +326,8 @@ fn main_imu() -> ! {
     // let e = hal::spi::nb::FullDuplex::write(&mut spi, bytes0[1]);
     // hprintln!("e: {:?}", e);
 
-    // /// send data
-    // // spi.send(word)
-    // let e = spi.write(&mut bytes0).ok();
-    // // let e = hal::spi::blocking::Write::write(&mut spi, &mut bytes0).ok();
-    // // let e = hal::spi::blocking::TransferInplace::transfer_inplace(&mut spi, &mut bytes0).ok();
-    // // let e = ::nb::block!(spi.write(&mut bytes0).ok());
-    // hprintln!("e: {:?}", e);
+    /// send data
+    let e0 = spi.write(&mut bytes0).ok();
 
     // let e = hal::spi::blocking::Read::read(&mut spi, &mut bytes0);
     // hprintln!("e: {:?}", e);
@@ -278,55 +337,31 @@ fn main_imu() -> ! {
     /// end tx
     cs_imu.set_high();
 
-    hprintln!("r0: {:#010b}", bytes0[0]);
-    hprintln!("r1: {:#010b}", bytes0[1]);
+    hprintln!("e0: {:?}", e0);
 
-    let mut bytes1 = [(reg << 1) | IMU_SPI_READ, 0];
+    // hprintln!("r0: {:#010b}", bytes0[0]);
+    // hprintln!("r1: {:#010b}", bytes0[1]);
+
+    let reg = IMURegisters::WHO_AM_I.to_addr();
+
+    let bytes1 = [(reg << 1) | IMU_SPI_READ];
+    let mut bytes2 = [0];
 
     cs_imu.set_low();
 
-    // let e = hal::spi::blocking::Read::read(&mut spi, &mut bytes1);
-    // hprintln!("e: {:?}", e);
+    let e1 = spi.write(&bytes1).ok();
+
+    let e2 = hal::spi::blocking::Read::read(&mut spi, &mut bytes2);
 
     cs_imu.set_high();
 
-    hprintln!("r0: {:#010b}", bytes1[0]);
-    hprintln!("r1: {:#010b}", bytes1[1]);
+    hprintln!("e1: {:?}", e1);
+    hprintln!("e2: {:?}", e2);
+
+    hprintln!("r0: {:#010b}", bytes2[0]);
 
     loop {}
 }
-
-// #[inline(always)]
-// fn check_send(spi: &mut SPI2, byte: u8) -> ::nb::Result<(), stm32f4xx_hal::spi::Error> {
-//     let sr = spi.sr.read();
-//     Err(if sr.ovr().bit_is_set() {
-//         // Read from the DR to clear the OVR bit
-//         let _ = spi.dr.read();
-//         stm32f4xx_hal::spi::Error::Overrun.into()
-//     } else if sr.modf().bit_is_set() {
-//         // Write to CR1 to clear MODF
-//         spi.cr1.modify(|_r, w| w);
-//         stm32f4xx_hal::spi::Error::ModeFault.into()
-//     } else if sr.crcerr().bit_is_set() {
-//         // Clear the CRCERR bit
-//         spi.sr.modify(|_r, w| {
-//             w.crcerr().clear_bit();
-//             w
-//         });
-//         stm32f4xx_hal::spi::Error::Crc.into()
-//     } else if sr.txe().bit_is_set() {
-//         send_u8(spi, byte);
-//         return Ok(());
-//     } else {
-//         ::nb::Error::WouldBlock
-//     })
-// }
-
-// #[inline(always)]
-// fn send_u8(spi: &mut SPI2, byte: u8) {
-//     // NOTE(write_volatile) see note above
-//     unsafe { core::ptr::write_volatile(&spi.dr as *const _ as *mut u8, byte) }
-// }
 
 // #[entry]
 fn main() -> ! {
