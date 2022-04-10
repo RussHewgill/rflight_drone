@@ -15,6 +15,7 @@ pub struct Spi3 {
     sck: Pin<'B', 13, Alternate<5>>,
     mosi: Pin<'B', 15, Alternate<5>>,
     miso: NoMiso,
+    output_mode: bool,
 }
 
 /// new
@@ -36,6 +37,11 @@ impl Spi3 {
         /// Enable GPIOB
         rcc.ahb1enr.write(|w| w.gpioben().set_bit());
 
+        /// set PB13, PB15 to output
+        gpiob
+            .moder
+            .modify(|r, w| w.moder13().output().moder15().output());
+
         /// set PB13, PB15 to high speed
         gpiob
             .ospeedr
@@ -47,6 +53,10 @@ impl Spi3 {
             .modify(|r, w| w.pupdr13().floating().pupdr15().floating());
 
         let gpiob = gpiob.split();
+
+        /// XXX: should be external, borrow rules
+        let mut cs_magno = gpiob.pb12.into_push_pull_output();
+        cs_magno.set_high();
 
         let sck = gpiob.pb13;
         let mosi = gpiob.pb15;
@@ -60,6 +70,8 @@ impl Spi3 {
                 .cpol() // clock polarity
                 .bit(mode.polarity == Polarity::IdleHigh)
                 .bidimode() // bidirectional half duplex mode
+                .set_bit()
+                .bidioe() // bidi output mode
                 .set_bit()
                 .br() // baud rate = 1/16 f_PCLK
                 .div16()
@@ -87,9 +99,10 @@ impl Spi3 {
             sck,
             mosi,
             miso: NoMiso {},
+            output_mode: true,
         };
 
-        out.enable(false);
+        out.enable(true);
 
         out
     }
@@ -107,21 +120,118 @@ impl Spi3 {
     /// The sequence begins when data are written into the SPI_DR register (Tx buffer)
     /// While (BIDIMODE=1 and BIDIOE=1)
     pub fn send(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
-        self.set_bidi_output();
-        self.enable(true);
+        // if !self.output_mode {
+        //     // self.set_bidi_output();
+        // }
+
+        // self.set_bidi_output();
+        // self.enable(true);
         for b in bytes {
             nb::block!(self.nb_send(*b))?;
         }
-        self.enable(false);
+        // self.enable(false);
         Ok(())
     }
 
-    /// The sequence begins as soon as SPE=1 and BIDIOE=0
-    pub fn read(&mut self, buf: &mut [u8]) -> nb::Result<(), SpiError> {
+    pub fn read(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
+        self.enable(false);
         self.set_bidi_input();
+        cortex_m::interrupt::disable();
         self.enable(true);
 
-        for b in buf {
+        {
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+        }
+
+        self.enable(false);
+        unsafe {
+            cortex_m::interrupt::enable();
+        }
+        self.set_bidi_output();
+        self.enable(true);
+
+        *byte = nb::block!(self.nb_read())?;
+
+        Ok(())
+    }
+
+    /// buf.len() > 1
+    /// The sequence begins as soon as SPE=1 and BIDIOE=0
+    pub fn read_mult(&mut self, buf: &mut [u8]) -> nb::Result<(), SpiError> {
+        self.enable(false);
+        self.set_bidi_input();
+
+        cortex_m::interrupt::disable();
+
+        let len = buf.len() - 2;
+        self.enable(true);
+        for b in &mut buf[..len] {
             *b = nb::block!(self.nb_read())?;
         }
 
@@ -131,23 +241,29 @@ impl Spi3 {
         /// __DSB instruction are inserted to garantee that clock is Disabled in the right timeframe
         cortex_m::asm::dsb();
         cortex_m::asm::dsb();
-
         self.enable(false);
 
-        Ok(())
-    }
+        unsafe {
+            cortex_m::interrupt::enable();
+        }
 
-    pub fn send_byte(&mut self, byte: u8) -> nb::Result<(), SpiError> {
         self.set_bidi_output();
-        nb::block!(self.nb_send(byte))?;
+        self.enable(true);
+
         Ok(())
     }
 
-    pub fn read_byte(&mut self, buf: &mut u8) -> nb::Result<u8, SpiError> {
-        self.set_bidi_input();
-        let x = nb::block!(self.nb_read())?;
-        Ok(x)
-    }
+    // pub fn send_byte(&mut self, byte: u8) -> nb::Result<(), SpiError> {
+    //     self.set_bidi_output();
+    //     nb::block!(self.nb_send(byte))?;
+    //     Ok(())
+    // }
+
+    // pub fn read_byte(&mut self, buf: &mut u8) -> nb::Result<u8, SpiError> {
+    //     self.set_bidi_input();
+    //     let x = nb::block!(self.nb_read())?;
+    //     Ok(x)
+    // }
 }
 
 /// nb
@@ -220,16 +336,29 @@ impl Spi3 {
             // spe: enable the SPI bus
             w.spe().bit(enable)
         });
+
+        // if enable {
+        //     self.spi.cr1.modify(|_, w| {
+        //         // spe: enable the SPI bus
+        //         w.spe().bit(true)
+        //     });
+        // } else {
+        //     while !self.is_txe() {
+        //         cortex_m::asm::nop();
+        //     }
+        // }
     }
 
     /// receive
     pub fn set_bidi_input(&mut self) {
         self.spi.cr1.modify(|_, w| w.bidioe().clear_bit());
+        self.output_mode = false;
     }
 
     /// transmit
     pub fn set_bidi_output(&mut self) {
         self.spi.cr1.modify(|_, w| w.bidioe().set_bit());
+        self.output_mode = true;
     }
 }
 
