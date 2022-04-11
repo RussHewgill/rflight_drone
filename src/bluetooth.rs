@@ -118,4 +118,19 @@ pub mod hci {
     pub struct BluetoothHCI {
         //
     }
+
+    // pub struct HciRequist {
+    // }
+
+    impl BluetoothHCI {
+        pub fn new() -> Self {
+            Self {}
+        }
+    }
+
+    impl BluetoothHCI {
+        pub fn send_req(&mut self) {
+            unimplemented!()
+        }
+    }
 }

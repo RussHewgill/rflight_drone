@@ -2,7 +2,7 @@ use core::ptr;
 use embedded_hal::spi::*;
 use stm32f4::stm32f401::{Peripherals, GPIOB, RCC, SPI2};
 use stm32f4xx_hal::{
-    gpio::{Alternate, Pin, PinExt, PA8, PB13, PB15},
+    gpio::{Alternate, Output, Pin, PinExt, PA8, PB12, PB13, PB15},
     nb,
     prelude::*,
     rcc::Clocks,
@@ -30,17 +30,20 @@ impl Spi3 {
         mode: Mode,
         freq: Hertz,
         // clocks: &Clocks,
-    ) -> Self {
+    ) -> (Pin<'B', 12, Output>, Self) {
         /// Enable SPI2 clock
         rcc.apb1enr.write(|w| w.spi2en().set_bit());
 
-        /// Enable GPIOB
-        rcc.ahb1enr.write(|w| w.gpioben().set_bit());
+        // /// Enable GPIOB
+        // rcc.ahb1enr.write(|w| w.gpioben().set_bit());
 
-        /// set PB13, PB15 to output
+        /// Set PB13, PB15 to AF5
+        gpiob.afrh.modify(|r, w| w.afrh13().af5().afrh15().af5());
+
+        /// set PB13, PB15 to alternate
         gpiob
             .moder
-            .modify(|r, w| w.moder13().output().moder15().output());
+            .modify(|r, w| w.moder13().alternate().moder15().alternate());
 
         /// set PB13, PB15 to high speed
         gpiob
@@ -53,10 +56,6 @@ impl Spi3 {
             .modify(|r, w| w.pupdr13().floating().pupdr15().floating());
 
         let gpiob = gpiob.split();
-
-        /// XXX: should be external, borrow rules
-        let mut cs_magno = gpiob.pb12.into_push_pull_output();
-        cs_magno.set_high();
 
         let sck = gpiob.pb13;
         let mosi = gpiob.pb15;
@@ -79,8 +78,8 @@ impl Spi3 {
                 .set_bit()
                 .ssm() // software slave management
                 .set_bit()
-                // .ssi()
-                // .set_bit()
+                .ssi()
+                .set_bit()
                 .dff() // 8 bit data frame format
                 .eight_bit()
                 .lsbfirst() // MSB first
@@ -96,6 +95,10 @@ impl Spi3 {
                 .clear_bit() // Motorola frame format (not TI)
         });
 
+        /// XXX: should be external, borrow rules
+        let mut cs_magno = gpiob.pb12.into_push_pull_output();
+        cs_magno.set_high();
+
         let mut out = Self {
             spi,
             sck,
@@ -106,7 +109,7 @@ impl Spi3 {
 
         out.enable(true);
 
-        out
+        (cs_magno, out)
     }
 }
 
@@ -119,9 +122,136 @@ impl Spi3 {
     //     while self.is_bsy() {}
     // }
 
+    // pub fn send(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
+    pub fn send(&mut self, byte: u8) -> nb::Result<(), SpiError> {
+        // while !self.is_txe() {
+        //     cortex_m::asm::nop();
+        // }
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+
+        self.send_u8(byte);
+
+        // while !self.is_txe() {
+        //     cortex_m::asm::nop();
+        // }
+        // while self.is_bsy() {
+        //     cortex_m::asm::nop();
+        // }
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+        Ok(())
+    }
+
+    pub fn read3(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
+        {
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+            cortex_m::asm::dsb();
+        }
+
+        *byte = self.read_u8();
+
+        Ok(())
+    }
+
+    // pub fn transfer(&mut self, send: u8, ) -> nb::Result<(), SpiError> {
+    //     unimplemented!()
+    // }
+
+    pub fn read(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
+        while !self.is_rxne() {
+            cortex_m::asm::nop();
+        }
+
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+
+        *byte = self.read_u8();
+
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+
+        Ok(())
+    }
+
+    fn spi_is_busy(&mut self) -> bool {
+        let sr = self.spi.sr.read();
+
+        !(sr.txe().bit_is_set() | sr.rxne().bit_is_set()) || sr.bsy().bit_is_set()
+    }
+
     /// The sequence begins when data are written into the SPI_DR register (Tx buffer)
     /// While (BIDIMODE=1 and BIDIOE=1)
-    pub fn send(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
+    pub fn send2(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
         // if !self.output_mode {
         //     // self.set_bidi_output();
         // }
@@ -135,7 +265,7 @@ impl Spi3 {
         Ok(())
     }
 
-    pub fn read(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
+    pub fn read2(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
         self.enable(false);
         self.set_bidi_input();
         cortex_m::interrupt::disable();

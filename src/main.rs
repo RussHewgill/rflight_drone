@@ -76,7 +76,7 @@ fn main_led() -> ! {
     loop {}
 }
 
-#[entry]
+// #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -166,10 +166,15 @@ fn main_imu_i2c() -> ! {
     loop {}
 }
 
-// #[entry]
+#[entry]
+#[allow(unreachable_code)]
 fn main_imu2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    dp.GPIOA.odr.modify(|_, w| w.odr8().set_bit());
+    dp.GPIOB.odr.modify(|_, w| w.odr12().set_bit());
+    dp.GPIOC.odr.modify(|_, w| w.odr13().set_bit());
 
     /// Enable GPIOA + GPIOB + GPIOC
     dp.RCC.ahb1enr.write(|w| {
@@ -203,65 +208,111 @@ fn main_imu2() -> ! {
     /// Magno is done in Spi3::new
     let mut cs_imu = gpioa.pa8.into_push_pull_output();
     cs_imu.set_high();
+
     let mut cs_baro = gpioc.pc13.into_push_pull_output();
     cs_baro.set_high();
 
-    let mut spi = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, MODE_3, 10.MHz());
+    let mode = MODE_3;
 
-    // let reg = IMURegisters::CTRL3_C.to_addr();
-    let reg = 0x12;
+    let (mut cs_magno, mut spi) = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, mode, 10.MHz());
 
-    // Sensor_IO_Write(*handle, LSM6DSL_ACC_GYRO_CTRL3_C, &data, 1)
+    // #[cfg(feature = "nope")]
+    {
+        let reg = 0x4F; // WHO_AM_I
 
-    /// SIM = 1, 3 wire mode
-    // let val = 0b0000_0100 | 0b1000;
-    let val = 0b0000_0000
+        const SPI_READ: u8 = 0x80; // 0x01 << 7
+        const SPI_WRITE: u8 = 0x00;
+
+        let addr = reg | SPI_READ;
+
+        // let bytes1 = [addr];
+        let bytes1 = addr;
+        let mut bytes2 = 0b1111_1111;
+
+        cs_magno.set_low();
+        // cortex_m::asm::delay(200);
+        let e1 = spi.send(bytes1);
+
+        spi.enable(false);
+        spi.set_bidi_input();
+        spi.enable(true);
+
+        // cortex_m::asm::delay(200);
+        let e2 = spi.read(&mut bytes2);
+        // cortex_m::asm::delay(200);
+        cs_magno.set_high();
+
+        spi.enable(false);
+        spi.set_bidi_output();
+        spi.enable(true);
+
+        hprintln!("e1: {:?}", e1);
+        hprintln!("e2: {:?}", e2);
+
+        hprintln!("b2: {:#010b}", bytes2);
+
+        loop {}
+    }
+
+    #[cfg(feature = "nope")]
+    {
+        // let reg = IMURegisters::CTRL3_C.to_addr();
+        let reg = 0x12;
+
+        // Sensor_IO_Write(*handle, LSM6DSL_ACC_GYRO_CTRL3_C, &data, 1)
+
+        /// SIM = 1, 3 wire mode
+        // let val = 0b0000_0100 | 0b1000;
+        let val = 0b0000_0000
         | (1 << 2) // IF_INC = 1
         | (1 << 3); // SIM = 1
 
-    // /// BLE = 1, use data MSB @ lower address
-    // let val = val | 0b0010;
+        // /// BLE = 1, use data MSB @ lower address
+        // let val = val | 0b0010;
 
-    const IMU_SPI_READ: u8 = 0x80; // 0x01 << 7
-    const IMU_SPI_WRITE: u8 = 0x00;
+        const IMU_SPI_READ: u8 = 0x80; // 0x01 << 7
+        const IMU_SPI_WRITE: u8 = 0x00;
 
-    // let mut bytes0 = [(reg << 1) | IMU_SPI_WRITE, val];
-    let mut bytes0 = [reg | IMU_SPI_WRITE, val];
+        // let mut bytes0 = [(reg << 1) | IMU_SPI_WRITE, val];
+        let mut bytes0 = [reg | IMU_SPI_WRITE, val];
 
-    cs_imu.set_low();
-    let e = spi.send(&bytes0);
-    cs_imu.set_high();
+        cs_imu.set_low();
+        let e0 = spi.send(bytes0[0]);
+        let e1 = spi.send(bytes0[1]);
+        cs_imu.set_high();
 
-    hprintln!("e: {:?}", e);
+        // hprintln!("e0: {:?}", e0);
+        // hprintln!("e1: {:?}", e1);
 
-    // let reg = IMURegisters::WHO_AM_I.to_addr();
+        let reg = IMURegisters::WHO_AM_I.to_addr();
 
-    // let bytes1 = [(reg << 1) | IMU_SPI_READ];
-    let bytes1 = [reg | IMU_SPI_READ];
-    let mut bytes2 = 0b1111_1111;
+        // let bytes1 = [(reg << 1) | IMU_SPI_READ];
+        let bytes1 = [reg | IMU_SPI_READ];
+        let mut bytes2 = 0b1111_1111;
 
-    cs_imu.set_low();
-    cortex_m::asm::delay(200);
-    let e1 = spi.send(&bytes1);
+        cs_imu.set_low();
+        cortex_m::asm::delay(200);
+        let e1 = spi.send(bytes1[0]);
 
-    cortex_m::asm::delay(200);
-    cortex_m::asm::dsb();
+        cortex_m::asm::delay(200);
+        // cortex_m::asm::dsb();
 
-    let e2 = spi.read(&mut bytes2);
-    cortex_m::asm::delay(200);
-    cs_imu.set_high();
+        let e2 = spi.read(&mut bytes2);
+        cortex_m::asm::delay(200);
+        cs_imu.set_high();
 
-    hprintln!("e1: {:?}", e1);
-    hprintln!("e2: {:?}", e2);
+        hprintln!("e1: {:?}", e1);
+        hprintln!("e2: {:?}", e2);
 
-    // match e2 {
-    //     Ok(()) => hprintln!("Ok"),
-    //     Err(e) => hprintln!("Err"),
-    // }
+        // match e2 {
+        //     Ok(()) => hprintln!("Ok"),
+        //     Err(e) => hprintln!("Err"),
+        // }
 
-    hprintln!("b2: {:#010b}", bytes2);
+        hprintln!("b2: {:#010b}", bytes2);
 
-    loop {}
+        loop {}
+    }
 }
 
 // #[entry]
