@@ -1,12 +1,13 @@
 use core::ptr;
 use embedded_hal::spi::*;
 use stm32f4::stm32f401::{Peripherals, GPIOB, RCC, SPI2};
+pub use stm32f4xx_hal::spi::Error as SpiError;
 use stm32f4xx_hal::{
     gpio::{Alternate, Output, Pin, PinExt, PA8, PB12, PB13, PB15},
     nb,
     prelude::*,
     rcc::Clocks,
-    spi::{Error as SpiError, NoMiso},
+    spi::NoMiso,
     time::*,
 };
 
@@ -113,6 +114,7 @@ impl Spi3 {
     }
 }
 
+#[cfg(feature = "nope")]
 impl Spi3 {
     // pub fn send(&mut self, byte: u8) {
     //     /// wait until Tx buffer is empty
@@ -121,29 +123,6 @@ impl Spi3 {
     //     while !self.is_txe() {}
     //     while self.is_bsy() {}
     // }
-
-    // pub fn send(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
-    pub fn send(&mut self, byte: u8) -> nb::Result<(), SpiError> {
-        // while !self.is_txe() {
-        //     cortex_m::asm::nop();
-        // }
-        while self.spi_is_busy() {
-            cortex_m::asm::nop();
-        }
-
-        self.send_u8(byte);
-
-        // while !self.is_txe() {
-        //     cortex_m::asm::nop();
-        // }
-        // while self.is_bsy() {
-        //     cortex_m::asm::nop();
-        // }
-        while self.spi_is_busy() {
-            cortex_m::asm::nop();
-        }
-        Ok(())
-    }
 
     pub fn read3(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
         {
@@ -224,30 +203,6 @@ impl Spi3 {
     // pub fn transfer(&mut self, send: u8, ) -> nb::Result<(), SpiError> {
     //     unimplemented!()
     // }
-
-    pub fn read(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
-        while !self.is_rxne() {
-            cortex_m::asm::nop();
-        }
-
-        while self.spi_is_busy() {
-            cortex_m::asm::nop();
-        }
-
-        *byte = self.read_u8();
-
-        while self.spi_is_busy() {
-            cortex_m::asm::nop();
-        }
-
-        Ok(())
-    }
-
-    fn spi_is_busy(&mut self) -> bool {
-        let sr = self.spi.sr.read();
-
-        !(sr.txe().bit_is_set() | sr.rxne().bit_is_set()) || sr.bsy().bit_is_set()
-    }
 
     /// The sequence begins when data are written into the SPI_DR register (Tx buffer)
     /// While (BIDIMODE=1 and BIDIOE=1)
@@ -384,18 +339,55 @@ impl Spi3 {
 
         Ok(())
     }
+}
 
-    // pub fn send_byte(&mut self, byte: u8) -> nb::Result<(), SpiError> {
-    //     self.set_bidi_output();
-    //     nb::block!(self.nb_send(byte))?;
-    //     Ok(())
-    // }
+impl Spi3 {
+    pub fn send_mult(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
+        unimplemented!()
+    }
 
-    // pub fn read_byte(&mut self, buf: &mut u8) -> nb::Result<u8, SpiError> {
-    //     self.set_bidi_input();
-    //     let x = nb::block!(self.nb_read())?;
-    //     Ok(x)
-    // }
+    pub fn send(&mut self, byte: u8) -> nb::Result<(), SpiError> {
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+
+        self.send_u8(byte);
+
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+        Ok(())
+    }
+
+    pub fn read_mult(&mut self, bytes: &mut [u8]) -> nb::Result<(), SpiError> {
+        unimplemented!()
+    }
+
+    pub fn read(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
+        self.enable(false);
+        self.set_bidi_input();
+        self.enable(true);
+
+        while !self.is_rxne() {
+            cortex_m::asm::nop();
+        }
+
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+
+        *byte = self.read_u8();
+
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+
+        // self.enable(false);
+        // self.set_bidi_output();
+        // self.enable(true);
+
+        Ok(())
+    }
 }
 
 /// nb
@@ -496,6 +488,11 @@ impl Spi3 {
 
 /// check flags
 impl Spi3 {
+    fn spi_is_busy(&mut self) -> bool {
+        let sr = self.spi.sr.read();
+        !(sr.txe().bit_is_set() | sr.rxne().bit_is_set()) || sr.bsy().bit_is_set()
+    }
+
     pub fn is_bsy(&self) -> bool {
         self.spi.sr.read().bsy().bit_is_set()
     }

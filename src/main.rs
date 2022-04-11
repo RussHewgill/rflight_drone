@@ -14,6 +14,7 @@ pub mod spi;
 use bluetooth::*;
 use sensors::barometer::*;
 use sensors::imu::*;
+use sensors::magneto::*;
 use spi::*;
 
 // pick a panicking behavior
@@ -37,6 +38,8 @@ use stm32f4xx_hal::{
     spi::NoMiso,
     time::*,
 };
+
+use crate::sensors::magneto::Magnetometer;
 
 #[inline(never)]
 fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
@@ -216,6 +219,44 @@ fn main_imu2() -> ! {
 
     let (mut cs_magno, mut spi) = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, mode, 10.MHz());
 
+    // let mut mag = Magnetometer::new(&mut spi, cs_magno);
+    // let b = mag.read_reg(MagRegister::WHO_AM_I);
+    // hprintln!("b2: {:#010b}", b.unwrap());
+
+    // let mut rcc = dp.RCC.constrain();
+    // let clocks = rcc.cfgr.freeze();
+    // let mut delay = cp.SYST.delay(&clocks);
+
+    // mag.reset().unwrap();
+    // delay.delay_ms(10u32);
+
+    // mag.init().unwrap();
+
+    // mag.read_new_data_available().unwrap();
+    // let temp = mag.read_temp().unwrap();
+
+    // let b = mag.read_reg(MagRegister::WHO_AM_I).unwrap();
+
+    // let reg = 0x4F;
+    // let addr = reg | 0x80;
+    // let mut b = 0u8;
+    // cs_magno.set_low();
+    // let e1 = spi.send(addr);
+    // let e2 = spi.read(&mut b);
+    // cs_magno.set_high();
+    // hprintln!("b: {:#010b}", b);
+
+    // loop {
+    //     if mag.read_new_data_available().unwrap() {
+    //         let data = mag.read_data().unwrap();
+    //         hprintln!("x: {:?}", data[0]);
+    //         hprintln!("y: {:?}", data[1]);
+    //         hprintln!("z: {:?}", data[2]);
+    //     }
+    // }
+
+    // loop {}
+
     // #[cfg(feature = "nope")]
     {
         let reg = 0x4F; // WHO_AM_I
@@ -233,9 +274,9 @@ fn main_imu2() -> ! {
         // cortex_m::asm::delay(200);
         let e1 = spi.send(bytes1);
 
-        spi.enable(false);
-        spi.set_bidi_input();
-        spi.enable(true);
+        // spi.enable(false);
+        // spi.set_bidi_input();
+        // spi.enable(true);
 
         // cortex_m::asm::delay(200);
         let e2 = spi.read(&mut bytes2);
@@ -246,10 +287,18 @@ fn main_imu2() -> ! {
         spi.set_bidi_output();
         spi.enable(true);
 
-        hprintln!("e1: {:?}", e1);
-        hprintln!("e2: {:?}", e2);
+        // hprintln!("e1: {:?}", e1);
+        // hprintln!("e2: {:?}", e2);
 
         hprintln!("b2: {:#010b}", bytes2);
+
+        // if bytes2 == 0b0100_0000 {
+        //     hprintln!("wat 0");
+        // } else {
+        //     hprintln!("wat 1");
+        // }
+
+        let mut mag = Magnetometer::new(&mut spi, cs_magno);
 
         loop {}
     }
