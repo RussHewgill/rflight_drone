@@ -79,6 +79,8 @@ impl Spi3 {
                 .set_bit()
                 .ssm() // software slave management
                 .set_bit()
+                // .ssi()
+                // .set_bit()
                 .dff() // 8 bit data frame format
                 .eight_bit()
                 .lsbfirst() // MSB first

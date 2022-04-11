@@ -6,10 +6,12 @@
 #![no_std]
 #![no_main]
 
+pub mod bluetooth;
 pub mod pid;
 pub mod sensors;
 pub mod spi;
 
+use bluetooth::*;
 use sensors::barometer::*;
 use sensors::imu::*;
 use spi::*;
@@ -79,6 +81,13 @@ fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
 
+    /// Reset  = PB2
+    /// BLE_CS = PB0
+    /// clk    = PA5
+    /// MISO   = PA6
+    /// MOSI   = PA7
+    /// IRQ    = PA4
+
     /// Enable SPI1 clock
     dp.RCC.apb2enr.write(|w| w.spi1en().set_bit());
 
@@ -86,6 +95,28 @@ fn main_bluetooth() -> ! {
     dp.RCC
         .ahb1enr
         .write(|w| w.gpioaen().set_bit().gpioben().set_bit());
+
+    let mode = Mode {
+        polarity: Polarity::IdleLow,
+        phase: Phase::CaptureOnFirstTransition,
+    };
+
+    let mut gpioa = dp.GPIOA.split();
+    let mut gpiob = dp.GPIOB.split();
+
+    let cs = gpiob.pb0.into_push_pull_output();
+    let reset = gpiob.pb2.into_push_pull_output();
+
+    let sck = gpioa.pa5.into_push_pull_output().into_alternate::<5>();
+    let miso = gpioa.pa6.into_push_pull_output().into_alternate::<5>();
+    let mosi = gpioa.pa7.into_push_pull_output().into_alternate::<5>();
+
+    let mut rcc = dp.RCC.constrain();
+    let clocks = rcc.cfgr.freeze();
+
+    let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+
+    let mut bt = BluetoothSpi::new(spi, cs, reset);
 
     loop {}
 }
@@ -109,8 +140,9 @@ fn main_imu_i2c() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
 
+    /// scl = PB13
+    /// sda = PB15
     // dp.RCC.apb1enr.write(|w| w.i2c1en().set_bit());
-
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
@@ -118,7 +150,8 @@ fn main_imu_i2c() -> ! {
 
     let mut gpiob = dp.GPIOB.split();
 
-    // let scl =
+    // let scl = gpiob.pb13.into_alternate();
+    // let sda = gpiob.pb15.into_alternate();
 
     loop {}
 }
