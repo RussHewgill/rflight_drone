@@ -101,6 +101,16 @@ fn main_bluetooth() -> ! {
         phase: Phase::CaptureOnFirstTransition,
     };
 
+    /// Reset pin config
+    {
+        dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr2().low_speed());
+        // dp.GPIOB.pupdr.modify(|_, w| w.pupdr2().pull_up());
+    }
+    /// CS pin config
+    {
+        dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr0().high_speed());
+    }
+
     let mut gpioa = dp.GPIOA.split();
     let mut gpiob = dp.GPIOB.split();
 
