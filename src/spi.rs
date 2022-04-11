@@ -364,9 +364,9 @@ impl Spi3 {
     }
 
     pub fn read(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
-        // self.enable(false);
-        // self.set_bidi_input();
-        // self.enable(true);
+        self.enable(false);
+        self.set_bidi_input();
+        self.enable(true);
 
         while !self.is_rxne() {
             cortex_m::asm::nop();
@@ -382,9 +382,9 @@ impl Spi3 {
             cortex_m::asm::nop();
         }
 
-        // self.enable(false);
-        // self.set_bidi_output();
-        // self.enable(true);
+        self.enable(false);
+        self.set_bidi_output();
+        self.enable(true);
 
         Ok(())
     }

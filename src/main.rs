@@ -219,9 +219,12 @@ fn main_imu2() -> ! {
 
     let (mut cs_magno, mut spi) = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, mode, 10.MHz());
 
-    // let mut mag = Magnetometer::new(&mut spi, cs_magno);
-    // let b = mag.read_reg(MagRegister::WHO_AM_I);
-    // hprintln!("b2: {:#010b}", b.unwrap());
+    let mut mag = Magnetometer::new(&mut spi, cs_magno);
+
+    let b = mag.read_reg(MagRegister::WHO_AM_I);
+    hprintln!("b2: {:#010b}", b.unwrap());
+
+    mag.init().unwrap();
 
     // let mut rcc = dp.RCC.constrain();
     // let clocks = rcc.cfgr.freeze();
@@ -232,8 +235,13 @@ fn main_imu2() -> ! {
 
     // mag.init().unwrap();
 
-    // mag.read_new_data_available().unwrap();
-    // let temp = mag.read_temp().unwrap();
+    mag.read_new_data_available().unwrap();
+    let temp = mag.read_temp().unwrap();
+
+    let data = mag.read_data().unwrap();
+    hprintln!("x: {:?}", data[0]);
+    hprintln!("y: {:?}", data[1]);
+    hprintln!("z: {:?}", data[2]);
 
     // let b = mag.read_reg(MagRegister::WHO_AM_I).unwrap();
 
@@ -255,9 +263,9 @@ fn main_imu2() -> ! {
     //     }
     // }
 
-    // loop {}
+    loop {}
 
-    // #[cfg(feature = "nope")]
+    #[cfg(feature = "nope")]
     {
         let reg = 0x4F; // WHO_AM_I
 
