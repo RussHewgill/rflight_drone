@@ -274,9 +274,9 @@ fn main_imu2() -> ! {
         // cortex_m::asm::delay(200);
         let e1 = spi.send(bytes1);
 
-        // spi.enable(false);
-        // spi.set_bidi_input();
-        // spi.enable(true);
+        spi.enable(false);
+        spi.set_bidi_input();
+        spi.enable(true);
 
         // cortex_m::asm::delay(200);
         let e2 = spi.read(&mut bytes2);
