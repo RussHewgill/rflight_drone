@@ -134,7 +134,7 @@ fn main_test() -> ! {
     loop {}
 }
 
-// #[entry]
+#[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -147,12 +147,12 @@ fn main_bluetooth() -> ! {
     /// IRQ    = PA4
 
     /// Enable SPI1 clock
-    dp.RCC.apb2enr.write(|w| w.spi1en().set_bit());
+    dp.RCC.apb2enr.modify(|r, w| w.spi1en().set_bit());
 
     /// Enable GPIOA + GPIOB
     dp.RCC
         .ahb1enr
-        .write(|w| w.gpioaen().set_bit().gpioben().set_bit());
+        .modify(|r, w| w.gpioaen().set_bit().gpioben().set_bit());
 
     let mode = Mode {
         polarity: Polarity::IdleLow,
@@ -190,7 +190,23 @@ fn main_bluetooth() -> ! {
         dp.GPIOB.pupdr.modify(|r, w| w.pupdr0().pull_up());
     }
     /// IRQ, PA4
+    #[cfg(feature = "nope")]
     {
+        /// Enable SYSCFG clock
+        dp.RCC.apb2enr.modify(|r, w| w.syscfgen().set_bit());
+
+        /// Set source for EXTI4 external interrupt to PA4
+        unsafe {
+            dp.SYSCFG
+                .exticr2
+                .modify(|r, w| w.bits(r.bits() & !(0b1111)));
+        }
+
+        dp.EXTI.imr.modify(|r, w| {
+            // w.mr4().
+            w
+        });
+
         dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr4().high_speed());
         dp.GPIOA.pupdr.modify(|r, w| w.pupdr4().floating());
     }
@@ -251,7 +267,7 @@ fn main_imu_i2c() -> ! {
     loop {}
 }
 
-#[entry]
+// #[entry]
 #[allow(unreachable_code)]
 fn main_imu2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();

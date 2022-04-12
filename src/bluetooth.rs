@@ -15,6 +15,8 @@ use stm32f4xx_hal::{
     time::*,
 };
 
+use byteorder::{ByteOrder, LittleEndian};
+
 /// // SPI Configuration
 /// #define BNRG_SPI_MODE               SPI_MODE_MASTER
 /// #define BNRG_SPI_DIRECTION          SPI_DIRECTION_2LINES
@@ -101,7 +103,7 @@ impl<SPI, CS, RESET> BluetoothSpi<SPI, CS, RESET> {
 
 impl<SPI, CS, RESET, E, PinError> BluetoothSpi<SPI, CS, RESET>
 where
-    SPI: Write<u8, Error = E> + Read<u8, Error = E>,
+    SPI: Transfer<u8, Error = E> + Write<u8, Error = E> + Read<u8, Error = E>,
     CS: hal::digital::blocking::OutputPin<Error = PinError>,
 {
     pub fn reset(&mut self, syst: SYST, clocks: &Clocks) {
@@ -111,16 +113,47 @@ where
         self.cs.set_low().ok();
         delay.delay_ms(5u32);
     }
+
+    pub fn block_until_ready(&mut self, access_byte: u8) {
+        loop {
+            let write_header = [access_byte, 0x00, 0x00, 0x00, 0x00];
+            let mut read_header = [0x00; 5];
+            let e = self.spi.transfer(&mut read_header, &write_header);
+
+            match Self::parse_spi_header(&read_header) {
+                Ok(len) => {}
+                Err(nb::Error::WouldBlock) => {}
+                _ => {}
+            }
+        }
+    }
+
+    fn parse_spi_header(header: &[u8; 5]) -> Result<(u16, u16), nb::Error<E>> {
+        const BNRG_READY: u8 = 0x02;
+        if header[0] == BNRG_READY {
+            Ok((
+                LittleEndian::read_u16(&header[1..]),
+                LittleEndian::read_u16(&header[3..]),
+            ))
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
+    }
 }
 
 pub mod hci {
+    use byteorder::{ByteOrder, LittleEndian};
+    use stm32f4xx_hal::nb;
 
     pub struct BluetoothHCI {
         //
     }
 
-    // pub struct HciRequist {
-    // }
+    pub struct HciRequist {
+        ogf: u16,
+        ocf: u16,
+        // event: i32,
+    }
 
     impl BluetoothHCI {
         pub fn new() -> Self {
@@ -132,5 +165,7 @@ pub mod hci {
         pub fn send_req(&mut self) {
             unimplemented!()
         }
+
+        // pub fn read_local_version(&mut self, )
     }
 }
