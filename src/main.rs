@@ -11,10 +11,13 @@ pub mod pid;
 pub mod sensors;
 pub mod spi;
 
+use core::cell::RefCell;
+
 use bluetooth::*;
 use sensors::barometer::*;
 use sensors::imu::*;
 use sensors::magneto::*;
+use sensors::*;
 use spi::*;
 
 // pick a panicking behavior
@@ -80,6 +83,25 @@ fn main_led() -> ! {
 }
 
 // #[entry]
+fn main_test() -> ! {
+    let gpio_mode = 0x00000003;
+    let exti_mode = 0x10000000;
+    let gpio_mode_it = 0x00010000;
+    let gpio_mode_evt = 0x00020000;
+    let rising_edge = 0x00100000;
+    let falling_edge = 0x00200000;
+    let gpio_output_type = 0x00000010;
+
+    let gpio_mode_it_rising = 0x10110000;
+
+    if (gpio_mode_it_rising & exti_mode) == exti_mode {
+        unimplemented!()
+    }
+
+    loop {}
+}
+
+// #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -104,20 +126,47 @@ fn main_bluetooth() -> ! {
         phase: Phase::CaptureOnFirstTransition,
     };
 
-    /// Reset pin config
+    /// Reset pin config, PB2
     {
+        // dp.GPIOB.moder.modify(|_, w| w.moder2().output());
+        dp.GPIOB.pupdr.modify(|_, w| w.pupdr2().pull_up());
         dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr2().low_speed());
-        // dp.GPIOB.pupdr.modify(|_, w| w.pupdr2().pull_up());
+        /// Added to avoid spurious interrupt from the BlueNRG
+        dp.GPIOB.bsrr.write(|w| w.br2().set_bit());
     }
-    /// CS pin config
+    /// SCLK pin config, PA5
+    {
+        dp.GPIOA.ospeedr.modify(|_, w| w.ospeedr5().high_speed());
+        dp.GPIOA.pupdr.modify(|r, w| w.pupdr5().pull_down());
+        // dp.GPIOA.moder.modify(|r, w| w.moder5().alternate());
+        // dp.GPIOA.afrl.modify(|r, w| w.afrl5().af5());
+    }
+    /// MISO pin config, PA6
+    {
+        dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr6().high_speed());
+        dp.GPIOA.pupdr.modify(|r, w| w.pupdr6().floating());
+    }
+    /// MOSI pin config, PA7
+    {
+        dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr7().high_speed());
+        dp.GPIOA.pupdr.modify(|r, w| w.pupdr7().floating());
+    }
+    /// CS pin config, PB0
     {
         dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr0().high_speed());
+        dp.GPIOB.pupdr.modify(|r, w| w.pupdr0().pull_up());
+    }
+    /// IRQ, PA4
+    {
+        dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr4().high_speed());
+        dp.GPIOA.pupdr.modify(|r, w| w.pupdr4().floating());
     }
 
     let mut gpioa = dp.GPIOA.split();
     let mut gpiob = dp.GPIOB.split();
 
-    let cs = gpiob.pb0.into_push_pull_output();
+    let mut cs = gpiob.pb0.into_push_pull_output();
+    cs.set_high();
     let reset = gpiob.pb2.into_push_pull_output();
 
     let sck = gpioa.pa5.into_push_pull_output().into_alternate::<5>();
@@ -219,51 +268,88 @@ fn main_imu2() -> ! {
 
     let (mut cs_magno, mut spi) = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, mode, 10.MHz());
 
-    let mut mag = Magnetometer::new(&mut spi, cs_magno);
+    let mag = Magnetometer::new(cs_magno);
 
-    let b = mag.read_reg(MagRegister::WHO_AM_I);
-    hprintln!("b2: {:#010b}", b.unwrap());
+    let baro = Barometer::new(cs_baro);
 
-    mag.init().unwrap();
+    let imu = IMU::new(cs_imu);
 
-    // let mut rcc = dp.RCC.constrain();
-    // let clocks = rcc.cfgr.freeze();
-    // let mut delay = cp.SYST.delay(&clocks);
+    let mut sensors = Sensors::new(spi, imu, mag, baro);
 
-    // mag.reset().unwrap();
-    // delay.delay_ms(10u32);
+    {
+        {
+            let (spi, mag) = sensors.get_mag();
+            let b = mag.read_reg(spi, MagRegister::WHO_AM_I).unwrap();
+            hprintln!("b0: {:#010b}", b);
+        }
 
-    // mag.init().unwrap();
+        {
+            let (spi, baro) = sensors.get_baro();
+            // let b = mag.read_reg(spi, MagRegister::WHO_AM_I).unwrap();
+            // hprintln!("b1: {:#010b}", b);
+        }
 
-    mag.read_new_data_available().unwrap();
-    let temp = mag.read_temp().unwrap();
+        {
+            let (spi, imu) = sensors.get_imu();
+            // let b = imu.read_reg(spi, IMURegisters::WHO_AM_I).unwrap();
+            // hprintln!("b2: {:#010b}", b);
+        }
 
-    let data = mag.read_data().unwrap();
-    hprintln!("x: {:?}", data[0]);
-    hprintln!("y: {:?}", data[1]);
-    hprintln!("z: {:?}", data[2]);
+        loop {}
+    }
 
-    // let b = mag.read_reg(MagRegister::WHO_AM_I).unwrap();
+    #[cfg(feature = "nope")]
+    {
+        // let spi = RefCell::new(spi);
 
-    // let reg = 0x4F;
-    // let addr = reg | 0x80;
-    // let mut b = 0u8;
-    // cs_magno.set_low();
-    // let e1 = spi.send(addr);
-    // let e2 = spi.read(&mut b);
-    // cs_magno.set_high();
-    // hprintln!("b: {:#010b}", b);
+        let mut mag = Magnetometer::new(spi, cs_magno);
 
-    // loop {
-    //     if mag.read_new_data_available().unwrap() {
-    //         let data = mag.read_data().unwrap();
-    //         hprintln!("x: {:?}", data[0]);
-    //         hprintln!("y: {:?}", data[1]);
-    //         hprintln!("z: {:?}", data[2]);
-    //     }
-    // }
+        let b = mag.read_reg(MagRegister::WHO_AM_I);
+        hprintln!("b2: {:#010b}", b.unwrap());
 
-    loop {}
+        loop {}
+
+        mag.init().unwrap();
+
+        // let mut rcc = dp.RCC.constrain();
+        // let clocks = rcc.cfgr.freeze();
+        // let mut delay = cp.SYST.delay(&clocks);
+
+        // mag.reset().unwrap();
+        // delay.delay_ms(10u32);
+
+        // mag.init().unwrap();
+
+        mag.read_new_data_available().unwrap();
+        let temp = mag.read_temp().unwrap();
+
+        let data = mag.read_data().unwrap();
+        hprintln!("x: {:?}", data[0]);
+        hprintln!("y: {:?}", data[1]);
+        hprintln!("z: {:?}", data[2]);
+
+        // let b = mag.read_reg(MagRegister::WHO_AM_I).unwrap();
+
+        // let reg = 0x4F;
+        // let addr = reg | 0x80;
+        // let mut b = 0u8;
+        // cs_magno.set_low();
+        // let e1 = spi.send(addr);
+        // let e2 = spi.read(&mut b);
+        // cs_magno.set_high();
+        // hprintln!("b: {:#010b}", b);
+
+        // loop {
+        //     if mag.read_new_data_available().unwrap() {
+        //         let data = mag.read_data().unwrap();
+        //         hprintln!("x: {:?}", data[0]);
+        //         hprintln!("y: {:?}", data[1]);
+        //         hprintln!("z: {:?}", data[2]);
+        //     }
+        // }
+
+        loop {}
+    }
 
     #[cfg(feature = "nope")]
     {
@@ -341,7 +427,7 @@ fn main_imu2() -> ! {
         // hprintln!("e0: {:?}", e0);
         // hprintln!("e1: {:?}", e1);
 
-        let reg = IMURegisters::WHO_AM_I.to_addr();
+        let reg = IMURegister::WHO_AM_I.to_addr();
 
         // let bytes1 = [(reg << 1) | IMU_SPI_READ];
         let bytes1 = [reg | IMU_SPI_READ];
@@ -373,6 +459,7 @@ fn main_imu2() -> ! {
 }
 
 // #[entry]
+#[cfg(feature = "nope")]
 fn main_imu() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -499,7 +586,7 @@ fn main_imu() -> ! {
     // /// If endianess is wrong, will only set LPF1 Bandwidth selection
     // let val = 0b00000000 | AccelPowerModes::Normal104.to_val();
 
-    let reg = IMURegisters::CTRL3_C.to_addr();
+    let reg = IMURegister::CTRL3_C.to_addr();
 
     /// SIM = 1, 3 wire mode
     let val = 0b0000_0100 | 0b1000;
@@ -536,7 +623,7 @@ fn main_imu() -> ! {
     // hprintln!("r0: {:#010b}", bytes0[0]);
     // hprintln!("r1: {:#010b}", bytes0[1]);
 
-    let reg = IMURegisters::WHO_AM_I.to_addr();
+    let reg = IMURegister::WHO_AM_I.to_addr();
 
     let bytes1 = [(reg << 1) | IMU_SPI_READ];
     let mut bytes2 = [0];
@@ -558,6 +645,7 @@ fn main_imu() -> ! {
 }
 
 // #[entry]
+#[cfg(feature = "nope")]
 fn main() -> ! {
     // let mut cp = stm32f401::CorePeripherals::take().unwrap();
     // let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -582,6 +670,7 @@ fn main() -> ! {
 }
 
 // #[entry]
+#[cfg(feature = "nope")]
 fn main2() -> ! {
     // hprintln!("Hello, world!, {}", 1);
 

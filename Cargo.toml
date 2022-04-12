@@ -36,3 +36,6 @@ stm32f4xx-hal = { version = "0.13.0", features = ["stm32f401"] }
 
 arrayvec = { version = "0.7.2", default_features=false }
 
+derive-new = { version = "0.5.9", default_features=false }
+
+

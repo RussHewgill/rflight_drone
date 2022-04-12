@@ -38,13 +38,13 @@ impl Spi3 {
         // /// Enable GPIOB
         // rcc.ahb1enr.write(|w| w.gpioben().set_bit());
 
-        /// Set PB13, PB15 to AF5
-        gpiob.afrh.modify(|r, w| w.afrh13().af5().afrh15().af5());
+        // /// Set PB13, PB15 to AF5
+        // gpiob.afrh.modify(|r, w| w.afrh13().af5().afrh15().af5());
 
-        /// set PB13, PB15 to alternate
-        gpiob
-            .moder
-            .modify(|r, w| w.moder13().alternate().moder15().alternate());
+        // /// set PB13, PB15 to alternate
+        // gpiob
+        //     .moder
+        //     .modify(|r, w| w.moder13().alternate().moder15().alternate());
 
         /// set PB13, PB15 to high speed
         gpiob

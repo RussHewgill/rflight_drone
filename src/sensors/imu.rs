@@ -6,56 +6,121 @@ use hal::spi::{
     blocking::{Read, Transfer, Write},
 };
 
+use stm32f4xx_hal::nb;
 use stm32f4xx_hal::prelude::*;
+
+use derive_new::new;
+
+use crate::spi::{Spi3, SpiError};
 
 /// https://www.st.com/resource/en/datasheet/lsm6dsl.pdf
 
-pub struct IMU<SPI, CS> {
-    spi: SPI,
+#[derive(new)]
+pub struct IMU<CS> {
     cs: CS,
 }
 
-impl<SPI, CS> IMU<SPI, CS> {
-    pub fn new(spi: SPI, cs: CS) -> Self {
-        Self { spi, cs }
+const SPI_READ: u8 = 0x80; // 0x01 << 7
+const SPI_WRITE: u8 = 0x00;
+
+impl<CS, PinError> IMU<CS>
+where
+    CS: hal::digital::blocking::OutputPin<Error = PinError>,
+{
+    pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+        unimplemented!()
+    }
+
+    pub fn init(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+        unimplemented!()
     }
 }
 
-/// datasheet: 6.4.1, 6.4.2
-const SPI_READ: u8 = 0x01;
-const SPI_WRITE: u8 = 0x00;
-
-impl<SPI, CS, E, PinError> IMU<SPI, CS>
+impl<CS, PinError> IMU<CS>
 where
-    // SPI: Transfer<u8, Error = E> + Write<u8, Error = E> + Read<u8, Error = E>,
-    SPI: Write<u8, Error = E> + Read<u8, Error = E>,
     CS: hal::digital::blocking::OutputPin<Error = PinError>,
 {
-    // pub fn set_3wire(&mut self) {
-    // }
+    pub fn read_reg(&mut self, spi: &mut Spi3, reg: IMURegister) -> nb::Result<u8, SpiError> {
+        let mut out = 0u8;
+        let addr = reg.to_addr() | SPI_READ;
 
-    pub fn write_reg(&mut self, reg: u8, val: u8) {
-        let mut bytes = [(reg << 1) | SPI_WRITE, val];
         self.cs.set_low().ok();
-        self.spi.write(&mut bytes).ok();
+
+        spi.send(addr)?;
+        spi.read(&mut out)?;
+
         self.cs.set_high().ok();
+        Ok(out)
     }
 
-    pub fn read_reg(&mut self, reg: u8, buf: &mut [u8]) {
-        // let mut bytes = [(reg << 1) | SPI_READ, 0];
+    pub fn write_reg(
+        &mut self,
+        spi: &mut Spi3,
+        reg: IMURegister,
+        val: u8,
+    ) -> nb::Result<(), SpiError> {
+        let addr = reg.to_addr() | SPI_WRITE;
+
         self.cs.set_low().ok();
-        //
+
+        spi.send(addr)?;
+        spi.send(val)?;
+
         self.cs.set_high().ok();
-        // buf[0] = bytes[1];
+        Ok(())
+    }
+}
+
+#[cfg(feature = "nope")]
+mod prev {
+
+    pub struct IMU<SPI, CS> {
+        spi: SPI,
+        cs: CS,
     }
 
-    // pub fn read_reg(&mut self, reg: u8, buf: &mut [u8]) {
-    //     let mut bytes = [(reg << 1) | SPI_WRITE, 0];
-    //     self.cs.set_low().ok();
-    //     // self.spi.transfer(&mut bytes).ok();
-    //     self.cs.set_high().ok();
-    //     buf[0] = bytes[1];
-    // }
+    impl<SPI, CS> IMU<SPI, CS> {
+        pub fn new(spi: SPI, cs: CS) -> Self {
+            Self { spi, cs }
+        }
+    }
+
+    /// datasheet: 6.4.1, 6.4.2
+    const SPI_READ: u8 = 0x01;
+    const SPI_WRITE: u8 = 0x00;
+
+    impl<SPI, CS, E, PinError> IMU<SPI, CS>
+    where
+        // SPI: Transfer<u8, Error = E> + Write<u8, Error = E> + Read<u8, Error = E>,
+        SPI: Write<u8, Error = E> + Read<u8, Error = E>,
+        CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    {
+        // pub fn set_3wire(&mut self) {
+        // }
+
+        pub fn write_reg(&mut self, reg: u8, val: u8) {
+            let mut bytes = [(reg << 1) | SPI_WRITE, val];
+            self.cs.set_low().ok();
+            self.spi.write(&mut bytes).ok();
+            self.cs.set_high().ok();
+        }
+
+        pub fn read_reg(&mut self, reg: u8, buf: &mut [u8]) {
+            // let mut bytes = [(reg << 1) | SPI_READ, 0];
+            self.cs.set_low().ok();
+            //
+            self.cs.set_high().ok();
+            // buf[0] = bytes[1];
+        }
+
+        // pub fn read_reg(&mut self, reg: u8, buf: &mut [u8]) {
+        //     let mut bytes = [(reg << 1) | SPI_WRITE, 0];
+        //     self.cs.set_low().ok();
+        //     // self.spi.transfer(&mut bytes).ok();
+        //     self.cs.set_high().ok();
+        //     buf[0] = bytes[1];
+        // }
+    }
 }
 
 #[derive(Debug)]
@@ -78,7 +143,7 @@ impl AccelPowerModes {
 #[allow(non_camel_case_types)]
 #[derive(Debug)]
 #[repr(u8)]
-pub enum IMURegisters {
+pub enum IMURegister {
     // RESERVED = 0x00,
     FUNC_CFG_ACCESS = 0x01,
     // RESERVED = 0x02,
@@ -188,7 +253,7 @@ pub enum IMURegisters {
     // RESERVED = 0x76,
 }
 
-impl IMURegisters {
+impl IMURegister {
     pub fn to_addr(self) -> u8 {
         self as u8
     }

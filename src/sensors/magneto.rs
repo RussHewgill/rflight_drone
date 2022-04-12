@@ -1,3 +1,5 @@
+// use core::cell::RefCell;
+
 use cortex_m_semihosting::hprintln;
 use embedded_hal as hal;
 
@@ -6,48 +8,48 @@ use stm32f4xx_hal::prelude::*;
 
 use crate::spi::{Spi3, SpiError};
 
-pub struct Magnetometer<'s, CS> {
-    spi: &'s mut Spi3,
+pub struct Magnetometer<CS> {
+    // spi: Spi3,
     cs: CS,
 }
 
 const SPI_READ: u8 = 0x80; // 0x01 << 7
 const SPI_WRITE: u8 = 0x00;
 
-impl<'s, CS, PinError> Magnetometer<'s, CS>
+impl<CS, PinError> Magnetometer<CS>
 where
     CS: hal::digital::blocking::OutputPin<Error = PinError>,
 {
-    pub fn new(spi: &'s mut Spi3, cs: CS) -> Self {
-        Self { spi, cs }
+    pub fn new(cs: CS) -> Self {
+        Self { cs }
     }
 
-    pub fn reset(&mut self) -> nb::Result<(), SpiError> {
-        self.write_reg(MagRegister::CFG_REG_A, 0b0010_0000)?;
+    pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+        self.write_reg(spi, MagRegister::CFG_REG_A, 0b0010_0000)?;
         Ok(())
     }
 
-    pub fn init(&mut self) -> nb::Result<(), SpiError> {
+    pub fn init(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
         /// Enable temperature compensation
         /// LP = 0, high power mode
         /// ODR = 00, Output Data Rate = 10Hz
         /// MD  = 00, Continuous mode
         // self.write_reg(MagRegister::CFG_REG_A, 0x80)?;
         /// Single mode
-        self.write_reg(MagRegister::CFG_REG_A, 0x81)?;
+        self.write_reg(spi, MagRegister::CFG_REG_A, 0x81)?;
         // self.write_reg(MagRegister::CFG_REG_C, 0x01)?; // Data Ready signal pin isn't connected
         Ok(())
     }
 
-    pub fn read_new_data_available(&mut self) -> nb::Result<bool, SpiError> {
-        let status = self.read_reg(MagRegister::STATUS_REG)?;
+    pub fn read_new_data_available(&mut self, spi: &mut Spi3) -> nb::Result<bool, SpiError> {
+        let status = self.read_reg(spi, MagRegister::STATUS_REG)?;
         hprintln!("s: {:#010b}", status);
         Ok((status & 0b0000_1000) == 0b1000)
     }
 
-    pub fn read_temp(&mut self) -> nb::Result<i16, SpiError> {
-        let temp_l = self.read_reg(MagRegister::TEMP_OUT_L_REG)?;
-        let temp_h = self.read_reg(MagRegister::TEMP_OUT_H_REG)?;
+    pub fn read_temp(&mut self, spi: &mut Spi3) -> nb::Result<i16, SpiError> {
+        let temp_l = self.read_reg(spi, MagRegister::TEMP_OUT_L_REG)?;
+        let temp_h = self.read_reg(spi, MagRegister::TEMP_OUT_H_REG)?;
 
         hprintln!("temp_l: {:#010b}", temp_l);
         hprintln!("temp_h: {:#010b}", temp_h);
@@ -55,18 +57,18 @@ where
         Ok(0)
     }
 
-    pub fn read_data(&mut self) -> nb::Result<[i16; 3], SpiError> {
-        let outx_l = self.read_reg(MagRegister::OUTX_L_REG)?;
-        let outx_h = self.read_reg(MagRegister::OUTX_H_REG)?;
+    pub fn read_data(&mut self, spi: &mut Spi3) -> nb::Result<[i16; 3], SpiError> {
+        let outx_l = self.read_reg(spi, MagRegister::OUTX_L_REG)?;
+        let outx_h = self.read_reg(spi, MagRegister::OUTX_H_REG)?;
 
         hprintln!("outx_l: {:#010b}", outx_l);
         hprintln!("outx_h: {:#010b}", outx_h);
 
-        let outy_l = self.read_reg(MagRegister::OUTY_L_REG)?;
-        let outy_h = self.read_reg(MagRegister::OUTY_H_REG)?;
+        let outy_l = self.read_reg(spi, MagRegister::OUTY_L_REG)?;
+        let outy_h = self.read_reg(spi, MagRegister::OUTY_H_REG)?;
 
-        let outz_l = self.read_reg(MagRegister::OUTZ_L_REG)?;
-        let outz_h = self.read_reg(MagRegister::OUTZ_H_REG)?;
+        let outz_l = self.read_reg(spi, MagRegister::OUTZ_L_REG)?;
+        let outz_h = self.read_reg(spi, MagRegister::OUTZ_H_REG)?;
 
         let mut out = [0u16; 3];
 
@@ -89,29 +91,39 @@ where
     }
 }
 
-impl<'s, CS, PinError> Magnetometer<'s, CS>
+impl<CS, PinError> Magnetometer<CS>
 where
-    // SPI: Write<u8, Error = E> + Read<u8, Error = E>,
     CS: hal::digital::blocking::OutputPin<Error = PinError>,
 {
-    pub fn read_reg(&mut self, reg: MagRegister) -> nb::Result<u8, SpiError> {
+    pub fn read_reg(&mut self, spi: &mut Spi3, reg: MagRegister) -> nb::Result<u8, SpiError> {
         let mut out = 0u8;
         let addr = reg.to_addr() | SPI_READ;
+
+        // let mut spi = self.spi.borrow_mut();
+
         self.cs.set_low().ok();
 
-        self.spi.send(addr)?;
-        self.spi.read(&mut out)?;
+        spi.send(addr)?;
+        spi.read(&mut out)?;
 
         self.cs.set_high().ok();
         Ok(out)
     }
 
-    pub fn write_reg(&mut self, reg: MagRegister, val: u8) -> nb::Result<(), SpiError> {
+    pub fn write_reg(
+        &mut self,
+        spi: &mut Spi3,
+        reg: MagRegister,
+        val: u8,
+    ) -> nb::Result<(), SpiError> {
         let addr = reg.to_addr() | SPI_WRITE;
+
+        // let mut spi = self.spi.borrow_mut();
+
         self.cs.set_low().ok();
 
-        self.spi.send(addr)?;
-        self.spi.send(val)?;
+        spi.send(addr)?;
+        spi.send(val)?;
 
         self.cs.set_high().ok();
         Ok(())

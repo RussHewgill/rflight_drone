@@ -7,25 +7,19 @@ use hal::spi::{
 use stm32f4xx_hal::prelude::*;
 
 #[derive(Debug)]
-pub struct Barometer<SPI, CS> {
-    pub spi: SPI,
+pub struct Barometer<CS> {
     pub cs: CS,
 }
 
 /// new
-impl<SPI, CS> Barometer<SPI, CS> {
-    pub fn new(spi: SPI, cs: CS) -> Self {
-        Self { spi, cs }
+impl<CS> Barometer<CS> {
+    pub fn new(cs: CS) -> Self {
+        Self { cs }
     }
 }
 
-/// datasheet: 6.4.1, 6.4.2
-const SPI_READ: u8 = 0x01;
-const SPI_WRITE: u8 = 0x00;
-
-impl<SPI, CS, E, PinError> Barometer<SPI, CS>
+impl<CS, PinError> Barometer<CS>
 where
-    SPI: Write<u8, Error = E> + Read<u8, Error = E>,
     CS: hal::digital::blocking::OutputPin<Error = PinError>,
 {
     // pub fn write_reg(&mut self, reg: u8, val: u8) {
