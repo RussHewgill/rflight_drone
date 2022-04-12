@@ -18,24 +18,32 @@ use crate::spi::{Spi3, SpiError};
 // #[derive(new)]
 pub struct IMU<CS> {
     cs: CS,
-    acc_scale: Scale,
-    gyro_scale: Scale,
+    acc_scale: AccScale,
+    gyro_scale: GyroScale,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Scale {
+pub enum AccScale {
     S2 = 2,
     S4 = 4,
     S8 = 8,
     S16 = 16,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GyroScale {
+    S250 = 250,
+    S500 = 500,
+    S1000 = 1000,
+    S2000 = 2000,
+}
+
 impl<CS> IMU<CS> {
     pub fn new(cs: CS) -> Self {
         Self {
             cs,
-            acc_scale: Scale::S2,
-            gyro_scale: Scale::S2,
+            acc_scale: AccScale::S2,
+            gyro_scale: GyroScale::S250,
         }
     }
 }
@@ -94,42 +102,71 @@ where
         Ok([(b & TDA) == TDA, (b & GDA) == GDA, (b & XLDA) == XLDA])
     }
 
-    pub fn read_accel_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
-        let outx_l = self.read_reg(spi, IMURegister::OUTX_L_XL)?;
-        let outx_h = self.read_reg(spi, IMURegister::OUTX_H_XL)?;
+    pub fn read_data(&mut self, spi: &mut Spi3) -> nb::Result<([f32; 3], [f32; 3]), SpiError> {
+        // let mut data = [0u8; 14]; // extra for temp
+        let mut data = [0u8; 12];
 
-        let outy_l = self.read_reg(spi, IMURegister::OUTY_L_XL)?;
-        let outy_h = self.read_reg(spi, IMURegister::OUTY_H_XL)?;
+        self.read_reg_mult(spi, IMURegister::OUTX_L_G, &mut data)?;
 
-        let outz_l = self.read_reg(spi, IMURegister::OUTZ_L_XL)?;
-        let outz_h = self.read_reg(spi, IMURegister::OUTZ_H_XL)?;
+        let gyro_data = &data[0..6];
 
-        Ok([
-            Self::convert_raw_data(outx_h, outx_l, self.acc_scale),
-            Self::convert_raw_data(outy_h, outy_l, self.acc_scale),
-            Self::convert_raw_data(outz_h, outz_l, self.acc_scale),
-        ])
-    }
-    pub fn read_gyro_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
-        let outx_l = self.read_reg(spi, IMURegister::OUTX_L_G)?;
-        let outx_h = self.read_reg(spi, IMURegister::OUTX_H_G)?;
+        let gyro = [
+            Self::convert_raw_data(gyro_data[0], gyro_data[1], self.gyro_scale as u8),
+            Self::convert_raw_data(gyro_data[2], gyro_data[3], self.gyro_scale as u8),
+            Self::convert_raw_data(gyro_data[4], gyro_data[5], self.gyro_scale as u8),
+        ];
 
-        let outy_l = self.read_reg(spi, IMURegister::OUTY_L_G)?;
-        let outy_h = self.read_reg(spi, IMURegister::OUTY_H_G)?;
+        let acc_data = &data[6..12];
 
-        let outz_l = self.read_reg(spi, IMURegister::OUTZ_L_G)?;
-        let outz_h = self.read_reg(spi, IMURegister::OUTZ_H_G)?;
+        let acc = [
+            Self::convert_raw_data(acc_data[0], acc_data[1], self.acc_scale as u8),
+            Self::convert_raw_data(acc_data[2], acc_data[3], self.acc_scale as u8),
+            Self::convert_raw_data(acc_data[4], acc_data[5], self.acc_scale as u8),
+        ];
 
-        Ok([
-            Self::convert_raw_data(outx_h, outx_l, self.gyro_scale),
-            Self::convert_raw_data(outy_h, outy_l, self.gyro_scale),
-            Self::convert_raw_data(outz_h, outz_l, self.gyro_scale),
-        ])
+        Ok((gyro, acc))
     }
 
-    fn convert_raw_data(h: u8, l: u8, scale: Scale) -> f32 {
+    // pub fn read_accel_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
+    //     // let outx_l = self.read_reg(spi, IMURegister::OUTX_L_XL)?;
+    //     // let outx_h = self.read_reg(spi, IMURegister::OUTX_H_XL)?;
+
+    //     // let outy_l = self.read_reg(spi, IMURegister::OUTY_L_XL)?;
+    //     // let outy_h = self.read_reg(spi, IMURegister::OUTY_H_XL)?;
+
+    //     // let outz_l = self.read_reg(spi, IMURegister::OUTZ_L_XL)?;
+    //     // let outz_h = self.read_reg(spi, IMURegister::OUTZ_H_XL)?;
+
+    //     let mut data = [0u8; 6];
+
+    //     self.read_reg_mult(spi, IMURegister::OUTX_L_XL, bytes)
+
+    //     Ok([
+    //         Self::convert_raw_data(outx_h, outx_l, self.acc_scale),
+    //         Self::convert_raw_data(outy_h, outy_l, self.acc_scale),
+    //         Self::convert_raw_data(outz_h, outz_l, self.acc_scale),
+    //     ])
+    // }
+    // pub fn read_gyro_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
+    //     let outx_l = self.read_reg(spi, IMURegister::OUTX_L_G)?;
+    //     let outx_h = self.read_reg(spi, IMURegister::OUTX_H_G)?;
+
+    //     let outy_l = self.read_reg(spi, IMURegister::OUTY_L_G)?;
+    //     let outy_h = self.read_reg(spi, IMURegister::OUTY_H_G)?;
+
+    //     let outz_l = self.read_reg(spi, IMURegister::OUTZ_L_G)?;
+    //     let outz_h = self.read_reg(spi, IMURegister::OUTZ_H_G)?;
+
+    //     Ok([
+    //         Self::convert_raw_data(outx_h, outx_l, self.gyro_scale),
+    //         Self::convert_raw_data(outy_h, outy_l, self.gyro_scale),
+    //         Self::convert_raw_data(outz_h, outz_l, self.gyro_scale),
+    //     ])
+    // }
+
+    fn convert_raw_data(l: u8, h: u8, scale: u8) -> f32 {
         let v0 = l as i16 | ((h as i16) << 8);
-        ((v0 as f32) / (i16::MAX as f32)) * (scale as u8) as f32
+        ((v0 as f32) / (i16::MAX as f32)) * scale as f32
     }
 }
 
@@ -137,6 +174,24 @@ impl<CS, PinError> IMU<CS>
 where
     CS: hal::digital::blocking::OutputPin<Error = PinError>,
 {
+    pub fn read_reg_mult(
+        &mut self,
+        spi: &mut Spi3,
+        start_reg: IMURegister,
+        bytes: &mut [u8],
+    ) -> nb::Result<(), SpiError> {
+        let addr = start_reg.to_addr() | SPI_READ;
+
+        self.cs.set_low().ok();
+
+        spi.send(addr)?;
+        // spi.read(&mut out)?;
+        spi.read_mult(bytes)?;
+
+        self.cs.set_high().ok();
+        Ok(())
+    }
+
     pub fn read_reg(&mut self, spi: &mut Spi3, reg: IMURegister) -> nb::Result<u8, SpiError> {
         let mut out = 0u8;
         let addr = reg.to_addr() | SPI_READ;
