@@ -95,6 +95,24 @@ impl<CS, PinError> Magnetometer<CS>
 where
     CS: hal::digital::blocking::OutputPin<Error = PinError>,
 {
+    pub fn read_reg_mult(
+        &mut self,
+        spi: &mut Spi3,
+        start_reg: MagRegister,
+        bytes: &mut [u8],
+    ) -> nb::Result<(), SpiError> {
+        let addr = start_reg.to_addr() | SPI_READ;
+
+        self.cs.set_low().ok();
+
+        spi.send(addr)?;
+        // spi.read(&mut out)?;
+        spi.read_mult(bytes)?;
+
+        self.cs.set_high().ok();
+        Ok(())
+    }
+
     pub fn read_reg(&mut self, spi: &mut Spi3, reg: MagRegister) -> nb::Result<u8, SpiError> {
         let mut out = 0u8;
         let addr = reg.to_addr() | SPI_READ;

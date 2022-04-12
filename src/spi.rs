@@ -341,6 +341,7 @@ impl Spi3 {
     }
 }
 
+/// read, send
 impl Spi3 {
     pub fn send_mult(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
         unimplemented!()
@@ -360,7 +361,26 @@ impl Spi3 {
     }
 
     pub fn read_mult(&mut self, bytes: &mut [u8]) -> nb::Result<(), SpiError> {
-        unimplemented!()
+        self.enable(false);
+        self.set_bidi_input();
+        self.enable(true);
+
+        for byte in bytes {
+            while !self.is_rxne() {
+                cortex_m::asm::nop();
+            }
+            *byte = self.read_u8();
+        }
+
+        while self.spi_is_busy() {
+            cortex_m::asm::nop();
+        }
+
+        self.enable(false);
+        self.set_bidi_output();
+        self.enable(true);
+
+        Ok(())
     }
 
     pub fn read(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
@@ -372,9 +392,10 @@ impl Spi3 {
             cortex_m::asm::nop();
         }
 
-        while self.spi_is_busy() {
-            cortex_m::asm::nop();
-        }
+        // XXX: not needed
+        // while self.spi_is_busy() {
+        //     cortex_m::asm::nop();
+        // }
 
         *byte = self.read_u8();
 

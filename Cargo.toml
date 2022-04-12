@@ -38,4 +38,6 @@ arrayvec = { version = "0.7.2", default_features=false }
 
 derive-new = { version = "0.5.9", default_features=false }
 
+micromath = "2.0.0"
+
 

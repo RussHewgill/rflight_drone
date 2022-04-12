@@ -8,21 +8,35 @@ use crate::spi::Spi3;
 
 use self::{barometer::Barometer, imu::IMU, magneto::Magnetometer};
 
-use derive_new::new;
+// #[derive(Debug, Clone, Copy, PartialEq)]
+// pub enum SensorType {
+//     IMU,
+//     Mag,
+//     Baro,
+// }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum SensorType {
-    IMU,
-    Mag,
-    Baro,
-}
-
-#[derive(new)]
 pub struct Sensors {
     spi: Spi3,
     imu: IMU<Pin<'A', 8, Output>>,
     magnetometer: Magnetometer<Pin<'B', 12, Output>>,
     barometer: Barometer<Pin<'C', 13, Output>>,
+}
+
+/// new
+impl Sensors {
+    pub fn new(
+        spi: Spi3,
+        imu: IMU<Pin<'A', 8, Output>>,
+        magnetometer: Magnetometer<Pin<'B', 12, Output>>,
+        barometer: Barometer<Pin<'C', 13, Output>>,
+    ) -> Self {
+        Self {
+            spi,
+            imu,
+            magnetometer,
+            barometer,
+        }
+    }
 }
 
 impl Sensors {

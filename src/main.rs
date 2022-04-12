@@ -84,19 +84,52 @@ fn main_led() -> ! {
 
 // #[entry]
 fn main_test() -> ! {
-    let gpio_mode = 0x00000003;
-    let exti_mode = 0x10000000;
-    let gpio_mode_it = 0x00010000;
-    let gpio_mode_evt = 0x00020000;
-    let rising_edge = 0x00100000;
-    let falling_edge = 0x00200000;
-    let gpio_output_type = 0x00000010;
+    // let gpio_mode = 0x00000003;
+    // let exti_mode = 0x10000000;
+    // let gpio_mode_it = 0x00010000;
+    // let gpio_mode_evt = 0x00020000;
+    // let rising_edge = 0x00100000;
+    // let falling_edge = 0x00200000;
+    // let gpio_output_type = 0x00000010;
 
-    let gpio_mode_it_rising = 0x10110000;
+    // let gpio_mode_it_rising = 0x10110000;
 
-    if (gpio_mode_it_rising & exti_mode) == exti_mode {
-        unimplemented!()
-    }
+    // if (gpio_mode_it_rising & exti_mode) == exti_mode {
+    //     unimplemented!()
+    // }
+
+    let scale = 2;
+
+    // let x_h: u8 = 0x16;
+    // let x_l: u8 = 0x69;
+
+    // let x_h: u8 = 0x40;
+    // let x_l: u8 = 0x09;
+
+    // let x_h: u8 = 0xff;
+    // let x_l: u8 = 0x1d;
+
+    let x_h: u8 = 0xE9;
+    let x_l: u8 = 0x97;
+
+    // let mut vs = [0i16; 2];
+
+    // let v0 = x_l as u16;
+    // let v0 = v0 | ((x_h as u16) << 8);
+    // let v1 = v0 as i16;
+
+    let v1 = ((x_h as i16) << 8) | x_l as i16;
+
+    // let v2 = (v1 as f32) / (scale as f32 * 2.0);
+
+    let v2 = ((v1 as f32) / (i16::MAX as f32)) * scale as f32;
+
+    // vs[0] |= ((x_h as i16) << 8) | x_l as i16;
+    // vs[1] |= ((y_h as i16) << 8) | y_l as i16;
+
+    // hprintln!("v0: {:?}", v0);
+    hprintln!("v1: {:?}", v1);
+    hprintln!("v2: {:?}", v2);
 
     loop {}
 }
@@ -268,15 +301,49 @@ fn main_imu2() -> ! {
 
     let (mut cs_magno, mut spi) = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, mode, 10.MHz());
 
-    let mag = Magnetometer::new(cs_magno);
-
-    let baro = Barometer::new(cs_baro);
-
-    let imu = IMU::new(cs_imu);
-
-    let mut sensors = Sensors::new(spi, imu, mag, baro);
-
     {
+        let mut mag = Magnetometer::new(cs_magno);
+        let b = mag.read_reg(&mut spi, MagRegister::WHO_AM_I);
+        hprintln!("b2: {:#010b}", b.unwrap());
+
+        // let mut bs = [0u8; 2];
+
+        // mag.read_
+    }
+
+    loop {}
+
+    #[cfg(feature = "nope")]
+    {
+        let mut imu = IMU::new(cs_imu);
+
+        // imu.write_reg(&mut spi, IMURegister::CTRL3_C, 0x0C).unwrap();
+        imu.init(&mut spi).unwrap();
+
+        let b = imu.read_reg(&mut spi, IMURegister::WHO_AM_I).unwrap();
+        hprintln!("b2: {:#010b}", b);
+
+        let ready = imu.read_new_data_available(&mut spi).unwrap();
+        hprintln!("r: {:?}", ready);
+
+        let acc = imu.read_accel_data(&mut spi).unwrap();
+        let gyro = imu.read_gyro_data(&mut spi).unwrap();
+
+        imu.power_down(&mut spi).unwrap();
+
+        loop {}
+    }
+
+    #[cfg(feature = "nope")]
+    {
+        let mag = Magnetometer::new(cs_magno);
+
+        let baro = Barometer::new(cs_baro);
+
+        let imu = IMU::new(cs_imu);
+
+        let mut sensors = Sensors::new(spi, imu, mag, baro);
+
         {
             let (spi, mag) = sensors.get_mag();
             let b = mag.read_reg(spi, MagRegister::WHO_AM_I).unwrap();
@@ -284,7 +351,7 @@ fn main_imu2() -> ! {
         }
 
         {
-            let (spi, baro) = sensors.get_baro();
+            // let (spi, baro) = sensors.get_baro();
             // let b = mag.read_reg(spi, MagRegister::WHO_AM_I).unwrap();
             // hprintln!("b1: {:#010b}", b);
         }

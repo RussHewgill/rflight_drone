@@ -15,9 +15,29 @@ use crate::spi::{Spi3, SpiError};
 
 /// https://www.st.com/resource/en/datasheet/lsm6dsl.pdf
 
-#[derive(new)]
+// #[derive(new)]
 pub struct IMU<CS> {
     cs: CS,
+    acc_scale: Scale,
+    gyro_scale: Scale,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Scale {
+    S2 = 2,
+    S4 = 4,
+    S8 = 8,
+    S16 = 16,
+}
+
+impl<CS> IMU<CS> {
+    pub fn new(cs: CS) -> Self {
+        Self {
+            cs,
+            acc_scale: Scale::S2,
+            gyro_scale: Scale::S2,
+        }
+    }
 }
 
 const SPI_READ: u8 = 0x80; // 0x01 << 7
@@ -32,7 +52,84 @@ where
     }
 
     pub fn init(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
-        unimplemented!()
+        let val = 0b0000_0000
+            // | 0b0100_0000 // Block Data Update
+            | 0b1000 // SIM
+            | 0b0100; // IF_INC
+
+        // /// BDU = 1, Block Data Update
+        /// SIM = 1, 3 wire SPI mode
+        /// IF_INC = 1, increment on multiple byte access
+        self.write_reg(spi, IMURegister::CTRL3_C, val)?;
+
+        /// Accelerometer
+        /// ODR_XL = 0100 = 104 Hz Normal mode
+        self.write_reg(spi, IMURegister::CTRL1_XL, 0b0100_0000)?;
+
+        /// Gyro
+        /// ODR_GL = 0100 = 104 Hz Normal mode
+        self.write_reg(spi, IMURegister::CTRL2_G, 0b0100_0000)?;
+
+        Ok(())
+    }
+
+    pub fn power_down(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+        self.write_reg(spi, IMURegister::CTRL1_XL, 0b0000_0000)?;
+        self.write_reg(spi, IMURegister::CTRL2_G, 0b0000_0000)?;
+        Ok(())
+    }
+}
+
+impl<CS, PinError> IMU<CS>
+where
+    CS: hal::digital::blocking::OutputPin<Error = PinError>,
+{
+    pub fn read_new_data_available(&mut self, spi: &mut Spi3) -> nb::Result<[bool; 3], SpiError> {
+        const TDA: u8 = 0b0100;
+        const GDA: u8 = 0b0010;
+        const XLDA: u8 = 0b0001;
+
+        let b = self.read_reg(spi, IMURegister::STATUS_REG)?;
+
+        Ok([(b & TDA) == TDA, (b & GDA) == GDA, (b & XLDA) == XLDA])
+    }
+
+    pub fn read_accel_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
+        let outx_l = self.read_reg(spi, IMURegister::OUTX_L_XL)?;
+        let outx_h = self.read_reg(spi, IMURegister::OUTX_H_XL)?;
+
+        let outy_l = self.read_reg(spi, IMURegister::OUTY_L_XL)?;
+        let outy_h = self.read_reg(spi, IMURegister::OUTY_H_XL)?;
+
+        let outz_l = self.read_reg(spi, IMURegister::OUTZ_L_XL)?;
+        let outz_h = self.read_reg(spi, IMURegister::OUTZ_H_XL)?;
+
+        Ok([
+            Self::convert_raw_data(outx_h, outx_l, self.acc_scale),
+            Self::convert_raw_data(outy_h, outy_l, self.acc_scale),
+            Self::convert_raw_data(outz_h, outz_l, self.acc_scale),
+        ])
+    }
+    pub fn read_gyro_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
+        let outx_l = self.read_reg(spi, IMURegister::OUTX_L_G)?;
+        let outx_h = self.read_reg(spi, IMURegister::OUTX_H_G)?;
+
+        let outy_l = self.read_reg(spi, IMURegister::OUTY_L_G)?;
+        let outy_h = self.read_reg(spi, IMURegister::OUTY_H_G)?;
+
+        let outz_l = self.read_reg(spi, IMURegister::OUTZ_L_G)?;
+        let outz_h = self.read_reg(spi, IMURegister::OUTZ_H_G)?;
+
+        Ok([
+            Self::convert_raw_data(outx_h, outx_l, self.gyro_scale),
+            Self::convert_raw_data(outy_h, outy_l, self.gyro_scale),
+            Self::convert_raw_data(outz_h, outz_l, self.gyro_scale),
+        ])
+    }
+
+    fn convert_raw_data(h: u8, l: u8, scale: Scale) -> f32 {
+        let v0 = l as i16 | ((h as i16) << 8);
+        ((v0 as f32) / (i16::MAX as f32)) * (scale as u8) as f32
     }
 }
 
