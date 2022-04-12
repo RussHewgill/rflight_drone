@@ -303,12 +303,19 @@ fn main_imu2() -> ! {
 
     {
         let mut mag = Magnetometer::new(cs_magno);
-        let b = mag.read_reg(&mut spi, MagRegister::WHO_AM_I);
-        hprintln!("b2: {:#010b}", b.unwrap());
+        // let b = mag.read_reg(&mut spi, MagRegister::WHO_AM_I);
+        // hprintln!("b2: {:#010b}", b.unwrap());
 
-        // let mut bs = [0u8; 2];
+        let mut bs = [0u8; 4];
 
-        // mag.read_
+        // mag.read_reg_mult(&mut spi, MagRegister::WHO_AM_I, &mut bs)
+        mag.read_reg_mult(&mut spi, MagRegister::CFG_REG_A, &mut bs)
+            .unwrap();
+
+        hprintln!("b0: {:#010b}", bs[0]);
+        hprintln!("b1: {:#010b}", bs[1]);
+        hprintln!("b2: {:#010b}", bs[2]);
+        hprintln!("b3: {:#010b}", bs[3]);
     }
 
     loop {}

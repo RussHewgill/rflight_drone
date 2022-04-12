@@ -372,9 +372,9 @@ impl Spi3 {
             *byte = self.read_u8();
         }
 
-        while self.spi_is_busy() {
-            cortex_m::asm::nop();
-        }
+        // while self.spi_is_busy() {
+        //     cortex_m::asm::nop();
+        // }
 
         self.enable(false);
         self.set_bidi_output();
