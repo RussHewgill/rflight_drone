@@ -569,7 +569,7 @@ fn first_16<T>(buffer: &[T]) -> &[T] {
 
 impl hci::event::VendorEvent for BlueNRGEvent {
     type Error = BlueNRGError;
-    type ReturnParameters = command::ReturnParameters;
+    type ReturnParameters = super::ev_command::ReturnParameters;
     type Status = Status;
 
     fn new(buffer: &[u8]) -> Result<Self, hci::event::Error<BlueNRGError>> {

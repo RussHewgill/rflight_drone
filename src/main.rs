@@ -204,7 +204,8 @@ fn main_bluetooth() -> ! {
             // w.mr4().
             w
         });
-
+    }
+    {
         dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr4().high_speed());
         dp.GPIOA.pupdr.modify(|r, w| w.pupdr4().floating());
     }
@@ -216,6 +217,8 @@ fn main_bluetooth() -> ! {
     cs.set_high();
     let reset = gpiob.pb2.into_push_pull_output();
 
+    let input = gpioa.pa4.into_input();
+
     let sck = gpioa.pa5.into_push_pull_output().into_alternate::<5>();
     let miso = gpioa.pa6.into_push_pull_output().into_alternate::<5>();
     let mosi = gpioa.pa7.into_push_pull_output().into_alternate::<5>();
@@ -225,16 +228,16 @@ fn main_bluetooth() -> ! {
 
     let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
 
-    // let mut bt = BluetoothSpi::new(spi, cs, reset);
+    let mut bt = BluetoothSpi::new(spi, cs, reset, input);
 
     let mut delay = cp.SYST.delay(&clocks);
 
-    // bt.reset(&mut delay);
+    bt.reset(&mut delay);
 
-    // let (a, b) = bt.block_until_ready(hci::AccessByte::Read);
+    let (a, b) = bt.block_until_ready(hci::AccessByte::Read).unwrap();
 
-    // hprintln!("a: {:?}", a);
-    // hprintln!("b: {:?}", b);
+    hprintln!("a: {:?}", a);
+    hprintln!("b: {:?}", b);
 
     loop {}
 }

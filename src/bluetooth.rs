@@ -119,6 +119,7 @@ pub struct BluetoothSpi<SPI, CS, Reset, Input> {
     buffer: ArrayVec<u8, 256>,
 }
 
+/// new
 impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
     pub fn new(spi: SPI, cs: CS, reset: Reset, input: Input) -> Self {
         Self {

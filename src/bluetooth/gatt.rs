@@ -8,11 +8,15 @@ use hal::{
     spi::blocking::{Read, Transfer, Write},
 };
 use stm32f4xx_hal::nb;
+use stm32f4xx_hal::spi::Error as SpiError;
 
 use bitflags::bitflags;
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::{impl_validate_variable_length_params, impl_variable_length_params};
+use crate::{
+    impl_params, impl_validate_variable_length_params, impl_value_params,
+    impl_variable_length_params,
+};
 
 /// GATT-specific commands for the [`ActiveBlueNRG`](crate::ActiveBlueNRG).
 pub trait Commands {
@@ -877,7 +881,7 @@ pub trait Commands {
     ) -> nb::Result<(), Error<Self::Error>>;
 }
 
-impl<'bnrg, 'spi, 'dbuf, SPI, CS, Reset, Input, SpiError, GpioError> Commands
+impl<SPI, CS, Reset, Input, GpioError> Commands
     for crate::bluetooth::BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
@@ -891,11 +895,18 @@ where
         self.write_command(crate::opcode::GATT_INIT, &[])
     }
 
-    impl_variable_length_params!(
-        add_service,
-        AddServiceParameters,
-        crate::opcode::GATT_ADD_SERVICE
-    );
+    // impl_variable_length_params!(
+    //     add_service,
+    //     AddServiceParameters,
+    //     crate::opcode::GATT_ADD_SERVICE
+    // );
+
+    fn add_service(&mut self, params: &AddServiceParameters) -> nb::Result<(), Self::Error> {
+        let mut bytes = [0; AddServiceParameters::MAX_LENGTH];
+        let len = params.copy_into_slice(&mut bytes);
+
+        self.write_command(crate::opcode::GATT_ADD_SERVICE, &bytes[..len])
+    }
 
     impl_variable_length_params!(
         include_service,
