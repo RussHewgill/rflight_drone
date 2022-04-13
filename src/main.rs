@@ -226,18 +226,24 @@ fn main_bluetooth() -> ! {
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
+    // let spi = dp.SPI1.spi_bidi((sck, miso, mosi), mode, 8.MHz(), &clocks);
     let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
 
-    let mut bt = BluetoothSpi::new(spi, cs, reset, input);
+    // let k = reset.get_state();
+    // hprintln!("k: {:?}", k);
 
+    let mut bt = BluetoothSpi::new(spi, cs, reset, input);
     let mut delay = cp.SYST.delay(&clocks);
 
     bt.reset(&mut delay);
 
+    bt.cs_enable(true).unwrap();
     let (a, b) = bt.block_until_ready(hci::AccessByte::Read).unwrap();
-
+    bt.cs_enable(false).unwrap();
     hprintln!("a: {:?}", a);
     hprintln!("b: {:?}", b);
+
+    // let (a, b) = bt.test(hci::AccessByte::Read).unwrap();
 
     loop {}
 }

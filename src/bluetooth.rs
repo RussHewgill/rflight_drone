@@ -14,7 +14,7 @@ use hal::{
     digital::blocking::{InputPin, OutputPin},
     spi::{
         self,
-        blocking::{Read, Transfer, Write},
+        blocking::{Read, Transfer, TransferInplace, Write},
     },
 };
 use stm32f4::stm32f401::{Peripherals, GPIOB, RCC, SPI2};
@@ -144,7 +144,10 @@ impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
 
 impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
-    SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
+    SPI: Transfer<u8, Error = SpiError>
+        + Write<u8, Error = SpiError>
+        + Read<u8, Error = SpiError>
+        + TransferInplace<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -154,14 +157,39 @@ where
         T: hal::delay::blocking::DelayUs,
     {
         self.cs.set_high().ok();
-        timer.delay_ms(5u32).ok();
+        timer.delay_ms(10u32).ok();
         self.cs.set_low().ok();
-        timer.delay_ms(5u32).ok();
+        timer.delay_ms(10u32).ok();
     }
 
-    // fn data_ready(&self) -> Result<bool, Input::Error> {
-    //     self.data_ready.is_high()
-    // }
+    pub fn cs_enable(&mut self, enable: bool) -> Result<(), Input::Error> {
+        if enable {
+            /// Select the BT spi
+            self.cs.set_low()
+        } else {
+            /// Un-Select the BT spi
+            self.cs.set_high()
+        }
+    }
+
+    pub fn data_ready(&self) -> Result<bool, Input::Error> {
+        self.input.is_high()
+    }
+
+    pub fn test(
+        &mut self,
+        access_byte: AccessByte,
+    ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
+        self.cs
+            .set_low()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?;
+
+        // let write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+        // let mut read_header = [0x00; 5];
+        // let e = self.spi.transfer(&mut read_header, &write_header);
+        unimplemented!()
+    }
 
     pub fn block_until_ready(
         &mut self,
@@ -170,11 +198,16 @@ where
         let mut x = 0;
         loop {
             x += 1;
-            let write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+            let mut write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
             let mut read_header = [0x00; 5];
             let e = self.spi.transfer(&mut read_header, &write_header);
 
-            match parse_spi_header(&read_header) {
+            // self.spi
+            //     .transfer_inplace(&mut write_header)
+            //     .map_err(BTError::Spi)?;
+
+            // match parse_spi_header(&read_header) {
+            match parse_spi_header(&write_header) {
                 Ok(lens) => {
                     hprintln!("x: {:?}", x);
                     return Ok(lens);
@@ -258,7 +291,11 @@ where
 
 impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
 where
-    SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
+    // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
+    SPI: Transfer<u8, Error = SpiError>
+        + Write<u8, Error = SpiError>
+        + Read<u8, Error = SpiError>
+        + TransferInplace<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -303,6 +340,16 @@ fn parse_spi_header<E>(header: &[u8; 5]) -> Result<(u16, u16), nb::Error<E>> {
             LittleEndian::read_u16(&header[3..]),
         ))
     } else {
+        // hprintln!("b");
+        // hprintln!(
+        //     "{:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
+        //     header[0],
+        //     header[1],
+        //     header[2],
+        //     header[3],
+        //     header[4],
+        // );
+
         Err(nb::Error::WouldBlock)
     }
 }
