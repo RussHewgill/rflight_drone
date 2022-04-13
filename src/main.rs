@@ -11,8 +11,6 @@ pub mod pid;
 pub mod sensors;
 pub mod spi;
 
-use core::cell::RefCell;
-
 use bluetooth::*;
 use sensors::barometer::*;
 use sensors::imu::*;
@@ -227,7 +225,16 @@ fn main_bluetooth() -> ! {
 
     let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
 
-    let mut bt = BluetoothSpi::new(spi, cs, reset);
+    // let mut bt = BluetoothSpi::new(spi, cs, reset);
+
+    let mut delay = cp.SYST.delay(&clocks);
+
+    // bt.reset(&mut delay);
+
+    // let (a, b) = bt.block_until_ready(hci::AccessByte::Read);
+
+    // hprintln!("a: {:?}", a);
+    // hprintln!("b: {:?}", b);
 
     loop {}
 }
