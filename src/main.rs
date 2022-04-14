@@ -33,6 +33,7 @@ use stm32f4::stm32f401::{self, SPI2};
 
 use embedded_hal as hal;
 use hal::spi::*;
+use stm32f4xx_hal::serial::Serial;
 use stm32f4xx_hal::{
     gpio::{Pin, PinExt},
     prelude::*,
@@ -132,7 +133,7 @@ fn main_test() -> ! {
     loop {}
 }
 
-#[entry]
+// #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -240,7 +241,7 @@ fn main_bluetooth() -> ! {
     bt.reset(&mut delay);
 
     bt.cs_enable(true).unwrap();
-    let (a, b) = bt.block_until_ready(hci::AccessByte::Read).unwrap();
+    let (a, b) = bt.block_until_ready(hci::AccessByte::Write).unwrap();
     bt.cs_enable(false).unwrap();
     hprintln!("a: {:?}", a);
     hprintln!("b: {:?}", b);
@@ -248,6 +249,47 @@ fn main_bluetooth() -> ! {
     // let (a, b) = bt.test(hci::AccessByte::Read).unwrap();
 
     loop {}
+}
+
+#[entry]
+fn main_uart() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    let rcc = dp.RCC.constrain();
+    let clocks = rcc.cfgr.freeze();
+
+    let mut delay = dp.TIM1.delay_ms(&clocks);
+
+    let gpioa = dp.GPIOA.split();
+
+    let tx = gpioa.pa9.into_alternate();
+    let rx = gpioa.pa10.into_alternate();
+
+    // let mut serial = dp.USART1.tx(tx_pin, 9600.bps(), &clocks).unwrap();
+    let mut serial = dp
+        .USART1
+        .serial((tx, rx), 9600.bps(), &clocks)
+        .unwrap()
+        .with_u8_data();
+
+    let (mut tx, mut rx) = serial.split();
+
+    let mut value: u8 = 0;
+
+    loop {
+        // print some value every 500 ms, value will overflow after 255
+        // writeln!(tx, "value: {:02}\r", value).unwrap();
+
+        use core::fmt::Write;
+        writeln!(tx, "wat: {:?}\r", value).unwrap();
+        // tx.write
+
+        value = value.wrapping_add(1);
+        delay.delay(2.secs());
+    }
+
+    // loop {}
 }
 
 // #[entry]
