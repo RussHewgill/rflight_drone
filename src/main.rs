@@ -6,17 +6,21 @@
 #![no_std]
 #![no_main]
 
+pub mod adc;
 pub mod bluetooth;
 pub mod pid;
 pub mod sensors;
 pub mod spi;
+pub mod uart;
 
+use adc::*;
 use bluetooth::*;
 use sensors::barometer::*;
 use sensors::imu::*;
 use sensors::magneto::*;
 use sensors::*;
 use spi::*;
+use uart::*;
 
 // pick a panicking behavior
 // use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
@@ -251,7 +255,7 @@ fn main_bluetooth() -> ! {
     loop {}
 }
 
-#[entry]
+// #[entry]
 fn main_uart() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -292,37 +296,88 @@ fn main_uart() -> ! {
     // loop {}
 }
 
-// #[entry]
+#[entry]
 fn main_adc() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
 
     dp.RCC.apb2enr.write(|w| w.adc1en().set_bit());
 
-    // dp.GPIOB.pupdr.modify(|r, w| w.pupdr8().floating());
+    /// Enable GPIOB
+    dp.RCC.ahb1enr.write(|w| w.gpioben().set_bit());
 
-    // dp.ADC1.cr2.modify(|r, w| w.adon().set_bit());
+    dp.GPIOB.pupdr.modify(|r, w| w.pupdr1().floating());
 
-    loop {}
-}
-
-// #[entry]
-fn main_imu_i2c() -> ! {
-    let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    let mut dp = stm32f401::Peripherals::take().unwrap();
-
-    /// scl = PB13
-    /// sda = PB15
-    // dp.RCC.apb1enr.write(|w| w.i2c1en().set_bit());
-    let mut rcc = dp.RCC.constrain();
+    let rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
-    // let i2c = dp.I2C
+    // let gpioa = dp.GPIOA.split();
+    let gpiob = dp.GPIOB.split();
 
-    let mut gpiob = dp.GPIOB.split();
+    // let uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
-    // let scl = gpiob.pb13.into_alternate();
-    // let sda = gpiob.pb15.into_alternate();
+    dp.ADC1
+        .cr1
+        .modify(|r, w| w.scan().clear_bit().res().twelve_bit().discen().disabled());
+
+    dp.ADC1.cr2.modify(|r, w| {
+        w.align()
+            .right()
+            .exten()
+            .disabled()
+            .cont()
+            .single()
+            .dma()
+            .disabled()
+            .eocs()
+            .each_conversion()
+    });
+
+    dp.ADC1.sqr1.modify(|r, w| w.l().bits(0b0000));
+
+    dp.ADC1.smpr2.modify(|r, w| w.smp9().cycles3());
+
+    unsafe {
+        dp.ADC1.sqr3.modify(|r, w| w.sq1().bits(9));
+    }
+
+    dp.ADC_COMMON.ccr.modify(|r, w| w.adcpre().div4());
+
+    /// enable ADC
+    dp.ADC1.cr2.modify(|r, w| w.adon().set_bit());
+
+    /// start single conversion
+    dp.ADC1.cr2.modify(|r, w| w.swstart().set_bit());
+
+    let adc_val: u16 = dp.ADC1.dr.read().data().bits();
+
+    /// disable ADC
+    dp.ADC1.cr2.modify(|r, w| w.adon().clear_bit());
+
+    let v_ref = 3.3;
+
+    let r_up = 10_000.0;
+    let r_down = 20_000.0;
+
+    let d = 2u32.pow(12) as f32;
+
+    let vbat = ((adc_val as f32 * v_ref) / d) * ((r_up + r_down) / r_down);
+
+    hprintln!("v = {:?}", vbat);
+
+    // use stm32f4xx_hal::adc::*;
+    // use stm32f4xx_hal::adc::config::*;
+
+    // let adc_cfg = AdcConfig::default()
+    //     .clock(Clock::Pclk2_div_4)
+    //     .resolution(Resolution::Twelve)
+    //     .align(Align::Right)
+    //     .scan(Scan::Disabled)
+    //     // .external_trigger(TriggerMode::Disabled, Exte)
+    //     .continuous(Continuous::Single)
+    //     ;
+
+    // let pb1 = gpiob.pb1.into_analog();
 
     loop {}
 }
@@ -805,99 +860,3 @@ fn main_imu() -> ! {
 
     loop {}
 }
-
-// #[entry]
-#[cfg(feature = "nope")]
-fn main() -> ! {
-    // let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    // let mut dp = stm32f401::Peripherals::take().unwrap();
-
-    hprintln!("Hello, world!, {}", 1);
-
-    // let spi1 = ps.SPI1
-
-    // let gpioa = dp.GPIOA.split();
-
-    // let mut rcc = dp.RCC.constrain();
-    // let clocks = rcc.cfgr.freeze();
-
-    // let spi1 = Spi::new(ps.SPI2, ());
-    // let spi = ps.SPI1.spi(
-    //     // (NoPin, NoPin, NoPin),
-    // );
-
-    // let spi = dp.SPI1.spi(pins, mode, Megahertz(10), clocks);
-
-    loop {}
-}
-
-// #[entry]
-#[cfg(feature = "nope")]
-fn main2() -> ! {
-    // hprintln!("Hello, world!, {}", 1);
-
-    let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    let mut ps = stm32f401::Peripherals::take().unwrap();
-
-    // ps.RCC.apb2enr.modify(|_, w| w.tim9en().set_bit());
-    // ps.TIM9.cr1.write(|w| w.opm().set_bit().cen().clear_bit());
-    // ps.TIM9.psc.write(|w| w.psc().bits(7_999));
-    //
-    // hprintln!("wat 0");
-    // delay(&ps.TIM9, 1000);
-    // hprintln!("wat 1");
-    // delay(&ps.TIM9, 1000);
-    // hprintln!("wat 2");
-
-    // enable TPIU and ITM
-    cp.DCB.enable_trace();
-
-    // prescaler
-    let swo_freq = 2_000_000;
-    unsafe {
-        // cp.TPIU.acpr.write((stm32f4xx_hal::rcc::Clocks::sysclk().0 / swo_freq) - 1);
-
-        // SWO NRZ
-        cp.TPIU.sppr.write(2);
-
-        cp.TPIU.ffcr.modify(|r| r | (1 << 1));
-    }
-
-    // SWO NRZ
-    ps.DBGMCU.cr.modify(|_, w| w.trace_ioen().set_bit());
-
-    unsafe {
-        cp.ITM.lar.write(0xC5ACCE55);
-
-        cp.ITM.tcr.write(
-            (0b000001 << 16) // TraceBusID
-            | (1 << 3) // enable SWO output ??
-            | (1 << 0), // Enable ITM
-        );
-
-        // enable stimulus port 0
-        cp.ITM.ter[0].write(1);
-    }
-
-    iprintln!(&mut cp.ITM.stim[0], "wat");
-
-    // let mut itm = init();
-    // iprintln!(&mut itm.stim[0], "wat");
-
-    // // exit QEMU
-    // // NOTE do not run this on hardware; it can corrupt OpenOCD state
-    // debug::exit(debug::EXIT_SUCCESS);
-
-    loop {}
-
-    // asm::nop(); // To not have main optimize to abort in release mode, remove when you add code
-
-    // loop {
-    //     // your code goes here
-    // }
-}
-
-// pub fn init() -> ITM {
-//     let p = cortex_m::Peripherals::take().unwrap();
-//     p.ITM
-// }
