@@ -881,13 +881,15 @@ pub trait Commands {
     ) -> nb::Result<(), Error<Self::Error>>;
 }
 
-impl<CS, Reset, Input, GpioError> Commands for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
+// impl<CS, Reset, Input, GpioError> Commands for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> Commands
+    for crate::bluetooth::BluetoothSpi<SPI, CS, Reset, Input>
 where
     // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
-    // SPI: Transfer<u8, Error = SpiError>
-    //     + Write<u8, Error = SpiError>
-    //     + Read<u8, Error = SpiError>
-    //     + TransferInplace<u8, Error = SpiError>,
+    SPI: Transfer<u8, Error = SpiError>
+        + Write<u8, Error = SpiError>
+        + Read<u8, Error = SpiError>
+        + TransferInplace<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,

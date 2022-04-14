@@ -17,7 +17,7 @@ use hal::{
         blocking::{Read, Transfer, TransferInplace, Write},
     },
 };
-use stm32f4::stm32f401::{Peripherals, GPIOB, RCC, SPI2};
+use stm32f4::stm32f401::{Peripherals, GPIOB, RCC, SPI1, SPI2};
 use stm32f4xx_hal::{
     gpio::{Alternate, Pin, PinExt, PA8, PB13, PB15},
     nb,
@@ -31,7 +31,7 @@ use bluetooth_hci::{host::HciHeader, Controller, Opcode};
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::spi::Spi4;
+use crate::uart::*;
 
 use self::hci::*;
 
@@ -102,6 +102,15 @@ use self::hci::*;
 /// #define BNRG_SPI_IRQ_PORT           GPIOA
 /// #define BNRG_SPI_IRQ_CLK_ENABLE()   __GPIOA_CLK_ENABLE()
 
+// pub type BtSpi = stm32f4xx_hal::spi::Spi<
+//     SPI1,
+//     (
+//         Pin<'A', 5, Alternate<5>>,
+//         Pin<'A', 6, Alternate<5>>,
+//         Pin<'A', 7, Alternate<5>>,
+//     ),
+// >;
+
 #[derive(Debug, PartialEq)]
 pub enum BTError<SpiError, GpioError> {
     /// SPI errors occur if there is an underlying error during a transfer.
@@ -112,9 +121,11 @@ pub enum BTError<SpiError, GpioError> {
     Gpio(GpioError),
 }
 
-// pub struct BluetoothSpi<SPI, CS, Reset, Input, GpioError, PinError>
-pub struct BluetoothSpi<CS, Reset, Input> {
-    spi: Spi4,
+// pub struct BluetoothSpi<SPI, CS, Reset, Input, GpioError, PinError> {
+pub struct BluetoothSpi<SPI, CS, Reset, Input> {
+    // pub struct BluetoothSpi<CS, Reset, Input> {
+    // spi: BtSpi,
+    spi: SPI,
     cs: CS,
     reset: Reset,
     input: Input,
@@ -122,8 +133,9 @@ pub struct BluetoothSpi<CS, Reset, Input> {
 }
 
 /// new
-impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
-    pub fn new(spi: Spi4, cs: CS, reset: Reset, input: Input) -> Self {
+// impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
+impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
+    pub fn new(spi: SPI, cs: CS, reset: Reset, input: Input) -> Self {
         Self {
             spi,
             cs,
@@ -144,12 +156,13 @@ impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
 //     //
 // }
 
-impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
+// impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
-    // SPI: Transfer<u8, Error = SpiError>
-    //     + Write<u8, Error = SpiError>
-    //     + Read<u8, Error = SpiError>
-    //     + TransferInplace<u8, Error = SpiError>,
+    SPI: Transfer<u8, Error = SpiError>
+        + Write<u8, Error = SpiError>
+        + Read<u8, Error = SpiError>
+        + TransferInplace<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -178,40 +191,61 @@ where
         self.input.is_high()
     }
 
-    pub fn test(
-        &mut self,
-        access_byte: AccessByte,
-    ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
-        self.cs
-            .set_low()
-            .map_err(BTError::Gpio)
-            .map_err(nb::Error::Other)?;
-
-        // let write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
-        // let mut read_header = [0x00; 5];
-        // let e = self.spi.transfer(&mut read_header, &write_header);
-        unimplemented!()
-    }
+    // pub fn test(
+    //     &mut self,
+    //     access_byte: AccessByte,
+    //     uart: &mut UART,
+    // ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
+    //     self.cs
+    //         .set_low()
+    //         .map_err(BTError::Gpio)
+    //         .map_err(nb::Error::Other)?;
+    //     let write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+    //     let mut read_header = [0x00; 5];
+    //     self.spi.transfer(&mut read_header, &write_header).unwrap();
+    //     unimplemented!()
+    // }
 
     pub fn block_until_ready(
         &mut self,
         access_byte: AccessByte,
+        uart: &mut UART,
     ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
         let mut x = 0;
         loop {
             x += 1;
             let mut write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
             let mut read_header = [0x00; 5];
-            let e = self.spi.transfer(&mut read_header, &write_header);
+            // let e = self.spi.transfer(&mut read_header, &write_header);
+
+            // let e = self.spi.transfer(&mut read_header, &write_header);
+
+            // let read_header =
+            //     stm32f4xx_hal::prelude::_embedded_hal_blocking_spi_Transfer::transfer(
+            //         &mut self,
+            //         // &mut read_header,
+            //         &write_header,
+            //     )
+            //     .unwrap();
+
+            let e = embedded_hal::spi::blocking::Transfer::transfer(
+                &mut self.spi,
+                &mut read_header,
+                &write_header,
+            );
+
+            // writeln!(uart, "e: {:?}\n", e).unwrap();
 
             // self.spi
             //     .transfer_inplace(&mut write_header)
             //     .map_err(BTError::Spi)?;
 
-            // match parse_spi_header(&read_header) {
-            match parse_spi_header(&write_header) {
+            writeln!(uart, "header: {:#010b}\r", read_header[0]).unwrap();
+
+            match parse_spi_header(&read_header) {
                 Ok(lens) => {
-                    hprintln!("x: {:?}", x);
+                    // hprintln!("x: {:?}", x);
+                    writeln!(uart, "x: {:?}\r", x).unwrap();
                     return Ok(lens);
                 }
                 Err(nb::Error::WouldBlock) => {
@@ -232,8 +266,9 @@ where
     fn block_until_ready_for(
         &mut self,
         access: AccessByte,
+        uart: &mut UART,
     ) -> nb::Result<u16, BTError<SpiError, GpioError>> {
-        let (write_len, read_len) = self.block_until_ready(access)?;
+        let (write_len, read_len) = self.block_until_ready(access, uart)?;
         Ok(match access {
             AccessByte::Read => read_len,
             AccessByte::Write => write_len,
@@ -282,17 +317,18 @@ where
         opcode: Opcode,
         params: &[u8],
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        const HEADER_LEN: usize = 4;
-        let mut header = [0; HEADER_LEN];
-        bluetooth_hci::host::uart::CommandHeader::new(opcode, params.len())
-            .copy_into_slice(&mut header);
+        // const HEADER_LEN: usize = 4;
+        // let mut header = [0; HEADER_LEN];
+        // bluetooth_hci::host::uart::CommandHeader::new(opcode, params.len())
+        //     .copy_into_slice(&mut header);
 
         // self.write(&header, params)
         unimplemented!()
     }
 }
 
-impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<CS, Reset, Input>
+// impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
 where
     // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
     // SPI: Transfer<u8, Error = SpiError>
@@ -308,22 +344,24 @@ where
     type Vendor = BlueNRGTypes;
 
     fn write(&mut self, header: &[u8], payload: &[u8]) -> nb::Result<(), Self::Error> {
-        self.cs
-            .set_low()
-            .map_err(BTError::Gpio)
-            .map_err(nb::Error::Other)?;
+        // self.cs
+        //     .set_low()
+        //     .map_err(BTError::Gpio)
+        //     .map_err(nb::Error::Other)?;
 
-        let write_len = self.block_until_ready_for(AccessByte::Write)?;
-        if (write_len as usize) < header.len() + payload.len() {
-            return Err(nb::Error::WouldBlock);
-        }
+        // let write_len = self.block_until_ready_for(AccessByte::Write)?;
+        // if (write_len as usize) < header.len() + payload.len() {
+        //     return Err(nb::Error::WouldBlock);
+        // }
 
-        let result = self.try_write(header, payload);
-        self.cs
-            .set_high()
-            .map_err(BTError::Gpio)
-            .map_err(nb::Error::Other)?;
-        result
+        // let result = self.try_write(header, payload);
+        // self.cs
+        //     .set_high()
+        //     .map_err(BTError::Gpio)
+        //     .map_err(nb::Error::Other)?;
+        // result
+
+        unimplemented!()
     }
 
     fn read_into(&mut self, buffer: &mut [u8]) -> nb::Result<(), Self::Error> {

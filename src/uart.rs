@@ -6,11 +6,14 @@ use stm32f4xx_hal::{
     serial::{Rx, Tx},
 };
 
+pub use core::fmt::Write as CoreWrite;
+
 pub struct UART {
-    tx: Tx<USART1, u8>,
-    rx: Rx<USART1, u8>,
+    pub tx: Tx<USART1, u8>,
+    pub rx: Rx<USART1, u8>,
 }
 
+/// new
 impl UART {
     pub fn new(
         usart1: USART1,
@@ -32,3 +35,26 @@ impl UART {
         Self { tx, rx }
     }
 }
+
+// impl UART {
+//     pub fn send(&mut self, s: &str) {
+//         use core::fmt::Write;
+//         // writeln!(self.tx, s).unwrap();
+//         self.tx.write_str(s).unwrap();
+//     }
+// }
+
+impl core::fmt::Write for UART {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.tx.write_str(s)
+    }
+}
+
+// macro_rules! uprintln {
+// 	  ($uart:expr) => {
+//         writeln!($uart.tx, "").unwrap();
+// 	  };
+// 	  ($uart:expr, $s:expr, $($tt:tt)*) => {
+//         writeln!($uart.tx, ).unwrap();
+// 	  };
+// }

@@ -60,84 +60,7 @@ fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
     tim9.sr.modify(|_, w| w.uif().clear_bit());
 }
 
-fn enable_bt(spi2: &SPI2) {
-    unimplemented!()
-}
-
-// #[entry]
-fn main_led() -> ! {
-    let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    let mut dp = stm32f401::Peripherals::take().unwrap();
-
-    // #define LED1_PIN                         GPIO_PIN_5
-    // #define LED1_GPIO_PORT                   GPIOB
-    // #define LED1_GPIO_CLK_ENABLE()           __GPIOB_CLK_ENABLE()
-    // #define LED1_GPIO_CLK_DISABLE()          __GPIOB_CLK_DISABLE()
-
-    // dp.RCC
-    //     .ahb1enr
-    //     .write(|w| w.gpioben().set_bit());
-
-    // let mut gpiob = dp.GPIOB.split();
-
-    // dp.GPIOB.moder
-
-    loop {}
-}
-
-// #[entry]
-fn main_test() -> ! {
-    // let gpio_mode = 0x00000003;
-    // let exti_mode = 0x10000000;
-    // let gpio_mode_it = 0x00010000;
-    // let gpio_mode_evt = 0x00020000;
-    // let rising_edge = 0x00100000;
-    // let falling_edge = 0x00200000;
-    // let gpio_output_type = 0x00000010;
-
-    // let gpio_mode_it_rising = 0x10110000;
-
-    // if (gpio_mode_it_rising & exti_mode) == exti_mode {
-    //     unimplemented!()
-    // }
-
-    let scale = 2;
-
-    // let x_h: u8 = 0x16;
-    // let x_l: u8 = 0x69;
-
-    // let x_h: u8 = 0x40;
-    // let x_l: u8 = 0x09;
-
-    // let x_h: u8 = 0xff;
-    // let x_l: u8 = 0x1d;
-
-    let x_h: u8 = 0xE9;
-    let x_l: u8 = 0x97;
-
-    // let mut vs = [0i16; 2];
-
-    // let v0 = x_l as u16;
-    // let v0 = v0 | ((x_h as u16) << 8);
-    // let v1 = v0 as i16;
-
-    let v1 = ((x_h as i16) << 8) | x_l as i16;
-
-    // let v2 = (v1 as f32) / (scale as f32 * 2.0);
-
-    let v2 = ((v1 as f32) / (i16::MAX as f32)) * scale as f32;
-
-    // vs[0] |= ((x_h as i16) << 8) | x_l as i16;
-    // vs[1] |= ((y_h as i16) << 8) | y_l as i16;
-
-    // hprintln!("v0: {:?}", v0);
-    hprintln!("v1: {:?}", v1);
-    hprintln!("v2: {:?}", v2);
-
-    loop {}
-}
-
-// #[entry]
+#[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -231,28 +154,108 @@ fn main_bluetooth() -> ! {
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
-    // // let spi = dp.SPI1.spi_bidi((sck, miso, mosi), mode, 8.MHz(), &clocks);
-    // let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
-    let spi = Spi4::new(dp.SPI1, sck, miso, mosi);
+    let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+
+    // dp.SPI1.cr1.modify(|r, w| {
+    //     w.cpha() // clock phase
+    //         .bit(mode.phase == Phase::CaptureOnSecondTransition)
+    //         .cpol() // clock polarity
+    //         .bit(mode.polarity == Polarity::IdleHigh)
+    //         .bidimode() // bidirectional half duplex mode
+    //         .clear_bit()
+    //         .bidioe() // bidi output mode
+    //         .clear_bit()
+    //         .br() // baud rate = 1/16 f_PCLK
+    //         .div16()
+    //         .mstr() // master mode enabled
+    //         .set_bit()
+    //         .ssm() // software slave management
+    //         .set_bit()
+    //         .ssi()
+    //         .set_bit()
+    //         .dff() // 8 bit data frame format
+    //         .eight_bit()
+    //         .lsbfirst() // MSB first
+    //         .clear_bit()
+    //         .crcen() // hardware CRC disabled (?)
+    //         .clear_bit()
+    // });
+
+    // dp.SPI1.cr2.modify(|_, w| {
+    //     w.ssoe()
+    //         .set_bit() // SS output enabled
+    //         .frf()
+    //         .clear_bit() // Motorola frame format (not TI)
+    // });
+
+    // let spi = Spi4::new(dp.SPI1, sck, miso, mosi);
 
     // let k = reset.get_state();
     // hprintln!("k: {:?}", k);
+
+    writeln!(uart, "wat 0\r").unwrap();
 
     let mut bt = BluetoothSpi::new(spi, cs, reset, input);
     let mut delay = cp.SYST.delay(&clocks);
 
     bt.reset(&mut delay);
 
-    bt.cs_enable(true).unwrap();
-    let (a, b) = bt.block_until_ready(hci::AccessByte::Write).unwrap();
-    bt.cs_enable(false).unwrap();
-    hprintln!("a: {:?}", a);
-    hprintln!("b: {:?}", b);
+    writeln!(uart, "wat 1\r").unwrap();
 
-    // let (a, b) = bt.test(hci::AccessByte::Read).unwrap();
+    bt.cs_enable(true).unwrap();
+    let (a, b) = bt
+        .block_until_ready(
+            // hci::AccessByte::Write,
+            hci::AccessByte::Read,
+            &mut uart,
+        )
+        .unwrap();
+    bt.cs_enable(false).unwrap();
+
+    writeln!(uart, "a: {:?}\r", a).unwrap();
+    writeln!(uart, "b: {:?}\r", b).unwrap();
+
+    // hprintln!("a: {:?}", a);
+    // hprintln!("b: {:?}", b);
+
+    // let (a, b) = bt.test(hci::AccessByte::Read, &mut uart).unwrap();
 
     loop {}
+}
+
+// #[entry]
+fn main_uart2() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    /// Enable GPIOA + GPIOB
+    dp.RCC
+        .ahb1enr
+        .modify(|r, w| w.gpioaen().set_bit().gpioben().set_bit());
+
+    let mut rcc = dp.RCC.constrain();
+    let clocks = rcc.cfgr.freeze();
+
+    let mut delay = dp.TIM1.delay_ms(&clocks);
+
+    let mut gpioa = dp.GPIOA.split();
+
+    let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
+
+    let mut value: u8 = 0;
+
+    loop {
+        // print some value every 500 ms, value will overflow after 255
+        // writeln!(tx, "value: {:02}\r", value).unwrap();
+
+        use core::fmt::Write;
+        writeln!(uart, "wat: {:?}\r", value).unwrap();
+
+        value = value.wrapping_add(1);
+        delay.delay(2.secs());
+    }
 }
 
 // #[entry]
@@ -296,7 +299,41 @@ fn main_uart() -> ! {
     // loop {}
 }
 
-#[entry]
+// #[entry]
+fn main_adc2() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    use stm32f4xx_hal::adc::config::*;
+    use stm32f4xx_hal::adc::*;
+
+    let gpiob = dp.GPIOB.split();
+
+    let voltage = gpiob.pb1.into_analog();
+
+    let adc_cfg = AdcConfig::default()
+        .clock(Clock::Pclk2_div_4)
+        .resolution(Resolution::Twelve)
+        .align(Align::Right)
+        .scan(Scan::Disabled)
+        // .external_trigger(TriggerMode::Disabled, Exte)
+        .continuous(Continuous::Single);
+
+    let mut adc = Adc::adc1(dp.ADC1, true, adc_cfg);
+
+    let sample = adc.convert(&voltage, SampleTime::Cycles_3);
+
+    let mv = adc.sample_to_millivolts(sample);
+
+    hprintln!("v = {:?}", mv);
+
+    // adc.configure_channel(&voltage, Sequence::One, SampleTime::Cycles_3);
+    // adc.enable_temperature_and_vref();
+
+    loop {}
+}
+
+// #[entry]
 fn main_adc() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -308,6 +345,8 @@ fn main_adc() -> ! {
 
     dp.GPIOB.pupdr.modify(|r, w| w.pupdr1().floating());
 
+    dp.GPIOB.moder.modify(|r, w| w.moder1().analog());
+
     let rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
@@ -315,6 +354,8 @@ fn main_adc() -> ! {
     let gpiob = dp.GPIOB.split();
 
     // let uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
+
+    // let pb1 = gpiob.pb1.into_analog();
 
     dp.ADC1
         .cr1
@@ -364,20 +405,6 @@ fn main_adc() -> ! {
     let vbat = ((adc_val as f32 * v_ref) / d) * ((r_up + r_down) / r_down);
 
     hprintln!("v = {:?}", vbat);
-
-    // use stm32f4xx_hal::adc::*;
-    // use stm32f4xx_hal::adc::config::*;
-
-    // let adc_cfg = AdcConfig::default()
-    //     .clock(Clock::Pclk2_div_4)
-    //     .resolution(Resolution::Twelve)
-    //     .align(Align::Right)
-    //     .scan(Scan::Disabled)
-    //     // .external_trigger(TriggerMode::Disabled, Exte)
-    //     .continuous(Continuous::Single)
-    //     ;
-
-    // let pb1 = gpiob.pb1.into_analog();
 
     loop {}
 }
