@@ -226,8 +226,10 @@ fn main_bluetooth() -> ! {
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
-    // let spi = dp.SPI1.spi_bidi((sck, miso, mosi), mode, 8.MHz(), &clocks);
-    let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    // // let spi = dp.SPI1.spi_bidi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    // let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+
+    let spi = Spi4::new(dp.SPI1, sck, miso, mosi);
 
     // let k = reset.get_state();
     // hprintln!("k: {:?}", k);

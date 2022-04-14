@@ -31,6 +31,8 @@ use bluetooth_hci::{host::HciHeader, Controller, Opcode};
 
 use byteorder::{ByteOrder, LittleEndian};
 
+use crate::spi::Spi4;
+
 use self::hci::*;
 
 /// // SPI Configuration
@@ -111,8 +113,8 @@ pub enum BTError<SpiError, GpioError> {
 }
 
 // pub struct BluetoothSpi<SPI, CS, Reset, Input, GpioError, PinError>
-pub struct BluetoothSpi<SPI, CS, Reset, Input> {
-    spi: SPI,
+pub struct BluetoothSpi<CS, Reset, Input> {
+    spi: Spi4,
     cs: CS,
     reset: Reset,
     input: Input,
@@ -120,8 +122,8 @@ pub struct BluetoothSpi<SPI, CS, Reset, Input> {
 }
 
 /// new
-impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
-    pub fn new(spi: SPI, cs: CS, reset: Reset, input: Input) -> Self {
+impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
+    pub fn new(spi: Spi4, cs: CS, reset: Reset, input: Input) -> Self {
         Self {
             spi,
             cs,
@@ -142,12 +144,12 @@ impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
 //     //
 // }
 
-impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 where
-    SPI: Transfer<u8, Error = SpiError>
-        + Write<u8, Error = SpiError>
-        + Read<u8, Error = SpiError>
-        + TransferInplace<u8, Error = SpiError>,
+    // SPI: Transfer<u8, Error = SpiError>
+    //     + Write<u8, Error = SpiError>
+    //     + Read<u8, Error = SpiError>
+    //     + TransferInplace<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -258,20 +260,21 @@ where
         header: &[u8],
         payload: &[u8],
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        if !header.is_empty() {
-            self.spi
-                .write(header)
-                .map_err(BTError::Spi)
-                .map_err(nb::Error::Other)?;
-        }
-        if !payload.is_empty() {
-            self.spi
-                .write(payload)
-                .map_err(BTError::Spi)
-                .map_err(nb::Error::Other)?;
-        }
+        // if !header.is_empty() {
+        //     self.spi
+        //         .write(header)
+        //         .map_err(BTError::Spi)
+        //         .map_err(nb::Error::Other)?;
+        // }
+        // if !payload.is_empty() {
+        //     self.spi
+        //         .write(payload)
+        //         .map_err(BTError::Spi)
+        //         .map_err(nb::Error::Other)?;
+        // }
 
-        Ok(())
+        // Ok(())
+        unimplemented!()
     }
 
     pub fn write_command(
@@ -289,13 +292,13 @@ where
     }
 }
 
-impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<CS, Reset, Input>
 where
     // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
-    SPI: Transfer<u8, Error = SpiError>
-        + Write<u8, Error = SpiError>
-        + Read<u8, Error = SpiError>
-        + TransferInplace<u8, Error = SpiError>,
+    // SPI: Transfer<u8, Error = SpiError>
+    //     + Write<u8, Error = SpiError>
+    //     + Read<u8, Error = SpiError>
+    //     + TransferInplace<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
