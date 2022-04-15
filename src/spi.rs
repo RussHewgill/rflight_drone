@@ -44,6 +44,8 @@ mod spi4 {
         }
 
         pub fn transfer(&mut self, read: &mut [u8], send: &[u8]) -> nb::Result<(), SpiError> {
+            self.enable(true);
+
             while self.spi_is_busy() {
                 cortex_m::asm::nop();
             }
@@ -54,6 +56,8 @@ mod spi4 {
             /// send first byte (clears TXE)
             if let Some(b) = send.next() {
                 self.send_u8(*b);
+            } else {
+                panic!();
             }
 
             loop {
@@ -72,9 +76,11 @@ mod spi4 {
 
                 if let Some(b) = read.next() {
                     *b = self.read_u8();
+                } else {
+                    panic!();
                 }
 
-                if read.len() <= 1 {
+                if read.len() == 1 {
                     break;
                 }
             }
@@ -93,9 +99,12 @@ mod spi4 {
                 cortex_m::asm::nop();
             }
 
-            // while self.spi_is_busy() {
-            //     cortex_m::asm::nop();
-            // }
+            while self.spi_is_busy() {
+                cortex_m::asm::nop();
+            }
+
+            self.enable(false);
+
             Ok(())
         }
     }

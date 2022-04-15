@@ -1,9 +1,9 @@
-pub mod ev_command;
-pub mod events;
+// pub mod ev_command;
+// pub mod events;
 
-pub mod command;
-pub mod gatt;
-pub mod opcode;
+// pub mod command;
+// pub mod gatt;
+// pub mod opcode;
 
 use arrayvec::ArrayVec;
 use core::ptr;
@@ -31,9 +31,18 @@ use bluetooth_hci::{host::HciHeader, Controller, Opcode};
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::uart::*;
+use crate::{spi::Spi4, uart::*, uprintln};
 
 use self::hci::*;
+
+// pub type BtSpi = stm32f4xx_hal::spi::Spi<
+//         SPI1,
+//     (
+//         Pin<'A', 5, Alternate<5>>,
+//         Pin<'A', 6, Alternate<5>>,
+//         Pin<'A', 7, Alternate<5>>,
+//     ),
+//     >;
 
 /// // SPI Configuration
 /// #define BNRG_SPI_MODE               SPI_MODE_MASTER
@@ -102,15 +111,6 @@ use self::hci::*;
 /// #define BNRG_SPI_IRQ_PORT           GPIOA
 /// #define BNRG_SPI_IRQ_CLK_ENABLE()   __GPIOA_CLK_ENABLE()
 
-// pub type BtSpi = stm32f4xx_hal::spi::Spi<
-//     SPI1,
-//     (
-//         Pin<'A', 5, Alternate<5>>,
-//         Pin<'A', 6, Alternate<5>>,
-//         Pin<'A', 7, Alternate<5>>,
-//     ),
-// >;
-
 #[derive(Debug, PartialEq)]
 pub enum BTError<SpiError, GpioError> {
     /// SPI errors occur if there is an underlying error during a transfer.
@@ -124,6 +124,7 @@ pub enum BTError<SpiError, GpioError> {
 // pub struct BluetoothSpi<SPI, CS, Reset, Input, GpioError, PinError> {
 pub struct BluetoothSpi<SPI, CS, Reset, Input> {
     // pub struct BluetoothSpi<CS, Reset, Input> {
+    // spi: Spi4,
     // spi: BtSpi,
     spi: SPI,
     cs: CS,
@@ -135,6 +136,7 @@ pub struct BluetoothSpi<SPI, CS, Reset, Input> {
 /// new
 // impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
 impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
+    // pub fn new(spi: Spi4, cs: CS, reset: Reset, input: Input) -> Self {
     pub fn new(spi: SPI, cs: CS, reset: Reset, input: Input) -> Self {
         Self {
             spi,
@@ -146,36 +148,26 @@ impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
     }
 }
 
-// impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input>
-// where
-//     SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
-//     CS: OutputPin,
-//     Reset: OutputPin,
-//     Input: InputPin,
-// {
-//     //
-// }
-
 // impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
-    SPI: Transfer<u8, Error = SpiError>
-        + Write<u8, Error = SpiError>
-        + Read<u8, Error = SpiError>
-        + TransferInplace<u8, Error = SpiError>,
+    // SPI: Transfer<u8, Error = SpiError>
+    //     + Write<u8, Error = SpiError>
+    //     + Read<u8, Error = SpiError>
+    //     + TransferInplace<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
 {
-    pub fn reset<T>(&mut self, timer: &mut T)
-    where
-        T: hal::delay::blocking::DelayUs,
-    {
-        self.cs.set_high().ok();
-        timer.delay_ms(10u32).ok();
-        self.cs.set_low().ok();
-        timer.delay_ms(10u32).ok();
-    }
+    // pub fn reset<T>(&mut self, timer: &mut T)
+    // where
+    //     T: hal::delay::blocking::DelayUs,
+    // {
+    //     self.cs.set_high().ok();
+    //     timer.delay_ms(10u32).ok();
+    //     self.cs.set_low().ok();
+    //     timer.delay_ms(10u32).ok();
+    // }
 
     pub fn cs_enable(&mut self, enable: bool) -> Result<(), Input::Error> {
         if enable {
@@ -215,10 +207,12 @@ where
         loop {
             x += 1;
             let mut write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
-            let mut read_header = [0x00; 5];
+            let mut read_header = [0xff; 5];
             // let e = self.spi.transfer(&mut read_header, &write_header);
 
-            // let e = self.spi.transfer(&mut read_header, &write_header);
+            let e = self.spi.transfer(&mut read_header, &write_header);
+
+            cortex_m::asm::dsb();
 
             // let read_header =
             //     stm32f4xx_hal::prelude::_embedded_hal_blocking_spi_Transfer::transfer(
@@ -228,11 +222,11 @@ where
             //     )
             //     .unwrap();
 
-            let e = embedded_hal::spi::blocking::Transfer::transfer(
-                &mut self.spi,
-                &mut read_header,
-                &write_header,
-            );
+            // let e = embedded_hal::spi::blocking::Transfer::transfer(
+            //     &mut self.spi,
+            //     &mut read_header,
+            //     &write_header,
+            // );
 
             // writeln!(uart, "e: {:?}\n", e).unwrap();
 
@@ -240,26 +234,63 @@ where
             //     .transfer_inplace(&mut write_header)
             //     .map_err(BTError::Spi)?;
 
-            writeln!(uart, "header: {:#010b}\r", read_header[0]).unwrap();
+            // if read_header[0] != 0x00 {
+            //     uprintln!(uart, "header: {:#010b}", read_header[0]);
+            // }
 
-            match parse_spi_header(&read_header) {
-                Ok(lens) => {
-                    // hprintln!("x: {:?}", x);
-                    writeln!(uart, "x: {:?}\r", x).unwrap();
-                    return Ok(lens);
-                }
-                Err(nb::Error::WouldBlock) => {
-                    self.cs
-                        .set_high()
-                        .map_err(BTError::Gpio)
-                        .map_err(nb::Error::Other)?;
-                    self.cs
-                        .set_low()
-                        .map_err(BTError::Gpio)
-                        .map_err(nb::Error::Other)?;
-                }
-                Err(e) => return Err(e),
+            if read_header[0] == 0x02 {
+                let a = LittleEndian::read_u16(&read_header[1..]);
+                let b = LittleEndian::read_u16(&read_header[3..]);
+                uprintln!(uart, "ready: {:?}, {:?}", a, b);
+                return Ok((a, b));
+            } else {
+                // uprintln!(
+                //     uart,
+                //     "nope: {:#010b} {:#010b} {:#010b} {:#010b} {:#010b}",
+                //     read_header[0],
+                //     read_header[1],
+                //     read_header[2],
+                //     read_header[3],
+                //     read_header[4],
+                // );
+                // uprintln!(
+                //     uart,
+                //     "      {:#010b} {:#010b} {:#010b} {:#010b} {:#010b}",
+                //     write_header[0],
+                //     write_header[1],
+                //     write_header[2],
+                //     write_header[3],
+                //     write_header[4],
+                // );
+
+                self.cs
+                    .set_high()
+                    .map_err(BTError::Gpio)
+                    .map_err(nb::Error::Other)?;
+                self.cs
+                    .set_low()
+                    .map_err(BTError::Gpio)
+                    .map_err(nb::Error::Other)?;
             }
+
+            // match parse_spi_header(&read_header) {
+            //     Ok(lens) => {
+            //         // hprintln!("x: {:?}", x);
+            //         uprintln!(uart, "x: {:?}", x);
+            //         return Ok(lens);
+            //     }
+            //     Err(nb::Error::WouldBlock) => {
+            //         self.cs
+            //             .set_high()
+            //             .map_err(BTError::Gpio)
+            //             .map_err(nb::Error::Other)?;
+            //         self.cs
+            //             .set_low()
+            //             .map_err(BTError::Gpio)
+            //             .map_err(nb::Error::Other)?;
+            //     }
+            //     Err(e) => return Err(e),
+            // }
         }
     }
 
@@ -327,8 +358,9 @@ where
     }
 }
 
-// impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<CS, Reset, Input>
-impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
+#[cfg(feature = "nope")]
+impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<CS, Reset, Input>
+// impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
 where
     // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
     // SPI: Transfer<u8, Error = SpiError>
@@ -395,12 +427,12 @@ fn parse_spi_header<E>(header: &[u8; 5]) -> Result<(u16, u16), nb::Error<E>> {
     }
 }
 
-/// Specify vendor-specific extensions for the BlueNRG.
-pub struct BlueNRGTypes;
-impl bluetooth_hci::Vendor for BlueNRGTypes {
-    type Status = self::events::Status;
-    type Event = self::events::BlueNRGEvent;
-}
+// /// Specify vendor-specific extensions for the BlueNRG.
+// pub struct BlueNRGTypes;
+// impl bluetooth_hci::Vendor for BlueNRGTypes {
+//     type Status = self::events::Status;
+//     type Event = self::events::BlueNRGEvent;
+// }
 
 pub mod hci {
     use byteorder::{ByteOrder, LittleEndian};
