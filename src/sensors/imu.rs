@@ -3,11 +3,14 @@
 use embedded_hal as hal;
 use hal::spi::{
     self,
-    blocking::{Read, Transfer, Write},
+    // blocking::{Read, Transfer, Write},
 };
 
 use stm32f4xx_hal::nb;
-use stm32f4xx_hal::prelude::*;
+use stm32f4xx_hal::{
+    hal::digital::v2::{InputPin, OutputPin},
+    prelude::*,
+};
 
 use derive_new::new;
 
@@ -53,7 +56,8 @@ const SPI_WRITE: u8 = 0x00;
 
 impl<CS, PinError> IMU<CS>
 where
-    CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    CS: OutputPin<Error = PinError>,
 {
     pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
         unimplemented!()
@@ -90,7 +94,8 @@ where
 
 impl<CS, PinError> IMU<CS>
 where
-    CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    CS: OutputPin<Error = PinError>,
 {
     pub fn read_new_data_available(&mut self, spi: &mut Spi3) -> nb::Result<[bool; 3], SpiError> {
         const TDA: u8 = 0b0100;
@@ -172,7 +177,8 @@ where
 
 impl<CS, PinError> IMU<CS>
 where
-    CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    CS: OutputPin<Error = PinError>,
 {
     pub fn read_reg_mult(
         &mut self,

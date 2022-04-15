@@ -1,10 +1,13 @@
 // use core::cell::RefCell;
 
-use cortex_m_semihosting::hprintln;
+// use cortex_m_semihosting::hprintln;
 use embedded_hal as hal;
 
 use stm32f4xx_hal::nb;
-use stm32f4xx_hal::prelude::*;
+use stm32f4xx_hal::{
+    hal::digital::v2::{InputPin, OutputPin},
+    prelude::*,
+};
 
 use crate::spi::{Spi3, SpiError};
 
@@ -18,7 +21,8 @@ const SPI_WRITE: u8 = 0x00;
 
 impl<CS, PinError> Magnetometer<CS>
 where
-    CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    CS: OutputPin<Error = PinError>,
 {
     pub fn new(cs: CS) -> Self {
         Self { cs }
@@ -29,7 +33,17 @@ where
         Ok(())
     }
 
-    pub fn init(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+    pub fn init_continuous(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+        /// Enable temperature compensation
+        /// LP = 0, high power mode
+        /// ODR = 00, Output Data Rate = 10Hz
+        /// MD  = 00, Continuous mode
+        self.write_reg(spi, MagRegister::CFG_REG_A, 0x80)?;
+        // self.write_reg(MagRegister::CFG_REG_C, 0x01)?; // Data Ready signal pin isn't connected
+        Ok(())
+    }
+
+    pub fn init_single(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
         /// Enable temperature compensation
         /// LP = 0, high power mode
         /// ODR = 00, Output Data Rate = 10Hz
@@ -43,7 +57,6 @@ where
 
     pub fn read_new_data_available(&mut self, spi: &mut Spi3) -> nb::Result<bool, SpiError> {
         let status = self.read_reg(spi, MagRegister::STATUS_REG)?;
-        hprintln!("s: {:#010b}", status);
         Ok((status & 0b0000_1000) == 0b1000)
     }
 
@@ -51,8 +64,8 @@ where
         let temp_l = self.read_reg(spi, MagRegister::TEMP_OUT_L_REG)?;
         let temp_h = self.read_reg(spi, MagRegister::TEMP_OUT_H_REG)?;
 
-        hprintln!("temp_l: {:#010b}", temp_l);
-        hprintln!("temp_h: {:#010b}", temp_h);
+        // hprintln!("temp_l: {:#010b}", temp_l);
+        // hprintln!("temp_h: {:#010b}", temp_h);
 
         Ok(0)
     }
@@ -60,9 +73,6 @@ where
     pub fn read_data(&mut self, spi: &mut Spi3) -> nb::Result<[i16; 3], SpiError> {
         let outx_l = self.read_reg(spi, MagRegister::OUTX_L_REG)?;
         let outx_h = self.read_reg(spi, MagRegister::OUTX_H_REG)?;
-
-        hprintln!("outx_l: {:#010b}", outx_l);
-        hprintln!("outx_h: {:#010b}", outx_h);
 
         let outy_l = self.read_reg(spi, MagRegister::OUTY_L_REG)?;
         let outy_h = self.read_reg(spi, MagRegister::OUTY_H_REG)?;
@@ -93,7 +103,8 @@ where
 
 impl<CS, PinError> Magnetometer<CS>
 where
-    CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
+    CS: OutputPin<Error = PinError>,
 {
     pub fn read_reg_mult(
         &mut self,

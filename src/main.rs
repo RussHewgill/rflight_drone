@@ -9,7 +9,7 @@
 pub mod adc;
 pub mod bluetooth;
 pub mod pid;
-// pub mod sensors;
+pub mod sensors;
 pub mod spi;
 pub mod uart;
 
@@ -17,10 +17,10 @@ use adc::*;
 use bluetooth::*;
 // use bluetooth_hci::host::Hci;
 // use bluetooth_hci::host::uart::Hci;
-// use sensors::barometer::*;
-// use sensors::imu::*;
-// use sensors::magneto::*;
-// use sensors::*;
+use sensors::barometer::*;
+use sensors::imu::*;
+use sensors::magneto::*;
+use sensors::*;
 use spi::*;
 use stm32f4xx_hal::block;
 use uart::*;
@@ -61,7 +61,7 @@ fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
     tim9.sr.modify(|_, w| w.uif().clear_bit());
 }
 
-#[entry]
+// #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -223,8 +223,6 @@ fn main_bluetooth() -> ! {
 
     uprintln!(uart, "wat 1");
 
-    uprintln!(uart, "wat 2");
-
     // bt.cs_enable(true).unwrap(); // set low
     // let (a, b) = bt
     //     .block_until_ready(
@@ -238,7 +236,7 @@ fn main_bluetooth() -> ! {
     use bluetooth_hci::host::uart::Hci as HciUart;
     use bluetooth_hci::host::Hci;
 
-    let e = block!(bt.read_local_version_information()).unwrap();
+    // let e = block!(bt.read_local_version_information()).unwrap();
     // uprintln!(uart, "e = {:?}", e);
 
     // for c in buffer.chunks(32) {
@@ -320,47 +318,6 @@ fn main_uart2() -> ! {
         value = value.wrapping_add(1);
         delay.delay(2.secs());
     }
-}
-
-// #[entry]
-fn main_uart() -> ! {
-    let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    let mut dp = stm32f401::Peripherals::take().unwrap();
-
-    let rcc = dp.RCC.constrain();
-    let clocks = rcc.cfgr.freeze();
-
-    let mut delay = dp.TIM1.delay_ms(&clocks);
-
-    let gpioa = dp.GPIOA.split();
-
-    let tx = gpioa.pa9.into_alternate();
-    let rx = gpioa.pa10.into_alternate();
-
-    // let mut serial = dp.USART1.tx(tx_pin, 9600.bps(), &clocks).unwrap();
-    let mut serial = dp
-        .USART1
-        .serial((tx, rx), 9600.bps(), &clocks)
-        .unwrap()
-        .with_u8_data();
-
-    let (mut tx, mut rx) = serial.split();
-
-    let mut value: u8 = 0;
-
-    loop {
-        // print some value every 500 ms, value will overflow after 255
-        // writeln!(tx, "value: {:02}\r", value).unwrap();
-
-        use core::fmt::Write;
-        writeln!(tx, "wat: {:?}\r", value).unwrap();
-        // tx.write
-
-        value = value.wrapping_add(1);
-        delay.delay(2.secs());
-    }
-
-    // loop {}
 }
 
 // #[entry]
@@ -473,9 +430,9 @@ fn main_adc() -> ! {
     loop {}
 }
 
-// #[entry]
+#[entry]
 #[allow(unreachable_code)]
-#[cfg(feature = "nope")]
+// #[cfg(feature = "nope")]
 fn main_imu2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -524,24 +481,40 @@ fn main_imu2() -> ! {
 
     let (mut cs_magno, mut spi) = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, mode, 10.MHz());
 
-    {
-        let mut mag = Magnetometer::new(cs_magno);
-        let b = mag.read_reg(&mut spi, MagRegister::WHO_AM_I);
-        hprintln!("b2: {:#010b}", b.unwrap());
+    let mut rcc = dp.RCC.constrain();
+    let clocks = rcc.cfgr.freeze();
+    let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
-        // let mut bs = [0u8; 4];
-
-        // // mag.read_reg_mult(&mut spi, MagRegister::WHO_AM_I, &mut bs)
-        // mag.read_reg_mult(&mut spi, MagRegister::CFG_REG_A, &mut bs)
-        //     .unwrap();
-
-        // hprintln!("b0: {:#010b}", bs[0]);
-        // hprintln!("b1: {:#010b}", bs[1]);
-        // hprintln!("b2: {:#010b}", bs[2]);
-        // hprintln!("b3: {:#010b}", bs[3]);
-    }
+    // let mut sensors = Sensors::new(spi, imu, magnetometer, barometer)
 
     // #[cfg(feature = "nope")]
+    {
+        let mut mag = Magnetometer::new(cs_magno);
+        let b = mag.read_reg(&mut spi, MagRegister::WHO_AM_I).unwrap();
+        uprintln!(uart, "b2: {:#010b}", b);
+
+        // mag.init_single(&mut spi).unwrap();
+        mag.init_continuous(&mut spi).unwrap();
+
+        loop {
+            match mag.read_new_data_available(&mut spi) {
+                Ok(true) => {
+                    let data = mag.read_data(&mut spi).unwrap();
+                    uprintln!(uart, "data: {:>6} {:>6} {:>6}", data[0], data[1], data[2]);
+                    // uprintln!(uart, "y: {:?}", data[1]);
+                    // uprintln!(uart, "z: {:?}", data[2]);
+                }
+                _ => {
+                    // uprintln!(uart, "no data");
+                    cortex_m::asm::nop();
+                }
+            }
+        }
+
+        // loop {}
+    }
+
+    #[cfg(feature = "nope")]
     {
         let mut imu = IMU::new(cs_imu);
 

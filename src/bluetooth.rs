@@ -46,11 +46,20 @@ pub mod bt_flight_control {
 
     use stm32f4::stm32f401::{RCC, SPI1};
     use stm32f4xx_hal::{
+        nb,
         prelude::*,
         spi::{Error as SpiError, NoMiso},
     };
 
-    use super::BluetoothSpi;
+    use bluetooth_hci::host::uart::Hci as HciUart;
+    use bluetooth_hci::host::Hci;
+
+    // use super::gap::Commands as GapCommands;
+    use super::gatt::Commands as GattCommands;
+    // use super::hal::Commands as HalCommands;
+    // use super::l2cap::Commands as L2CapCommands;
+
+    use super::{BTError, BluetoothSpi};
 
     impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
     where
@@ -60,21 +69,14 @@ pub mod bt_flight_control {
         Reset: OutputPin<Error = GpioError>,
         Input: InputPin<Error = GpioError>,
     {
-        pub fn init_bluetooth(&mut self) {
+        pub fn init_bluetooth(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
+            // bt.reset_with_delay(&mut delay, 10u32).unwrap();
+
+            self.init()?;
+
             unimplemented!()
         }
     }
-
-    // pub fn init_bluetooth<'buf>(
-    //     // rcc: &mut RCC,
-    //     // spi1: SPI1,
-    //     clocks: &Clocks,
-    //     buffer: &'buf mut [u8],
-    // ) -> BluetoothSpi<'buf, Spi<SPI1, _, _>, Pin<'B', 0, Output>, Pin<'B', 2, Output>, PA4> {
-    //     let spi = spi1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
-    //     let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
-    //     bt
-    // }
 }
 
 // pub type BtSpi = stm32f4xx_hal::spi::Spi<
