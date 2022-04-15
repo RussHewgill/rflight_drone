@@ -9,16 +9,16 @@
 pub mod adc;
 pub mod bluetooth;
 pub mod pid;
-pub mod sensors;
+// pub mod sensors;
 pub mod spi;
 pub mod uart;
 
 use adc::*;
 use bluetooth::*;
-use sensors::barometer::*;
-use sensors::imu::*;
-use sensors::magneto::*;
-use sensors::*;
+// use sensors::barometer::*;
+// use sensors::imu::*;
+// use sensors::magneto::*;
+// use sensors::*;
 use spi::*;
 use uart::*;
 
@@ -44,8 +44,6 @@ use stm32f4xx_hal::{
     spi::NoMiso,
     time::*,
 };
-
-use crate::sensors::magneto::Magnetometer;
 
 #[inline(never)]
 fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
@@ -173,41 +171,39 @@ fn main_bluetooth() -> ! {
 
     let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
-    // let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
 
-    dp.SPI1.cr1.modify(|r, w| {
-        w.cpha() // clock phase
-            .bit(mode.phase == Phase::CaptureOnSecondTransition)
-            .cpol() // clock polarity
-            .bit(mode.polarity == Polarity::IdleHigh)
-            .bidimode() // bidirectional half duplex mode
-            .clear_bit()
-            .bidioe() // bidi output mode
-            .clear_bit()
-            .br() // baud rate = 1/16 f_PCLK
-            .div16()
-            .mstr() // master mode enabled
-            .set_bit()
-            .ssm() // software slave management
-            .set_bit()
-            .ssi()
-            .set_bit()
-            .dff() // 8 bit data frame format
-            .eight_bit()
-            .lsbfirst() // MSB first
-            .clear_bit()
-            .crcen() // hardware CRC disabled (?)
-            .clear_bit()
-    });
-
-    dp.SPI1.cr2.modify(|_, w| {
-        w.ssoe()
-            .set_bit() // SS output enabled
-            .frf()
-            .clear_bit() // Motorola frame format (not TI)
-    });
-
-    let spi = Spi4::new(dp.SPI1, sck, miso, mosi);
+    // dp.SPI1.cr1.modify(|r, w| {
+    //     w.cpha() // clock phase
+    //         .bit(mode.phase == Phase::CaptureOnSecondTransition)
+    //         .cpol() // clock polarity
+    //         .bit(mode.polarity == Polarity::IdleHigh)
+    //         .bidimode() // bidirectional half duplex mode
+    //         .clear_bit()
+    //         .bidioe() // bidi output mode
+    //         .clear_bit()
+    //         .br() // baud rate = 1/16 f_PCLK
+    //         .div16()
+    //         .mstr() // master mode enabled
+    //         .set_bit()
+    //         .ssm() // software slave management
+    //         .set_bit()
+    //         .ssi()
+    //         .set_bit()
+    //         .dff() // 8 bit data frame format
+    //         .eight_bit()
+    //         .lsbfirst() // MSB first
+    //         .clear_bit()
+    //         .crcen() // hardware CRC disabled (?)
+    //         .clear_bit()
+    // });
+    // dp.SPI1.cr2.modify(|_, w| {
+    //     w.ssoe()
+    //         .set_bit() // SS output enabled
+    //         .frf()
+    //         .clear_bit() // Motorola frame format (not TI)
+    // });
+    // let spi = Spi4::new(dp.SPI1, sck, miso, mosi);
 
     // let k = reset.get_state();
     // hprintln!("k: {:?}", k);
@@ -217,7 +213,8 @@ fn main_bluetooth() -> ! {
     let mut bt = BluetoothSpi::new(spi, cs, reset, input);
     let mut delay = cp.SYST.delay(&clocks);
 
-    bt.reset(&mut delay);
+    // bt.reset(&mut delay);
+    bt.reset_with_delay(&mut delay, 10u32).unwrap();
 
     uprintln!(uart, "wat 1");
 
@@ -430,6 +427,7 @@ fn main_adc() -> ! {
 
 // #[entry]
 #[allow(unreachable_code)]
+#[cfg(feature = "nope")]
 fn main_imu2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();

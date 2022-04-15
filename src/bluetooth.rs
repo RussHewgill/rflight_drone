@@ -10,13 +10,17 @@ use core::ptr;
 use cortex_m::peripheral::SYST;
 use cortex_m_semihosting::hprintln;
 use embedded_hal as hal;
-use hal::{
-    digital::blocking::{InputPin, OutputPin},
-    spi::{
-        self,
-        blocking::{Read, Transfer, TransferInplace, Write},
-    },
-};
+
+use hal::digital::v2::{InputPin, OutputPin};
+
+// use hal::{
+//     digital::blocking::{InputPin, OutputPin},
+//     spi::{
+//         self,
+//         blocking::{Read, Transfer, TransferInplace, Write},
+//     },
+// };
+
 use stm32f4::stm32f401::{Peripherals, GPIOB, RCC, SPI1, SPI2};
 use stm32f4xx_hal::{
     gpio::{Alternate, Pin, PinExt, PA8, PB13, PB15},
@@ -151,14 +155,38 @@ impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
 // impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
+    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+        + hal::blocking::spi::Write<u8, Error = SpiError>,
+
     // SPI: Transfer<u8, Error = SpiError>
     //     + Write<u8, Error = SpiError>
     //     + Read<u8, Error = SpiError>
     //     + TransferInplace<u8, Error = SpiError>,
+    // CS: OutputPin<Error = GpioError>,
+    // Reset: OutputPin<Error = GpioError>,
+    // Input: InputPin<Error = GpioError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
 {
+    pub fn reset_with_delay<D, UXX>(
+        &mut self,
+        delay: &mut D,
+        time: UXX,
+    ) -> nb::Result<(), GpioError>
+    where
+        D: hal::blocking::delay::DelayMs<UXX>,
+        UXX: Copy,
+    {
+        self.reset.set_low().map_err(nb::Error::Other)?;
+        delay.delay_ms(time);
+
+        self.reset.set_high().map_err(nb::Error::Other)?;
+        delay.delay_ms(time);
+
+        Ok(())
+    }
+
     // pub fn reset<T>(&mut self, timer: &mut T)
     // where
     //     T: hal::delay::blocking::DelayUs,
@@ -183,21 +211,6 @@ where
         self.input.is_high()
     }
 
-    // pub fn test(
-    //     &mut self,
-    //     access_byte: AccessByte,
-    //     uart: &mut UART,
-    // ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
-    //     self.cs
-    //         .set_low()
-    //         .map_err(BTError::Gpio)
-    //         .map_err(nb::Error::Other)?;
-    //     let write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
-    //     let mut read_header = [0x00; 5];
-    //     self.spi.transfer(&mut read_header, &write_header).unwrap();
-    //     unimplemented!()
-    // }
-
     pub fn block_until_ready(
         &mut self,
         access_byte: AccessByte,
@@ -206,13 +219,19 @@ where
         let mut x = 0;
         loop {
             x += 1;
-            let mut write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
-            let mut read_header = [0xff; 5];
+            // let mut write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+            // let mut read_header = [0xff; 5];
             // let e = self.spi.transfer(&mut read_header, &write_header);
 
-            let e = self.spi.transfer(&mut read_header, &write_header);
+            let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
 
-            cortex_m::asm::dsb();
+            // let e = self.spi.transfer(&mut read_header, &write_header);
+            // cortex_m::asm::dsb();
+
+            self.spi
+                .transfer(&mut header)
+                .map_err(BTError::Spi)
+                .map_err(nb::Error::Other)?;
 
             // let read_header =
             //     stm32f4xx_hal::prelude::_embedded_hal_blocking_spi_Transfer::transfer(
@@ -238,59 +257,59 @@ where
             //     uprintln!(uart, "header: {:#010b}", read_header[0]);
             // }
 
-            if read_header[0] == 0x02 {
-                let a = LittleEndian::read_u16(&read_header[1..]);
-                let b = LittleEndian::read_u16(&read_header[3..]);
-                uprintln!(uart, "ready: {:?}, {:?}", a, b);
-                return Ok((a, b));
-            } else {
-                // uprintln!(
-                //     uart,
-                //     "nope: {:#010b} {:#010b} {:#010b} {:#010b} {:#010b}",
-                //     read_header[0],
-                //     read_header[1],
-                //     read_header[2],
-                //     read_header[3],
-                //     read_header[4],
-                // );
-                // uprintln!(
-                //     uart,
-                //     "      {:#010b} {:#010b} {:#010b} {:#010b} {:#010b}",
-                //     write_header[0],
-                //     write_header[1],
-                //     write_header[2],
-                //     write_header[3],
-                //     write_header[4],
-                // );
-
-                self.cs
-                    .set_high()
-                    .map_err(BTError::Gpio)
-                    .map_err(nb::Error::Other)?;
-                self.cs
-                    .set_low()
-                    .map_err(BTError::Gpio)
-                    .map_err(nb::Error::Other)?;
-            }
+            // if read_header[0] == 0x02 {
+            //     let a = LittleEndian::read_u16(&read_header[1..]);
+            //     let b = LittleEndian::read_u16(&read_header[3..]);
+            //     uprintln!(uart, "ready: {:?}, {:?}", a, b);
+            //     return Ok((a, b));
+            // } else {
+            //     // uprintln!(
+            //     //     uart,
+            //     //     "nope: {:#010b} {:#010b} {:#010b} {:#010b} {:#010b}",
+            //     //     read_header[0],
+            //     //     read_header[1],
+            //     //     read_header[2],
+            //     //     read_header[3],
+            //     //     read_header[4],
+            //     // );
+            //     // uprintln!(
+            //     //     uart,
+            //     //     "      {:#010b} {:#010b} {:#010b} {:#010b} {:#010b}",
+            //     //     write_header[0],
+            //     //     write_header[1],
+            //     //     write_header[2],
+            //     //     write_header[3],
+            //     //     write_header[4],
+            //     // );
+            //     self.cs
+            //         .set_high()
+            //         .map_err(BTError::Gpio)
+            //         .map_err(nb::Error::Other)?;
+            //     self.cs
+            //         .set_low()
+            //         .map_err(BTError::Gpio)
+            //         .map_err(nb::Error::Other)?;
+            // }
 
             // match parse_spi_header(&read_header) {
-            //     Ok(lens) => {
-            //         // hprintln!("x: {:?}", x);
-            //         uprintln!(uart, "x: {:?}", x);
-            //         return Ok(lens);
-            //     }
-            //     Err(nb::Error::WouldBlock) => {
-            //         self.cs
-            //             .set_high()
-            //             .map_err(BTError::Gpio)
-            //             .map_err(nb::Error::Other)?;
-            //         self.cs
-            //             .set_low()
-            //             .map_err(BTError::Gpio)
-            //             .map_err(nb::Error::Other)?;
-            //     }
-            //     Err(e) => return Err(e),
-            // }
+            match parse_spi_header(&header) {
+                Ok(lens) => {
+                    // hprintln!("x: {:?}", x);
+                    uprintln!(uart, "x: {:?}", x);
+                    return Ok(lens);
+                }
+                Err(nb::Error::WouldBlock) => {
+                    self.cs
+                        .set_high()
+                        .map_err(BTError::Gpio)
+                        .map_err(nb::Error::Other)?;
+                    self.cs
+                        .set_low()
+                        .map_err(BTError::Gpio)
+                        .map_err(nb::Error::Other)?;
+                }
+                Err(e) => return Err(e),
+            }
         }
     }
 

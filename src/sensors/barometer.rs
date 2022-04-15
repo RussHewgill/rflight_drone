@@ -1,8 +1,9 @@
 use embedded_hal as hal;
-use hal::spi::{
-    self,
-    blocking::{Read, Transfer, Write},
-};
+
+// use hal::spi::{
+//     self,
+//     blocking::{Read, Transfer, Write},
+// };
 
 use stm32f4xx_hal::prelude::*;
 
@@ -18,17 +19,17 @@ impl<CS> Barometer<CS> {
     }
 }
 
-impl<CS, PinError> Barometer<CS>
-where
-    CS: hal::digital::blocking::OutputPin<Error = PinError>,
-{
-    // pub fn write_reg(&mut self, reg: u8, val: u8) {
-    //     let mut bytes = [(reg << 1) | SPI_WRITE, val];
-    //     self.cs.set_low().ok();
-    //     self.spi.write(&mut bytes).ok();
-    //     self.cs.set_high().ok();
-    // }
-}
+// impl<CS, PinError> Barometer<CS>
+// where
+//     CS: hal::digital::blocking::OutputPin<Error = PinError>,
+// {
+//     // pub fn write_reg(&mut self, reg: u8, val: u8) {
+//     //     let mut bytes = [(reg << 1) | SPI_WRITE, val];
+//     //     self.cs.set_low().ok();
+//     //     self.spi.write(&mut bytes).ok();
+//     //     self.cs.set_high().ok();
+//     // }
+// }
 
 // #[allow(non_camel_case_types)]
 // #[derive(Debug)]
