@@ -38,7 +38,44 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use crate::{spi::Spi4, uart::*, uprintln};
 
-use self::{hci::*, rx_buffer::Buffer};
+use self::rx_buffer::Buffer;
+
+pub mod bt_flight_control {
+    use embedded_hal as hal;
+    use hal::digital::v2::{InputPin, OutputPin};
+
+    use stm32f4::stm32f401::{RCC, SPI1};
+    use stm32f4xx_hal::{
+        prelude::*,
+        spi::{Error as SpiError, NoMiso},
+    };
+
+    use super::BluetoothSpi;
+
+    impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+    where
+        SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+            + hal::blocking::spi::Write<u8, Error = SpiError>,
+        CS: OutputPin<Error = GpioError>,
+        Reset: OutputPin<Error = GpioError>,
+        Input: InputPin<Error = GpioError>,
+    {
+        pub fn init_bluetooth(&mut self) {
+            unimplemented!()
+        }
+    }
+
+    // pub fn init_bluetooth<'buf>(
+    //     // rcc: &mut RCC,
+    //     // spi1: SPI1,
+    //     clocks: &Clocks,
+    //     buffer: &'buf mut [u8],
+    // ) -> BluetoothSpi<'buf, Spi<SPI1, _, _>, Pin<'B', 0, Output>, Pin<'B', 2, Output>, PA4> {
+    //     let spi = spi1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    //     let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
+    //     bt
+    // }
+}
 
 // pub type BtSpi = stm32f4xx_hal::spi::Spi<
 //         SPI1,
@@ -116,6 +153,12 @@ use self::{hci::*, rx_buffer::Buffer};
 /// #define BNRG_SPI_IRQ_PORT           GPIOA
 /// #define BNRG_SPI_IRQ_CLK_ENABLE()   __GPIOA_CLK_ENABLE()
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AccessByte {
+    Read = 0x0A,
+    Write = 0x0B,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum BTError<SpiError, GpioError> {
     /// SPI errors occur if there is an underlying error during a transfer.
@@ -140,8 +183,8 @@ pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
 }
 
 /// new
-// impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
 impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
+    // impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
     // pub fn new(spi: Spi4, cs: CS, reset: Reset, input: Input) -> Self {
     pub fn new(spi: SPI, cs: CS, reset: Reset, input: Input, buffer: &'buf mut [u8]) -> Self {
         Self {
@@ -489,6 +532,76 @@ impl bluetooth_hci::Vendor for BlueNRGTypes {
     type Event = self::events::BlueNRGEvent;
 }
 
+/// Vendor-specific interpretation of the local version information from the controller.
+#[derive(Clone)]
+pub struct Version {
+    /// Version of the controller hardware.
+    pub hw_version: u8,
+
+    /// Major version of the controller firmware
+    pub major: u8,
+
+    /// Minor version of the controller firmware
+    pub minor: u8,
+
+    /// Patch version of the controller firmware
+    pub patch: u8,
+}
+
+/// Extension trait to convert [`hci::event::command::LocalVersionInfo`] into the BlueNRG-specific
+/// [`Version`] struct.
+pub trait LocalVersionInfoExt {
+    /// Converts LocalVersionInfo as returned by the controller into a BlueNRG-specific [`Version`]
+    /// struct.
+    fn bluenrg_version(&self) -> Version;
+}
+
+impl<VS> LocalVersionInfoExt for bluetooth_hci::event::command::LocalVersionInfo<VS> {
+    fn bluenrg_version(&self) -> Version {
+        Version {
+            hw_version: (self.hci_revision >> 8) as u8,
+            major: (self.hci_revision & 0xFF) as u8,
+            minor: ((self.lmp_subversion >> 4) & 0xF) as u8,
+            patch: (self.lmp_subversion & 0xF) as u8,
+        }
+    }
+}
+
+/// Hardware event codes returned by the `HardwareError` HCI event.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum HardwareError {
+    /// Error on the SPI bus has been detected, most likely caused by incorrect SPI configuration on
+    /// the external micro-controller.
+    SpiFraming,
+
+    /// Caused by a slow crystal startup and they are an indication that the HS_STARTUP_TIME in the
+    /// device configuration needs to be tuned. After this event is recommended to hardware reset
+    /// the device.
+    RadioState,
+
+    /// Caused by a slow crystal startup and they are an indication that the HS_STARTUP_TIME in the
+    /// device configuration needs to be tuned. After this event is recommended to hardware reset
+    /// the device.
+    TimerOverrun,
+}
+
+/// Error type for `TryFrom<u8>` to `HardwareError`. Includes the invalid byte.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct InvalidHardwareError(pub u8);
+
+impl TryFrom<u8> for HardwareError {
+    type Error = InvalidHardwareError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(HardwareError::SpiFraming),
+            1 => Ok(HardwareError::RadioState),
+            2 => Ok(HardwareError::TimerOverrun),
+            _ => Err(InvalidHardwareError(value)),
+        }
+    }
+}
+
+#[cfg(feature = "nope")]
 pub mod hci {
     use byteorder::{ByteOrder, LittleEndian};
     use stm32f4xx_hal::nb;
@@ -502,12 +615,6 @@ pub mod hci {
     //     ocf: u16,
     //     // event: i32,
     // }
-
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    pub enum AccessByte {
-        Read = 0x0A,
-        Write = 0x0B,
-    }
 
     impl BluetoothHCI {
         pub fn new() -> Self {

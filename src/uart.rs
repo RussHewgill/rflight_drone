@@ -51,6 +51,20 @@ impl core::fmt::Write for UART {
 }
 
 #[macro_export]
+macro_rules! uprint {
+	  ($uart:expr, $fmt:expr) => {
+        // core::fmt::Write::write_str(&mut $uart, concat!($fmt, "\r\n")).unwrap();
+        $uart.write_str($fmt).unwrap();
+	  };
+	  ($uart:expr, $fmt:expr, $($arg:tt)*) => {
+        // writeln!($uart.tx, ).unwrap();
+        // core::fmt::Write::write_str(&mut $uart, format_args!(concat!($fmt, "\n"), $($arg)*)).unwrap();
+        // core::fmt::Write::write_fmt(&mut $uart, format_args!(concat!($fmt, "\r\n"), $($arg)*)).unwrap();
+        $uart.write_fmt(format_args!($fmt, $($arg)*)).unwrap();
+	  };
+}
+
+#[macro_export]
 macro_rules! uprintln {
 	  ($uart:expr) => {
         writeln!($uart.tx, "").unwrap();

@@ -15,11 +15,14 @@ pub mod uart;
 
 use adc::*;
 use bluetooth::*;
+// use bluetooth_hci::host::Hci;
+// use bluetooth_hci::host::uart::Hci;
 // use sensors::barometer::*;
 // use sensors::imu::*;
 // use sensors::magneto::*;
 // use sensors::*;
 use spi::*;
+use stm32f4xx_hal::block;
 use uart::*;
 
 // pick a panicking behavior
@@ -232,15 +235,58 @@ fn main_bluetooth() -> ! {
     //     .unwrap();
     // bt.cs_enable(false).unwrap(); // set high
 
+    use bluetooth_hci::host::uart::Hci as HciUart;
+    use bluetooth_hci::host::Hci;
+
+    let e = block!(bt.read_local_version_information()).unwrap();
+    // uprintln!(uart, "e = {:?}", e);
+
+    // for c in buffer.chunks(32) {
+    //     for b in c {
+    //         uprint!(uart, "{:#04x} ", b);
+    //     }
+    //     uprintln!(uart, " === ");
+    // }
+
+    use stm32f4xx_hal::nb;
+
+    loop {
+        match block!(bt.read()) {
+            Ok(p) => {
+                let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                match e {
+                    bluetooth_hci::event::Event::ConnectionComplete(params) => {
+                        // handle the new connection
+                    }
+                    bluetooth_hci::event::Event::ReadRemoteVersionInformationComplete(v) => {
+                        uprintln!(uart, "v = {:?}", v);
+                    }
+                    bluetooth_hci::event::Event::Vendor(
+                        crate::bluetooth::events::BlueNRGEvent::HalInitialized(reason),
+                    ) => {
+                        // handle the BlueNRG chip reset
+                    }
+                    ev => {
+                        uprintln!(uart, "ev = {:?}", ev);
+                    },
+                }
+
+            }
+            Err(e) => {
+                unimplemented!()
+            }
+            // Err(nb::Error::Other(_)) => (),
+            // Err(nb::Error::WouldBlock) => (),
+        }
+    }
+
+    // let e = block!(bt.read()).unwrap();
+    // uprintln!(uart, "e = {:?}", e);
+
     // uprintln!(uart, "a: {:?}", a);
     // uprintln!(uart, "b: {:?}", b);
 
-    // hprintln!("a: {:?}", a);
-    // hprintln!("b: {:?}", b);
-
-    // let (a, b) = bt.test(hci::AccessByte::Read, &mut uart).unwrap();
-
-    loop {}
+    // loop {}
 }
 
 // #[entry]
