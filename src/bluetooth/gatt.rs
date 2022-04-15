@@ -3,10 +3,13 @@
 use bluetooth_hci as hci;
 use byteorder;
 use embedded_hal as hal;
-use hal::{
-    digital::blocking::{InputPin, OutputPin},
-    spi::blocking::{Read, Transfer, TransferInplace, Write},
-};
+
+use hal::digital::v2::{InputPin, OutputPin};
+// use hal::{
+//     digital::blocking::{InputPin, OutputPin},
+//     spi::blocking::{Read, Transfer, TransferInplace, Write},
+// };
+
 use stm32f4xx_hal::nb;
 use stm32f4xx_hal::spi::Error as SpiError;
 
@@ -881,10 +884,12 @@ pub trait Commands {
     ) -> nb::Result<(), Error<Self::Error>>;
 }
 
-impl<CS, Reset, Input, GpioError> Commands for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
-// impl<SPI, CS, Reset, Input, GpioError> Commands
-//     for crate::bluetooth::BluetoothSpi<SPI, CS, Reset, Input>
+// impl<CS, Reset, Input, GpioError> Commands for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
+impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
+    for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
 where
+    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+        + hal::blocking::spi::Write<u8, Error = SpiError>,
     // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
     // SPI: Transfer<u8, Error = SpiError>
     //     + Write<u8, Error = SpiError>

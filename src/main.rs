@@ -210,7 +210,9 @@ fn main_bluetooth() -> ! {
 
     uprintln!(uart, "wat 0");
 
-    let mut bt = BluetoothSpi::new(spi, cs, reset, input);
+    let mut buffer = [0u8; 128];
+
+    let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
     let mut delay = cp.SYST.delay(&clocks);
 
     // bt.reset(&mut delay);
@@ -220,18 +222,18 @@ fn main_bluetooth() -> ! {
 
     uprintln!(uart, "wat 2");
 
-    bt.cs_enable(true).unwrap(); // set low
-    let (a, b) = bt
-        .block_until_ready(
-            // hci::AccessByte::Write,
-            hci::AccessByte::Read,
-            &mut uart,
-        )
-        .unwrap();
-    bt.cs_enable(false).unwrap(); // set high
+    // bt.cs_enable(true).unwrap(); // set low
+    // let (a, b) = bt
+    //     .block_until_ready(
+    //         // hci::AccessByte::Write,
+    //         hci::AccessByte::Read,
+    //         // &mut uart,
+    //     )
+    //     .unwrap();
+    // bt.cs_enable(false).unwrap(); // set high
 
-    uprintln!(uart, "a: {:?}", a);
-    uprintln!(uart, "b: {:?}", b);
+    // uprintln!(uart, "a: {:?}", a);
+    // uprintln!(uart, "b: {:?}", b);
 
     // hprintln!("a: {:?}", a);
     // hprintln!("b: {:?}", b);
