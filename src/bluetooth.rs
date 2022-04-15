@@ -46,13 +46,15 @@ pub mod bt_flight_control {
 
     use stm32f4::stm32f401::{RCC, SPI1};
     use stm32f4xx_hal::{
-        nb,
+        block, nb,
         prelude::*,
         spi::{Error as SpiError, NoMiso},
     };
 
     use bluetooth_hci::host::uart::Hci as HciUart;
     use bluetooth_hci::host::Hci;
+
+    use crate::uart::UART;
 
     // use super::gap::Commands as GapCommands;
     use super::gatt::Commands as GattCommands;
@@ -69,12 +71,27 @@ pub mod bt_flight_control {
         Reset: OutputPin<Error = GpioError>,
         Input: InputPin<Error = GpioError>,
     {
-        pub fn init_bluetooth(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        pub fn init_bluetooth(
+            &mut self,
+            uart: &mut UART,
+        ) -> nb::Result<(), BTError<SpiError, GpioError>> {
             // bt.reset_with_delay(&mut delay, 10u32).unwrap();
 
             self.init()?;
 
-            unimplemented!()
+            match block!(self.read()) {
+                Ok(p) => {
+                    let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                    match e {
+                        // super::ev_command::ReturnParameters::GattInit(status) => {
+                        // }
+                        _ => unimplemented!(),
+                    }
+                }
+                _ => unimplemented!(),
+            }
+
+            Ok(())
         }
     }
 }

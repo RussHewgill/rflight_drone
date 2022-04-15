@@ -48,20 +48,7 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-#[inline(never)]
-fn delay(tim9: &stm32f401::tim9::RegisterBlock, ms: u16) {
-    unsafe {
-        tim9.arr.write(|w| w.arr().bits(ms));
-    }
-
-    tim9.cr1.modify(|_, w| w.cen().set_bit());
-
-    while !tim9.sr.read().uif().bit_is_set() {}
-
-    tim9.sr.modify(|_, w| w.uif().clear_bit());
-}
-
-// #[entry]
+#[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -223,6 +210,10 @@ fn main_bluetooth() -> ! {
 
     uprintln!(uart, "wat 1");
 
+    // uprintln!(uart, "c = {:?}", crate::bluetooth::opcode::GATT_INIT);
+
+    bt.init_bluetooth(&mut uart).unwrap();
+
     // bt.cs_enable(true).unwrap(); // set low
     // let (a, b) = bt
     //     .block_until_ready(
@@ -233,8 +224,8 @@ fn main_bluetooth() -> ! {
     //     .unwrap();
     // bt.cs_enable(false).unwrap(); // set high
 
-    use bluetooth_hci::host::uart::Hci as HciUart;
-    use bluetooth_hci::host::Hci;
+    // use bluetooth_hci::host::uart::Hci as HciUart;
+    // use bluetooth_hci::host::Hci;
 
     // let e = block!(bt.read_local_version_information()).unwrap();
     // uprintln!(uart, "e = {:?}", e);
@@ -246,37 +237,34 @@ fn main_bluetooth() -> ! {
     //     uprintln!(uart, " === ");
     // }
 
-    use stm32f4xx_hal::nb;
-
-    loop {
-        match block!(bt.read()) {
-            Ok(p) => {
-                let bluetooth_hci::host::uart::Packet::Event(e) = p;
-                match e {
-                    bluetooth_hci::event::Event::ConnectionComplete(params) => {
-                        // handle the new connection
-                    }
-                    bluetooth_hci::event::Event::ReadRemoteVersionInformationComplete(v) => {
-                        uprintln!(uart, "v = {:?}", v);
-                    }
-                    bluetooth_hci::event::Event::Vendor(
-                        crate::bluetooth::events::BlueNRGEvent::HalInitialized(reason),
-                    ) => {
-                        // handle the BlueNRG chip reset
-                    }
-                    ev => {
-                        uprintln!(uart, "ev = {:?}", ev);
-                    },
-                }
-
-            }
-            Err(e) => {
-                unimplemented!()
-            }
-            // Err(nb::Error::Other(_)) => (),
-            // Err(nb::Error::WouldBlock) => (),
-        }
-    }
+    // loop {
+    //     match block!(bt.read()) {
+    //         Ok(p) => {
+    //             let bluetooth_hci::host::uart::Packet::Event(e) = p;
+    //             match e {
+    //                 bluetooth_hci::event::Event::ConnectionComplete(params) => {
+    //                     // handle the new connection
+    //                 }
+    //                 bluetooth_hci::event::Event::ReadRemoteVersionInformationComplete(v) => {
+    //                     uprintln!(uart, "v = {:?}", v);
+    //                 }
+    //                 bluetooth_hci::event::Event::Vendor(
+    //                     crate::bluetooth::events::BlueNRGEvent::HalInitialized(reason),
+    //                 ) => {
+    //                     // handle the BlueNRG chip reset
+    //                 }
+    //                 ev => {
+    //                     uprintln!(uart, "ev = {:?}", ev);
+    //                 },
+    //             }
+    //         }
+    //         Err(e) => {
+    //             unimplemented!()
+    //         }
+    //         // Err(nb::Error::Other(_)) => (),
+    //         // Err(nb::Error::WouldBlock) => (),
+    //     }
+    // }
 
     // let e = block!(bt.read()).unwrap();
     // uprintln!(uart, "e = {:?}", e);
@@ -284,7 +272,7 @@ fn main_bluetooth() -> ! {
     // uprintln!(uart, "a: {:?}", a);
     // uprintln!(uart, "b: {:?}", b);
 
-    // loop {}
+    loop {}
 }
 
 // #[entry]
@@ -296,28 +284,15 @@ fn main_uart2() -> ! {
     dp.RCC
         .ahb1enr
         .modify(|r, w| w.gpioaen().set_bit().gpioben().set_bit());
-
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
-
     let mut delay = dp.TIM1.delay_ms(&clocks);
-
     let mut gpioa = dp.GPIOA.split();
-
     let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
-    let mut value: u8 = 0;
+    uprintln!(uart, "c = {:?}", crate::bluetooth::opcode::GATT_INIT);
 
-    loop {
-        // print some value every 500 ms, value will overflow after 255
-        // writeln!(tx, "value: {:02}\r", value).unwrap();
-
-        use core::fmt::Write;
-        writeln!(uart, "wat: {:?}\r", value).unwrap();
-
-        value = value.wrapping_add(1);
-        delay.delay(2.secs());
-    }
+    loop {}
 }
 
 // #[entry]
@@ -430,7 +405,7 @@ fn main_adc() -> ! {
     loop {}
 }
 
-#[entry]
+// #[entry]
 #[allow(unreachable_code)]
 // #[cfg(feature = "nope")]
 fn main_imu2() -> ! {
