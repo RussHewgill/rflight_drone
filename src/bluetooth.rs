@@ -6,6 +6,8 @@ pub mod gatt;
 pub mod opcode;
 pub mod rx_buffer;
 
+pub mod hal_bt;
+
 use arrayvec::ArrayVec;
 use core::ptr;
 use cortex_m::peripheral::SYST;
