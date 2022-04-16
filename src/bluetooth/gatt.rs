@@ -884,31 +884,20 @@ pub trait Commands {
     ) -> nb::Result<(), Error<Self::Error>>;
 }
 
-// // impl<CS, Reset, Input, GpioError> Commands for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
-// impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
-//     // for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
-//     for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
-// where
-//     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-//         + hal::blocking::spi::Write<u8, Error = SpiError>,
-//     // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
-//     // SPI: Transfer<u8, Error = SpiError>
-//     //     + Write<u8, Error = SpiError>
-//     //     + Read<u8, Error = SpiError>
-//     //     + TransferInplace<u8, Error = SpiError>,
-//     CS: OutputPin<Error = GpioError>,
-//     Reset: OutputPin<Error = GpioError>,
-//     Input: InputPin<Error = GpioError>,
-// {
-
-impl<'bnrg, 'spi, 'dbuf, SPI, OutputPin1, OutputPin2, InputPin, SpiError, GpioError> Commands
-    for crate::ActiveBlueNRG<'bnrg, 'spi, 'dbuf, SPI, OutputPin1, OutputPin2, InputPin, GpioError>
+// impl<CS, Reset, Input, GpioError> Commands for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
+impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
+    for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
-    OutputPin1: hal::digital::v2::OutputPin<Error = GpioError>,
-    OutputPin2: hal::digital::v2::OutputPin<Error = GpioError>,
-    InputPin: hal::digital::v2::InputPin<Error = GpioError>,
+    // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
+    // SPI: Transfer<u8, Error = SpiError>
+    //     + Write<u8, Error = SpiError>
+    //     + Read<u8, Error = SpiError>
+    //     + TransferInplace<u8, Error = SpiError>,
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+    Input: InputPin<Error = GpioError>,
 {
     type Error = crate::bluetooth::BTError<SpiError, GpioError>;
 

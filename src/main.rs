@@ -17,6 +17,7 @@ pub mod uart;
 use adc::*;
 use bluetooth::*;
 use bt_control::*;
+use byteorder::ByteOrder;
 // use bluetooth_hci::host::Hci;
 // use bluetooth_hci::host::uart::Hci;
 use sensors::barometer::*;
@@ -51,7 +52,7 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-#[entry]
+// #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -207,10 +208,9 @@ fn main_bluetooth() -> ! {
 
     let mut delay = cp.SYST.delay(&clocks);
 
-    // let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
+    let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
 
-    // // bt.reset(&mut delay);
-    // bt.reset_with_delay(&mut delay, 10u32).unwrap();
+    bt.reset_with_delay(&mut delay, 10u32).unwrap();
 
     uprintln!(uart, "wat 1");
 
@@ -218,34 +218,36 @@ fn main_bluetooth() -> ! {
 
     use bluetooth_hci::host::uart::Hci as HciUart;
     use bluetooth_hci::host::Hci;
+    use bluetooth_hci::Controller;
 
-    let mut bt = BlueNRG::new(&mut buffer, cs, input, reset);
-
-    // bt.with_spi(&mut spi, |c| {
-    //     //
-    //     block!(c.read_local_version_information())
-    // })
-    // .unwrap();
-
-    // let e = block!(bt.read_local_version_information()).unwrap();
-    // uprintln!(uart, "e = {:?}", e);
+    let e = block!(bt.read_local_version_information()).unwrap();
+    uprintln!(uart, "e = {:?}", e);
 
     // while !(bt._data_ready().unwrap()) {
     //     cortex_m::asm::nop();
     // }
 
-    bt.with_spi(&mut spi, |c| {
-        c.init_bluetooth(&mut uart).unwrap();
-    });
-
     // bt.init_bluetooth(&mut uart).unwrap();
 
-    for c in buffer.chunks(32) {
-        for b in c {
-            uprint!(uart, "{:#04x} ", b);
-        }
-        uprintln!(uart, " === ");
-    }
+    // for c in buffer.chunks(32) {
+    //     for b in c {
+    //         uprint!(uart, "{:#04x} ", b);
+    //     }
+    //     uprintln!(uart, " === ");
+    // }
+
+    let x = bt.peek(0).unwrap();
+    uprintln!(uart, "x = {:#04x}", x);
+
+    // let x: Result<
+    //     bluetooth_hci::host::uart::Packet<crate::bluetooth::events::BlueNRGEvent>,
+    //     bluetooth_hci::host::uart::Error<
+    //         BTError<SpiError, _>,
+    //         crate::bluetooth::events::BlueNRGError,
+    //     >,
+    // > = block!(bt.read());
+
+    // uprintln!(uart, "x = {:?}", x);
 
     // let e = block!(bt.read()).unwrap();
     // uprintln!(uart, "e = {:?}", e);
@@ -256,7 +258,7 @@ fn main_bluetooth() -> ! {
     loop {}
 }
 
-// #[entry]
+#[entry]
 fn main_uart2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -271,7 +273,28 @@ fn main_uart2() -> ! {
     let mut gpioa = dp.GPIOA.split();
     let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
-    uprintln!(uart, "c = {:?}", crate::bluetooth::opcode::GATT_INIT);
+    use bluetooth_hci::host::HciHeader;
+
+    const HEADER_LEN: usize = 4;
+    let mut header = [0; HEADER_LEN];
+
+    let opcode = bluetooth_hci::Opcode::new(0x04, 0x01);
+    bluetooth_hci::host::uart::CommandHeader::new(opcode, 0).copy_into_slice(&mut header);
+
+    let x = byteorder::LittleEndian::read_u16(&header[..]);
+
+    for b in header {
+        uprint!(uart, "{:#04x} ", b);
+    }
+
+    uprintln!(uart, "opcode = {:?}", opcode);
+    uprintln!(uart, "x = {:#x}", x);
+
+    // // uprintln!(uart, "c = {:?}", crate::bluetooth::opcode::GATT_INIT);
+    // uprintln!(
+    //     uart, "c = {:?}", // bluetooth_hci::opcode::READ_LOCAL_VERSION_INFO
+    //     c
+    // );
 
     loop {}
 }
