@@ -41,8 +41,8 @@ where
 
         // self.init()?;
 
-        let e = block!(self.read_local_version_information());
-        uprintln!(uart, "e = {:?}", e);
+        // let e = block!(self.read_local_version_information());
+        // uprintln!(uart, "e = {:?}", e);
 
         // block!(self.init_gatt())?;
 
@@ -54,7 +54,29 @@ where
             >,
         > = block!(self.read());
 
+        match x {
+            Ok(p) => {}
+            Err(e) => {
+                let e: bluetooth_hci::host::uart::Error<
+                    BTError<SpiError, GpioError>,
+                    crate::bluetooth::events::BlueNRGError,
+                > = e;
+                match e {
+                    bluetooth_hci::host::uart::Error::Comm(e) => {
+                        uprintln!(uart, "error 0 = {:?}", e);
+                    }
+                    bluetooth_hci::host::uart::Error::BadPacketType(e) => {
+                        uprintln!(uart, "error 1 = {:?}", e);
+                    }
+                    bluetooth_hci::host::uart::Error::BLE(e) => {
+                        uprintln!(uart, "error 2 = {:?}", e);
+                    }
+                }
+            }
+        }
+
         // match block!(self.read()) {
+        #[cfg(feature = "nope")]
         match x {
             Ok(p) => {
                 let bluetooth_hci::host::uart::Packet::Event(e) = p;
@@ -104,23 +126,17 @@ where
             Err(e) => {
                 let e: bluetooth_hci::host::uart::Error<
                         BTError<SpiError, GpioError>, crate::bluetooth::events::BlueNRGError> = e;
-
                 match e {
                     bluetooth_hci::host::uart::Error::Comm(e) => {
-                        // unimplemented!()
                         uprintln!(uart, "error 0 = {:?}", e);
                     }
                     bluetooth_hci::host::uart::Error::BadPacketType(e) => {
                         uprintln!(uart, "error 1 = {:?}", e);
-                        // unimplemented!()
                     }
                     bluetooth_hci::host::uart::Error::BLE(e) => {
                         uprintln!(uart, "error 2 = {:?}", e);
-                        // unimplemented!()
                     }
                 }
-
-                // uprintln!(uart, "error = {:?}", e);
             }
 
             // _ => unimplemented!(),
