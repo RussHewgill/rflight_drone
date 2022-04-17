@@ -52,7 +52,7 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-// #[entry]
+#[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -87,7 +87,7 @@ fn main_bluetooth() -> ! {
         dp.GPIOB.otyper.modify(|r, w| w.ot2().push_pull());
         dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr2().low_speed());
         /// Added to avoid spurious interrupt from the BlueNRG
-        dp.GPIOB.bsrr.write(|w| w.br2().set_bit());
+        dp.GPIOB.bsrr.write(|w| w.br2().clear_bit());
     }
     /// SCLK pin config, PA5
     {
@@ -104,10 +104,10 @@ fn main_bluetooth() -> ! {
         dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr6().high_speed());
         dp.GPIOA.pupdr.modify(|r, w| w.pupdr6().floating());
 
-        // XXX: ?
-        dp.GPIOA.otyper.modify(|r, w| w.ot6().push_pull());
-        dp.GPIOA.moder.modify(|r, w| w.moder6().alternate());
-        dp.GPIOA.afrl.modify(|r, w| w.afrl6().af5());
+        // // XXX: ?
+        // dp.GPIOA.otyper.modify(|r, w| w.ot6().push_pull());
+        // dp.GPIOA.moder.modify(|r, w| w.moder6().alternate());
+        // dp.GPIOA.afrl.modify(|r, w| w.afrl6().af5());
     }
     /// MOSI pin config, PA7
     {
@@ -155,17 +155,20 @@ fn main_bluetooth() -> ! {
 
     let mut cs = gpiob.pb0.into_push_pull_output().speed(Speed::High);
     cs.set_high();
-    let reset = gpiob.pb2.into_push_pull_output().speed(Speed::Low);
+    let mut reset = gpiob.pb2.into_push_pull_output().speed(Speed::Low);
+    // reset.set_low();
 
     let input = gpioa.pa4.into_pull_down_input();
 
     let sck = gpioa.pa5.into_push_pull_output().into_alternate::<5>();
-    let miso = gpioa.pa6.into_push_pull_output().into_alternate::<5>();
+    // let miso = gpioa.pa6.into_push_pull_output().into_alternate::<5>();
+    // let mosi = gpioa.pa7.into_push_pull_output().into_alternate::<5>();
+    let miso = gpioa.pa6.into_alternate::<5>();
     let mosi = gpioa.pa7.into_push_pull_output().into_alternate::<5>();
 
     let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
-    let mut spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    let mut spi = dp.SPI1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);
 
     // dp.SPI1.cr1.modify(|r, w| {
     //     w.cpha() // clock phase
@@ -204,13 +207,13 @@ fn main_bluetooth() -> ! {
 
     uprintln!(uart, "wat 0");
 
-    let mut buffer = [0u8; 128];
+    let mut buffer = [0u8; 512];
 
     let mut delay = cp.SYST.delay(&clocks);
 
     let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
 
-    bt.reset_with_delay(&mut delay, 10u32).unwrap();
+    bt.reset_with_delay(&mut delay, 5u32).unwrap();
 
     uprintln!(uart, "wat 1");
 
@@ -220,12 +223,30 @@ fn main_bluetooth() -> ! {
     use bluetooth_hci::host::Hci;
     use bluetooth_hci::Controller;
 
-    let e = block!(bt.read_local_version_information()).unwrap();
-    uprintln!(uart, "e = {:?}", e);
+    // let e = block!(bt.read_local_version_information()).unwrap();
+    // uprintln!(uart, "e = {:?}", e);
+
+    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
 
     // while !(bt._data_ready().unwrap()) {
     //     cortex_m::asm::nop();
     // }
+
+    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
+
+    let param_len = block!(bt.test1(&mut uart)).unwrap();
+    uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
+
+    // let param_len = block!(bt.test3(&mut uart)).unwrap();
+    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
+
+    // delay.delay_ms(1000u32);
+
+    // let param_len = block!(bt.test1(&mut uart)).unwrap();
+    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
+
+    // let e = block!(bt.test2(&mut uart, param_len));
+    // uprintln!(uart, "e = {:?}", e);
 
     // bt.init_bluetooth(&mut uart).unwrap();
 
@@ -236,8 +257,8 @@ fn main_bluetooth() -> ! {
     //     uprintln!(uart, " === ");
     // }
 
-    let x = bt.peek(0).unwrap();
-    uprintln!(uart, "x = {:#04x}", x);
+    // let x = bt.peek(0).unwrap();
+    // uprintln!(uart, "x = {:#04x}", x);
 
     // let x: Result<
     //     bluetooth_hci::host::uart::Packet<crate::bluetooth::events::BlueNRGEvent>,
@@ -258,7 +279,7 @@ fn main_bluetooth() -> ! {
     loop {}
 }
 
-#[entry]
+// #[entry]
 fn main_uart2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();

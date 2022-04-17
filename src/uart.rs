@@ -57,8 +57,8 @@ macro_rules! uprint {
         $uart.write_str($fmt).unwrap();
 	  };
 	  ($uart:expr, $fmt:expr, $($arg:tt)*) => {
-        // $uart.write_fmt(format_args!($fmt, $($arg)*)).unwrap();
-        core::fmt::Write::write_fmt(&mut $uart, format_args!($fmt, $($arg)*)).unwrap();
+        $uart.write_fmt(format_args!($fmt, $($arg)*)).unwrap();
+        // core::fmt::Write::write_fmt(&mut $uart, format_args!($fmt, $($arg)*)).unwrap();
 	  };
 }
 

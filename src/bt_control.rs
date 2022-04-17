@@ -8,7 +8,7 @@ use stm32f4xx_hal::{
     spi::{Error as SpiError, NoMiso},
 };
 
-use bluetooth_hci::host::uart::Hci as HciUart;
+use bluetooth_hci::host::uart::{CommandHeader, Hci as HciUart};
 use bluetooth_hci::host::Hci;
 
 use crate::{uart::*, uprintln};
@@ -55,7 +55,10 @@ where
         > = block!(self.read());
 
         match x {
-            Ok(p) => {}
+            Ok(p) => {
+                uprintln!(uart, "Ok, p = {:?}", p);
+                return Ok(());
+            }
             Err(e) => {
                 let e: bluetooth_hci::host::uart::Error<
                     BTError<SpiError, GpioError>,
@@ -64,12 +67,15 @@ where
                 match e {
                     bluetooth_hci::host::uart::Error::Comm(e) => {
                         uprintln!(uart, "error 0 = {:?}", e);
+                        return Ok(());
                     }
                     bluetooth_hci::host::uart::Error::BadPacketType(e) => {
                         uprintln!(uart, "error 1 = {:?}", e);
+                        return Ok(());
                     }
                     bluetooth_hci::host::uart::Error::BLE(e) => {
                         uprintln!(uart, "error 2 = {:?}", e);
+                        return Ok(());
                     }
                 }
             }
@@ -80,6 +86,7 @@ where
         match x {
             Ok(p) => {
                 let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                uprintln!(uart, "event = {:?}", &e);
                 match e {
                     // Event::ConnectionComplete(params) => {
                     //     // handle the new connection
@@ -105,7 +112,7 @@ where
                                 }
                             }
                             ReturnParameters::ReadLocalVersionInformation(v) => {
-                                unimplemented!()
+                                uprintln!(uart, "v = {:?}", v);
                             }
                             ps => {
                                 uprintln!(uart, "Other: return_params = {:?}", ps);
@@ -149,6 +156,94 @@ where
             // }, // _ => unimplemented!(),
         }
 
-        Ok(())
+        // Ok(())
+    }
+}
+
+fn rewrap_error<E, VE>(e: nb::Error<E>) -> nb::Error<bluetooth_hci::host::uart::Error<E, VE>> {
+    match e {
+        nb::Error::WouldBlock => nb::Error::WouldBlock,
+        nb::Error::Other(err) => nb::Error::Other(bluetooth_hci::host::uart::Error::Comm(err)),
+    }
+}
+
+fn read_event<E, T, Vendor, VE>(
+    controller: &mut T,
+) -> nb::Result<bluetooth_hci::Event<Vendor>, bluetooth_hci::host::uart::Error<E, VE>>
+where
+    T: bluetooth_hci::Controller<Error = E>,
+    Vendor: bluetooth_hci::event::VendorEvent<Error = VE>,
+{
+    const MAX_EVENT_LENGTH: usize = 255;
+    const PACKET_HEADER_LENGTH: usize = 1;
+    const EVENT_PACKET_HEADER_LENGTH: usize = 3;
+    const PARAM_LEN_BYTE: usize = 2;
+
+    let param_len = controller.peek(PARAM_LEN_BYTE).map_err(rewrap_error)? as usize;
+
+    let mut buf = [0; MAX_EVENT_LENGTH + EVENT_PACKET_HEADER_LENGTH];
+    controller
+        .read_into(&mut buf[..EVENT_PACKET_HEADER_LENGTH + param_len])
+        .map_err(rewrap_error)?;
+
+    bluetooth_hci::Event::new(bluetooth_hci::event::Packet(
+        &buf[PACKET_HEADER_LENGTH..EVENT_PACKET_HEADER_LENGTH + param_len],
+    ))
+    .map_err(|e| nb::Error::Other(bluetooth_hci::host::uart::Error::BLE(e)))
+}
+
+pub trait HciRead<E, Vendor, VE>: bluetooth_hci::host::Hci<E> {
+    /// Reads and returns a packet from the controller. Consumes exactly enough bytes to read the
+    /// next packet including its header.
+    ///
+    /// # Errors
+    ///
+    /// - Returns [`nb::Error::WouldBlock`] if the controller does not have enough bytes available
+    ///   to read the full packet right now.
+    /// - Returns [`nb::Error::Other`]`(`[`Error::BadPacketType`]`)` if the next byte is not a valid
+    ///   packet type.
+    /// - Returns [`nb::Error::Other`]`(`[`Error::BLE`]`)` if there is an error deserializing the
+    ///   packet (such as a mismatch between the packet length and the expected length of the
+    ///   event). See [`crate::event::Error`] for possible values of `e`.
+    /// - Returns [`nb::Error::Other`]`(`[`Error::Comm`]`)` if there is an error reading from the
+    ///   controller.
+    fn read2(
+        &mut self,
+    ) -> nb::Result<
+        bluetooth_hci::host::uart::Packet<Vendor>,
+        bluetooth_hci::host::uart::Error<E, VE>,
+    >
+    where
+        Vendor: bluetooth_hci::event::VendorEvent<Error = VE>;
+}
+
+const PACKET_TYPE_HCI_COMMAND: u8 = 0x01;
+// const PACKET_TYPE_ACL_DATA: u8 = 0x02;
+// const PACKET_TYPE_SYNC_DATA: u8 = 0x03;
+const PACKET_TYPE_HCI_EVENT: u8 = 0x04;
+const PACKET_TYPE_VS_EVENT: u8 = 0xFF;
+
+impl<E, Vendor, VE, T> HciRead<E, Vendor, VE> for T
+where
+    T: bluetooth_hci::Controller<Error = E, Header = CommandHeader>,
+{
+    fn read2(
+        &mut self,
+    ) -> nb::Result<
+        bluetooth_hci::host::uart::Packet<Vendor>,
+        bluetooth_hci::host::uart::Error<E, VE>,
+    >
+    where
+        Vendor: bluetooth_hci::event::VendorEvent<Error = VE>,
+    {
+        match self.peek(0).map_err(rewrap_error)? {
+            PACKET_TYPE_HCI_EVENT => {
+                Ok(bluetooth_hci::host::uart::Packet::Event(read_event(self)?))
+            }
+            PACKET_TYPE_VS_EVENT => Ok(bluetooth_hci::host::uart::Packet::Event(read_event(self)?)),
+            x => Err(nb::Error::Other(
+                bluetooth_hci::host::uart::Error::BadPacketType(x),
+            )),
+        }
     }
 }

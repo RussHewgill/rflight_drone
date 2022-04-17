@@ -26,6 +26,7 @@ use hal::digital::v2::{InputPin, OutputPin};
 
 use stm32f4::stm32f401::{Peripherals, GPIOB, RCC, SPI1, SPI2};
 use stm32f4xx_hal::{
+    block,
     gpio::{Alternate, Pin, PinExt, PA8, PB13, PB15},
     nb,
     prelude::*,
@@ -34,11 +35,13 @@ use stm32f4xx_hal::{
     time::*,
 };
 
+use bluetooth_hci::host::uart::{CommandHeader, Hci as HciUart};
+use bluetooth_hci::host::Hci;
 use bluetooth_hci::{host::HciHeader, Controller, Opcode};
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::{spi::Spi4, uart::*};
+use crate::{spi::Spi4, uart::*, uprint, uprintln};
 
 use self::rx_buffer::Buffer;
 
@@ -154,6 +157,7 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     }
 }
 
+/// reset, bluenrg fns
 // impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
 where
@@ -181,9 +185,11 @@ where
         UXX: Copy,
     {
         self.reset.set_low().map_err(nb::Error::Other)?;
+        // self.reset.set_high().map_err(nb::Error::Other)?;
         delay.delay_ms(time);
 
         self.reset.set_high().map_err(nb::Error::Other)?;
+        // self.reset.set_low().map_err(nb::Error::Other)?;
         delay.delay_ms(time);
 
         Ok(())
@@ -223,9 +229,11 @@ where
     pub fn block_until_ready(
         &mut self,
         access_byte: AccessByte,
-        // uart: &mut UART,
+        mut uart: Option<&mut UART>,
     ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
+        let mut x = 0;
         loop {
+            x += 1;
             // let mut write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
             // let mut read_header = [0xff; 5];
             // let e = self.spi.transfer(&mut read_header, &write_header);
@@ -237,9 +245,18 @@ where
                 .map_err(BTError::Spi)
                 .map_err(nb::Error::Other)?;
 
+            if let Some(ref mut uart) = uart {
+                for b in header {
+                    uprint!(uart, "{:#04x} ", b);
+                }
+                uprintln!(uart, "");
+            }
+
             match parse_spi_header(&header) {
                 Ok(lens) => {
-                    // uprintln!(uart, "ready: {:?}", lens);
+                    if let Some(ref mut uart) = uart {
+                        uprintln!(uart, "ready in {:?} loops", x);
+                    }
                     return Ok(lens);
                 }
                 Err(nb::Error::WouldBlock) => {
@@ -260,10 +277,10 @@ where
     fn block_until_ready_for(
         &mut self,
         access: AccessByte,
-        // uart: &mut UART,
+        uart: Option<&mut UART>,
     ) -> nb::Result<u16, BTError<SpiError, GpioError>> {
         // let (write_len, read_len) = self.block_until_ready(access, uart)?;
-        let (write_len, read_len) = self.block_until_ready(access)?;
+        let (write_len, read_len) = self.block_until_ready(access, uart)?;
         Ok(match access {
             AccessByte::Read => read_len,
             AccessByte::Write => write_len,
@@ -330,7 +347,7 @@ where
             return Err(nb::Error::WouldBlock);
         }
 
-        let read_len = self.block_until_ready_for(AccessByte::Read)?;
+        let read_len = self.block_until_ready_for(AccessByte::Read, None)?;
         let mut bytes_available = read_len as usize;
         while bytes_available > 0 && self.buffer.next_contiguous_slice_len() > 0 {
             let transfer_count =
@@ -351,6 +368,35 @@ where
         Ok(())
     }
 
+    #[cfg(feature = "nope")]
+    fn read_available_data_into(
+        &mut self,
+        uart: &mut UART,
+        buf: &mut [u8],
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        if !self
+            .data_ready()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?
+        {
+            return Err(nb::Error::WouldBlock);
+        }
+
+        let read_len = self.block_until_ready_for(AccessByte::Read, Some(uart))? as usize;
+
+        if read_len > buf.len() {
+            uprintln!(uart, "buffer too small");
+            return Ok(());
+        }
+
+        self.spi
+            .transfer(&mut buf[..read_len])
+            .map_err(BTError::Spi)
+            .map_err(nb::Error::Other)?;
+
+        Ok(())
+    }
+
     pub fn write_command(
         &mut self,
         opcode: Opcode,
@@ -362,6 +408,104 @@ where
             .copy_into_slice(&mut header);
 
         self.write(&header, params)
+    }
+}
+
+/// tests
+impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+where
+    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+        + hal::blocking::spi::Write<u8, Error = SpiError>,
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+    Input: InputPin<Error = GpioError>,
+{
+    pub fn test1(&mut self, uart: &mut UART) -> nb::Result<usize, BTError<SpiError, GpioError>> {
+        while !self
+            .data_ready()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?
+        {
+            return Err(nb::Error::WouldBlock);
+            // cortex_m::asm::nop();
+        }
+
+        uprintln!(uart, "wat 2");
+
+        self.cs
+            .set_low()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?;
+
+        let read_len = block!(self.block_until_ready_for(AccessByte::Read, Some(uart)))?;
+
+        let mut rx = [0u8; 128];
+
+        uprintln!(uart, "read_len = {:?}", read_len);
+
+        self.spi
+            .transfer(&mut rx[..read_len as usize])
+            .map_err(BTError::Spi)
+            .map_err(nb::Error::Other)?;
+
+        self.cs
+            .set_high()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?;
+
+        for c in rx.chunks(32) {
+            for b in c {
+                uprint!(uart, "{:#04x} ", b);
+            }
+            uprintln!(uart, "");
+        }
+        uprintln!(uart, "");
+
+        let param_len = rx[1] as usize;
+        // uprintln!(uart, "param_len = {:?}", param_len);
+
+        Ok(param_len)
+    }
+
+    pub fn test2(
+        &mut self,
+        uart: &mut UART,
+        param_len: usize,
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        const MAX_EVENT_LENGTH: usize = 255;
+        const PACKET_HEADER_LENGTH: usize = 1;
+        const EVENT_PACKET_HEADER_LENGTH: usize = 3;
+        const PARAM_LEN_BYTE: usize = 2;
+
+        let mut buf = [0; MAX_EVENT_LENGTH + EVENT_PACKET_HEADER_LENGTH];
+
+        self.cs
+            .set_low()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?;
+        // self.read_available_data_into(uart, &mut buf[..EVENT_PACKET_HEADER_LENGTH + param_len])?;
+        self.cs
+            .set_high()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?;
+
+        // self.read_into(&mut buf[..EVENT_PACKET_HEADER_LENGTH + param_len])?;
+
+        for c in buf.chunks(32) {
+            for b in c {
+                uprint!(uart, "{:#04x} ", b);
+            }
+            uprintln!(uart, "");
+        }
+
+        Ok(())
+    }
+
+    pub fn test3(&mut self, uart: &mut UART) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        // let e = block!(self.read_local_version_information())?;
+        // uprintln!(uart, "e = {:?}", e);
+
+        Ok(())
     }
 }
 
@@ -390,7 +534,7 @@ where
             .map_err(BTError::Gpio)
             .map_err(nb::Error::Other)?;
 
-        let write_len = self.block_until_ready_for(AccessByte::Write)?;
+        let write_len = self.block_until_ready_for(AccessByte::Write, None)?;
         if (write_len as usize) < header.len() + payload.len() {
             return Err(nb::Error::WouldBlock);
         }
