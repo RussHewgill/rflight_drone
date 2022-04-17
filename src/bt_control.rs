@@ -60,10 +60,10 @@ where
                 return Ok(());
             }
             Err(e) => {
-                let e: bluetooth_hci::host::uart::Error<
-                    BTError<SpiError, GpioError>,
-                    crate::bluetooth::events::BlueNRGError,
-                > = e;
+                // let e: bluetooth_hci::host::uart::Error<
+                //     BTError<SpiError, GpioError>,
+                //     crate::bluetooth::events::BlueNRGError,
+                // > = e;
                 match e {
                     bluetooth_hci::host::uart::Error::Comm(e) => {
                         uprintln!(uart, "error 0 = {:?}", e);

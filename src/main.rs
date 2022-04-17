@@ -223,8 +223,9 @@ fn main_bluetooth() -> ! {
     use bluetooth_hci::host::Hci;
     use bluetooth_hci::Controller;
 
-    // let e = block!(bt.read_local_version_information()).unwrap();
-    // uprintln!(uart, "e = {:?}", e);
+    let e = block!(bt.read_local_version_information()).unwrap();
+    // let e = block!(bt.read_local_supported_commands()).unwrap();
+    uprintln!(uart, "e = {:?}", e);
 
     // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
 
@@ -234,8 +235,8 @@ fn main_bluetooth() -> ! {
 
     // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
 
-    let param_len = block!(bt.test1(&mut uart)).unwrap();
-    uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
+    // let param_len = block!(bt.test1(&mut uart)).unwrap();
+    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
 
     // let param_len = block!(bt.test3(&mut uart)).unwrap();
     // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
@@ -248,7 +249,7 @@ fn main_bluetooth() -> ! {
     // let e = block!(bt.test2(&mut uart, param_len));
     // uprintln!(uart, "e = {:?}", e);
 
-    // bt.init_bluetooth(&mut uart).unwrap();
+    bt.init_bluetooth(&mut uart).unwrap();
 
     // for c in buffer.chunks(32) {
     //     for b in c {

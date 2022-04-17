@@ -114,8 +114,8 @@ use self::rx_buffer::Buffer;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccessByte {
-    Read = 0x0A,
-    Write = 0x0B,
+    Write = 0x0A,
+    Read = 0x0B,
 }
 
 #[derive(Debug, PartialEq)]
@@ -194,26 +194,6 @@ where
 
         Ok(())
     }
-
-    // pub fn reset<T>(&mut self, timer: &mut T)
-    // where
-    //     T: hal::delay::blocking::DelayUs,
-    // {
-    //     self.cs.set_high().ok();
-    //     timer.delay_ms(10u32).ok();
-    //     self.cs.set_low().ok();
-    //     timer.delay_ms(10u32).ok();
-    // }
-
-    // pub fn cs_enable(&mut self, enable: bool) -> Result<(), Input::Error> {
-    //     if enable {
-    //         /// Select the BT spi
-    //         self.cs.set_low()
-    //     } else {
-    //         /// Un-Select the BT spi
-    //         self.cs.set_high()
-    //     }
-    // }
 
     pub fn _data_ready(&self) -> nb::Result<bool, BTError<SpiError, GpioError>> {
         self.input
@@ -429,17 +409,17 @@ where
             return Err(nb::Error::WouldBlock);
             // cortex_m::asm::nop();
         }
-
-        uprintln!(uart, "wat 2");
+        // uprintln!(uart, "wat 2");
 
         self.cs
             .set_low()
             .map_err(BTError::Gpio)
             .map_err(nb::Error::Other)?;
 
-        let read_len = block!(self.block_until_ready_for(AccessByte::Read, Some(uart)))?;
+        // let read_len = block!(self.block_until_ready_for(AccessByte::Read, Some(uart)))?;
+        let read_len = block!(self.block_until_ready_for(AccessByte::Read, None))?;
 
-        let mut rx = [0u8; 128];
+        let mut rx = [0u8; 64];
 
         uprintln!(uart, "read_len = {:?}", read_len);
 
