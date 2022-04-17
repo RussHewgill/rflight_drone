@@ -33,19 +33,26 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
-    pub fn init_bluetooth(
-        &mut self,
+    fn handle_event_command_complete(
         uart: &mut UART,
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        // bt.reset_with_delay(&mut delay, 10u32).unwrap();
+        return_params: ReturnParameters<BlueNRGEvent>,
+    ) {
+        match return_params {
+            ReturnParameters::Vendor(VReturnParameters::GattInit(status)) => match status {
+                _ => {
+                    uprintln!(uart, "status = {:?}", status);
+                }
+            },
+            ReturnParameters::ReadLocalVersionInformation(v) => {
+                uprintln!(uart, "v = {:?}", v);
+            }
+            ps => {
+                uprintln!(uart, "Other: return_params = {:?}", ps);
+            }
+        }
+    }
 
-        // self.init()?;
-
-        // let e = block!(self.read_local_version_information());
-        // uprintln!(uart, "e = {:?}", e);
-
-        // block!(self.init_gatt())?;
-
+    pub fn read_event(&mut self, uart: &mut UART) -> nb::Result<(), BTError<SpiError, GpioError>> {
         let x: Result<
             bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
             bluetooth_hci::host::uart::Error<
@@ -56,83 +63,31 @@ where
 
         match x {
             Ok(p) => {
-                uprintln!(uart, "Ok, p = {:?}", p);
-                return Ok(());
-            }
-            Err(e) => {
-                // let e: bluetooth_hci::host::uart::Error<
-                //     BTError<SpiError, GpioError>,
-                //     crate::bluetooth::events::BlueNRGError,
-                // > = e;
-                match e {
-                    bluetooth_hci::host::uart::Error::Comm(e) => {
-                        uprintln!(uart, "error 0 = {:?}", e);
-                        return Ok(());
-                    }
-                    bluetooth_hci::host::uart::Error::BadPacketType(e) => {
-                        uprintln!(uart, "error 1 = {:?}", e);
-                        return Ok(());
-                    }
-                    bluetooth_hci::host::uart::Error::BLE(e) => {
-                        uprintln!(uart, "error 2 = {:?}", e);
-                        return Ok(());
-                    }
-                }
-            }
-        }
-
-        // match block!(self.read()) {
-        #[cfg(feature = "nope")]
-        match x {
-            Ok(p) => {
                 let bluetooth_hci::host::uart::Packet::Event(e) = p;
                 uprintln!(uart, "event = {:?}", &e);
                 match e {
-                    // Event::ConnectionComplete(params) => {
-                    //     // handle the new connection
-                    // }
+                    Event::ConnectionComplete(params) => {
+                        // handle the new connection
+                    }
                     Event::Vendor(crate::bluetooth::events::BlueNRGEvent::HalInitialized(
                         reason,
                     )) => {
                         uprintln!(uart, "bt restarted, reason = {:?}", reason);
                     }
                     Event::CommandComplete(params) => {
-                        let params: bluetooth_hci::event::command::CommandComplete<
-                            crate::bluetooth::events::BlueNRGEvent,
-                        > = params;
-
-                        uprintln!(uart, "CommandComplete");
-
-                        match params.return_params {
-                            ReturnParameters::Vendor(VReturnParameters::GattInit(status)) => {
-                                match status {
-                                    _ => {
-                                        uprintln!(uart, "status = {:?}", status);
-                                    }
-                                }
-                            }
-                            ReturnParameters::ReadLocalVersionInformation(v) => {
-                                uprintln!(uart, "v = {:?}", v);
-                            }
-                            ps => {
-                                uprintln!(uart, "Other: return_params = {:?}", ps);
-                            }
-                        }
-
-                        // unimplemented!()
+                        Self::handle_event_command_complete(uart, params.return_params);
                     }
-                    // super::ev_command::ReturnParameters::GattInit(status) => {
-                    // }
                     ev => {
-                        uprintln!(uart, "ev = {:?}", ev);
+                        uprintln!(uart, "unhandled event = {:?}", ev);
                     }
-                    // _ => unimplemented!(),
                 }
             }
 
             Err(e) => {
                 let e: bluetooth_hci::host::uart::Error<
-                        BTError<SpiError, GpioError>, crate::bluetooth::events::BlueNRGError> = e;
+                    BTError<SpiError, GpioError>,
+                    crate::bluetooth::events::BlueNRGError,
+                > = e;
                 match e {
                     bluetooth_hci::host::uart::Error::Comm(e) => {
                         uprintln!(uart, "error 0 = {:?}", e);
@@ -145,18 +100,9 @@ where
                     }
                 }
             }
-
-            // _ => unimplemented!(),
-
-            // Err(e) => match e {
-            //     nb::Error::Other(error) => {
-            //         uprintln!(uart, "error = {:?}", error);
-            //     }
-            //     nb::Error::WouldBlock => (),
-            // }, // _ => unimplemented!(),
         }
 
-        // Ok(())
+        Ok(())
     }
 }
 

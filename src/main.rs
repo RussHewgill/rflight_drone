@@ -223,33 +223,40 @@ fn main_bluetooth() -> ! {
     use bluetooth_hci::host::Hci;
     use bluetooth_hci::Controller;
 
-    let e = block!(bt.read_local_version_information()).unwrap();
-    // let e = block!(bt.read_local_supported_commands()).unwrap();
-    uprintln!(uart, "e = {:?}", e);
+    bt.read_event(&mut uart).unwrap();
 
-    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
-
-    // while !(bt._data_ready().unwrap()) {
-    //     cortex_m::asm::nop();
-    // }
-
-    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
-
-    // let param_len = block!(bt.test1(&mut uart)).unwrap();
-    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
-
-    // let param_len = block!(bt.test3(&mut uart)).unwrap();
-    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
-
-    // delay.delay_ms(1000u32);
-
-    // let param_len = block!(bt.test1(&mut uart)).unwrap();
-    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
-
-    // let e = block!(bt.test2(&mut uart, param_len));
+    // let e = block!(bt.read_local_version_information()).unwrap();
+    // // let e = block!(bt.read_local_supported_commands()).unwrap();
     // uprintln!(uart, "e = {:?}", e);
 
-    bt.init_bluetooth(&mut uart).unwrap();
+    use crate::bluetooth::gatt::Commands as GattCommands;
+
+    block!(bt.init_gatt()).unwrap();
+    block!(bt.read_event(&mut uart)).unwrap();
+
+    block!(bt.le_set_random_address()).unwrap();
+    block!(bt.read_event(&mut uart)).unwrap();
+
+    static ble_name: &'static [u8; 7] = b"DRN1120";
+
+    // let ps = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
+    //     service_handle,
+    //     characteristic_handle,
+    //     offset: 0,
+    //     value: &ble_name,
+    // };
+
+    // block!(bt.update_characteristic_value(ps)).unwrap();
+    // block!(bt.read_event(&mut uart).unwrap());
+
+    loop {
+        block!(bt.read_event(&mut uart)).unwrap();
+    }
+
+    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
+
+    // let param_len = block!(bt.test1(&mut uart)).unwrap();
+    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
 
     // for c in buffer.chunks(32) {
     //     for b in c {
@@ -258,26 +265,7 @@ fn main_bluetooth() -> ! {
     //     uprintln!(uart, " === ");
     // }
 
-    // let x = bt.peek(0).unwrap();
-    // uprintln!(uart, "x = {:#04x}", x);
-
-    // let x: Result<
-    //     bluetooth_hci::host::uart::Packet<crate::bluetooth::events::BlueNRGEvent>,
-    //     bluetooth_hci::host::uart::Error<
-    //         BTError<SpiError, _>,
-    //         crate::bluetooth::events::BlueNRGError,
-    //     >,
-    // > = block!(bt.read());
-
-    // uprintln!(uart, "x = {:?}", x);
-
-    // let e = block!(bt.read()).unwrap();
-    // uprintln!(uart, "e = {:?}", e);
-
-    // uprintln!(uart, "a: {:?}", a);
-    // uprintln!(uart, "b: {:?}", b);
-
-    loop {}
+    // loop {}
 }
 
 // #[entry]
