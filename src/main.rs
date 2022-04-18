@@ -12,22 +12,21 @@ pub mod bt_control;
 pub mod pid;
 pub mod sensors;
 pub mod spi;
+// pub mod time;
+pub mod init;
 pub mod uart;
 
 use adc::*;
 use bluetooth::*;
 use bt_control::*;
-use byteorder::ByteOrder;
-// use bluetooth_hci::host::Hci;
-// use bluetooth_hci::host::uart::Hci;
 use sensors::barometer::*;
 use sensors::imu::*;
 use sensors::magneto::*;
 use sensors::*;
 use spi::*;
-use stm32f4xx_hal::block;
-use stm32f4xx_hal::gpio::Speed;
 use uart::*;
+
+use byteorder::ByteOrder;
 
 // pick a panicking behavior
 // use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
@@ -40,10 +39,11 @@ use cortex_m::{iprintln, peripheral::ITM};
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
-use stm32f4::stm32f401::{self, SPI2};
-
 use embedded_hal as hal;
 use hal::spi::*;
+use stm32f4::stm32f401::{self, SPI2};
+use stm32f4xx_hal::block;
+use stm32f4xx_hal::gpio::Speed;
 use stm32f4xx_hal::serial::Serial;
 use stm32f4xx_hal::{
     gpio::{Pin, PinExt},
@@ -52,7 +52,62 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-#[entry]
+use rtic::app;
+
+// #[cfg(feature = "nope")]
+#[app(device = stm32f4xx_hal::pac)]
+mod app {
+    use cortex_m_semihosting::debug;
+    // use embedded_time::{clock, duration::*, rate::*, Instant, Timer};
+    use dwt_systick_monotonic::DwtSystick;
+    use fugit::{Duration, ExtU32};
+    use stm32f4::stm32f401;
+    use stm32f4xx_hal::prelude::*;
+
+    #[shared]
+    struct Shared {
+        //
+    }
+
+    #[local]
+    struct Local {
+        //
+    }
+
+    // #[monotonic(binds = SysTick, default = true)]
+    // type MonoTick = DwtSystick<1_000>; // 1000 Hz
+
+    #[init]
+    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        // debug::exit(debug::EXIT_SUCCESS); // Exit QEMU simulator
+
+        // let cp: stm32f401::CorePeripherals = cx.core;
+        // let dp: stm32f401::Peripherals = cx.device;
+
+        // /// Enable HSE
+        // dp.RCC.cr.modify(|r, w| w.hseon().set_bit());
+
+        // /// Wait until HSE is ready
+        // while dp.RCC.cr.read().hserdy().bit_is_clear() {
+        //     cortex_m::asm::nop();
+        // }
+
+        // let mut rcc = dp.RCC.constrain();
+        // let clocks = rcc.cfgr.freeze();
+
+        // let mono = MonoTick::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.hclk());
+
+        (Shared {}, Local {}, init::Monotonics())
+        // (Shared {}, Local {}, init::Monotonics(mono))
+    }
+
+    #[idle]
+    fn idle(cx: idle::Context) -> ! {
+        loop {}
+    }
+}
+
+// #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -231,13 +286,13 @@ fn main_bluetooth() -> ! {
 
     use crate::bluetooth::gatt::Commands as GattCommands;
 
-    block!(bt.init_gatt()).unwrap();
-    block!(bt.read_event(&mut uart)).unwrap();
+    // block!(bt.init_gatt()).unwrap();
+    // block!(bt.read_event(&mut uart)).unwrap();
 
-    block!(bt.le_set_random_address()).unwrap();
-    block!(bt.read_event(&mut uart)).unwrap();
+    // block!(bt.le_set_random_address()).unwrap();
+    // block!(bt.read_event(&mut uart)).unwrap();
 
-    static ble_name: &'static [u8; 7] = b"DRN1120";
+    // static ble_name: &'static [u8; 7] = b"DRN1120";
 
     // let ps = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
     //     service_handle,
