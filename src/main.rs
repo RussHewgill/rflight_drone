@@ -316,7 +316,10 @@ fn main_bluetooth() -> ! {
     block!(bt.init_gatt()).unwrap();
     block!(bt.read_event(&mut uart)).unwrap();
 
-    // block!(bt.init_gap(role))
+    let role = crate::bluetooth::gap::Role::PERIPHERAL;
+    block!(bt.init_gap(role, false, 7)).unwrap();
+    // block!(bt.read_event(&mut uart)).unwrap();
+    let gap = block!(bt.read_event_gap_init(&mut uart)).unwrap();
 
     // block!(bt.le_set_random_address()).unwrap();
     // block!(bt.read_event(&mut uart)).unwrap();

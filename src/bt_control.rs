@@ -11,7 +11,7 @@ use stm32f4xx_hal::{
 use bluetooth_hci::host::uart::{CommandHeader, Hci as HciUart};
 use bluetooth_hci::host::Hci;
 
-use crate::{uart::*, uprintln};
+use crate::{bluetooth::ev_command::GapInit, uart::*, uprintln};
 
 // use super::gap::Commands as GapCommands;
 use super::gatt::Commands as GattCommands;
@@ -48,6 +48,44 @@ where
             }
             ps => {
                 uprintln!(uart, "Other: return_params = {:?}", ps);
+            }
+        }
+    }
+
+    pub fn _read_event(
+        &mut self,
+        uart: &mut UART,
+    ) -> nb::Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>> {
+        let x: Result<
+            bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
+            bluetooth_hci::host::uart::Error<
+                BTError<SpiError, GpioError>,
+                crate::bluetooth::events::BlueNRGError,
+            >,
+        > = block!(self.read());
+
+        match x {
+            Ok(p) => {
+                let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                return Ok(e);
+            }
+            Err(e) => {
+                let e: bluetooth_hci::host::uart::Error<
+                    BTError<SpiError, GpioError>,
+                    crate::bluetooth::events::BlueNRGError,
+                > = e;
+                match e {
+                    bluetooth_hci::host::uart::Error::Comm(e) => {
+                        uprintln!(uart, "error 0 = {:?}", e);
+                    }
+                    bluetooth_hci::host::uart::Error::BadPacketType(e) => {
+                        uprintln!(uart, "error 1 = {:?}", e);
+                    }
+                    bluetooth_hci::host::uart::Error::BLE(e) => {
+                        uprintln!(uart, "error 2 = {:?}", e);
+                    }
+                }
+                unimplemented!()
             }
         }
     }
@@ -103,6 +141,19 @@ where
         }
 
         Ok(())
+    }
+
+    pub fn read_event_gap_init(
+        &mut self,
+        uart: &mut UART,
+    ) -> nb::Result<GapInit, BTError<SpiError, GpioError>> {
+        match self._read_event(uart)? {
+            Event::CommandComplete(params) => match params.return_params {
+                ReturnParameters::Vendor(VReturnParameters::GapInit(g)) => return Ok(g),
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        }
     }
 }
 
