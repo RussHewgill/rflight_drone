@@ -27,6 +27,8 @@ embedded-hal = "0.2.7"
 # embedded-hal = "1.0.0-alpha.7"
 # nb = "1.0.0"
 # embedded-time = "0.12.1"
+
+systick-monotonic = "1.0.0"
 dwt-systick-monotonic = "1.0.0"
 fugit = "0.3.5"
 

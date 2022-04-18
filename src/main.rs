@@ -55,17 +55,23 @@ use stm32f4xx_hal::{
 use rtic::app;
 
 // #[cfg(feature = "nope")]
-#[app(device = stm32f4xx_hal::pac)]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+// #[rtic::app(device = stm32f4xx_hal::pac)]
 mod app {
-    use cortex_m_semihosting::debug;
+    use cortex_m_semihosting::{debug, hprintln};
     // use embedded_time::{clock, duration::*, rate::*, Instant, Timer};
-    use dwt_systick_monotonic::DwtSystick;
-    use fugit::{Duration, ExtU32};
+    // use dwt_systick_monotonic::DwtSystick;
+    // use fugit::{Duration, ExtU32};
     use stm32f4::stm32f401;
     use stm32f4xx_hal::prelude::*;
 
+    use systick_monotonic::{ExtU64, Systick};
+
+    use crate::{init::*, uart::*, uprint, uprintln};
+
     #[shared]
     struct Shared {
+        uart: UART,
         //
     }
 
@@ -77,28 +83,50 @@ mod app {
     // #[monotonic(binds = SysTick, default = true)]
     // type MonoTick = DwtSystick<1_000>; // 1000 Hz
 
+    // #[monotonic(binds = SysTick, default = true)]
+    // type MonoTick = crate::init::Systick<1_000>; // 1000 Hz
+
+    #[monotonic(binds = SysTick, default = true)]
+    type MonoTick = Systick<1_000>; // 1000 Hz
+
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         // debug::exit(debug::EXIT_SUCCESS); // Exit QEMU simulator
 
-        // let cp: stm32f401::CorePeripherals = cx.core;
-        // let dp: stm32f401::Peripherals = cx.device;
+        let mut cp: stm32f401::CorePeripherals = cx.core;
+        let mut dp: stm32f401::Peripherals = cx.device;
 
-        // /// Enable HSE
-        // dp.RCC.cr.modify(|r, w| w.hseon().set_bit());
+        let (mut uart, clocks, mono) = init_all(cp, dp);
 
-        // /// Wait until HSE is ready
-        // while dp.RCC.cr.read().hserdy().bit_is_clear() {
-        //     cortex_m::asm::nop();
-        // }
+        uprintln!(uart, "wat 0");
 
-        // let mut rcc = dp.RCC.constrain();
-        // let clocks = rcc.cfgr.freeze();
+        uprintln!(uart, "hclk() = {:?}", clocks.hclk());
+        uprintln!(uart, "pclk1() = {:?}", clocks.pclk1());
+        uprintln!(uart, "pclk2() = {:?}", clocks.pclk2());
+        uprintln!(uart, "sysclk() = {:?}", clocks.sysclk());
 
-        // let mono = MonoTick::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.hclk());
+        // let mono = MonoTick::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.sysclk().raw());
 
-        (Shared {}, Local {}, init::Monotonics())
-        // (Shared {}, Local {}, init::Monotonics(mono))
+        let shared = Shared {
+            //
+            uart,
+        };
+
+        // test_uart::spawn().unwrap();
+        test_uart::spawn_after(1.secs()).unwrap();
+        test_uart::spawn_after(2.secs()).unwrap();
+
+        // (shared, Local {}, init::Monotonics())
+        (shared, Local {}, init::Monotonics(mono))
+    }
+
+    #[task(shared = [uart])]
+    fn test_uart(mut cx: test_uart::Context) {
+        cx.shared.uart.lock(|uart| {
+            uprintln!(uart, "wat 1");
+        });
+
+        // test_uart::spawn_after(1.secs().into()).unwrap();
     }
 
     #[idle]
