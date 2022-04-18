@@ -9,11 +9,11 @@
 pub mod adc;
 pub mod bluetooth;
 pub mod bt_control;
+pub mod init;
 pub mod pid;
 pub mod sensors;
 pub mod spi;
 // pub mod time;
-pub mod init;
 pub mod uart;
 
 use adc::*;
@@ -24,6 +24,7 @@ use sensors::imu::*;
 use sensors::magneto::*;
 use sensors::*;
 use spi::*;
+// use time::*;
 use uart::*;
 
 use byteorder::ByteOrder;
@@ -54,19 +55,18 @@ use stm32f4xx_hal::{
 
 use rtic::app;
 
-// #[cfg(feature = "nope")]
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-// #[rtic::app(device = stm32f4xx_hal::pac)]
+#[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     // use embedded_time::{clock, duration::*, rate::*, Instant, Timer};
-    // use dwt_systick_monotonic::DwtSystick;
-    // use fugit::{Duration, ExtU32};
-    use stm32f4::stm32f401;
-    use stm32f4xx_hal::prelude::*;
+    use stm32f4::stm32f401::{self, TIM2};
+    // use stm32f4xx_hal::prelude::*;
 
+    // use dwt_systick_monotonic::{DwtSystick, ExtU32};
     use systick_monotonic::{ExtU64, Systick};
 
+    // use crate::time::*;
     use crate::{init::*, uart::*, uprint, uprintln};
 
     #[shared]
@@ -83,11 +83,11 @@ mod app {
     // #[monotonic(binds = SysTick, default = true)]
     // type MonoTick = DwtSystick<1_000>; // 1000 Hz
 
-    // #[monotonic(binds = SysTick, default = true)]
-    // type MonoTick = crate::init::Systick<1_000>; // 1000 Hz
-
     #[monotonic(binds = SysTick, default = true)]
     type MonoTick = Systick<1_000>; // 1000 Hz
+
+    // #[monotonic(binds = SysTick, default = true)]
+    // type MonoTick = MonoTimer<TIM2, 1_000>; // 1000 Hz
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -98,44 +98,42 @@ mod app {
 
         let (mut uart, clocks, mono) = init_all(cp, dp);
 
-        uprintln!(uart, "wat 0");
-
+        // uprintln!(uart, "wat 0");
         uprintln!(uart, "hclk() = {:?}", clocks.hclk());
-        uprintln!(uart, "pclk1() = {:?}", clocks.pclk1());
-        uprintln!(uart, "pclk2() = {:?}", clocks.pclk2());
         uprintln!(uart, "sysclk() = {:?}", clocks.sysclk());
 
-        // let mono = MonoTick::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.sysclk().raw());
+        let local = Local {};
 
         let shared = Shared {
             //
             uart,
         };
 
-        // test_uart::spawn().unwrap();
-        test_uart::spawn_after(1.secs()).unwrap();
-        test_uart::spawn_after(2.secs()).unwrap();
+        test_uart::spawn().unwrap();
+        // test_uart::spawn_after(1.secs()).unwrap();
 
         // (shared, Local {}, init::Monotonics())
-        (shared, Local {}, init::Monotonics(mono))
+        (shared, local, init::Monotonics(mono))
     }
 
-    #[task(shared = [uart])]
+    #[task(capacity = 3, shared = [uart])]
     fn test_uart(mut cx: test_uart::Context) {
         cx.shared.uart.lock(|uart| {
             uprintln!(uart, "wat 1");
         });
 
-        // test_uart::spawn_after(1.secs().into()).unwrap();
+        test_uart::spawn_after(1.secs()).unwrap();
     }
 
     #[idle]
     fn idle(cx: idle::Context) -> ! {
-        loop {}
+        loop {
+            cortex_m::asm::nop();
+        }
     }
 }
 
-// #[entry]
+#[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -312,13 +310,18 @@ fn main_bluetooth() -> ! {
     // // let e = block!(bt.read_local_supported_commands()).unwrap();
     // uprintln!(uart, "e = {:?}", e);
 
+    use crate::bluetooth::gap::Commands as GapCommands;
     use crate::bluetooth::gatt::Commands as GattCommands;
 
-    // block!(bt.init_gatt()).unwrap();
-    // block!(bt.read_event(&mut uart)).unwrap();
+    block!(bt.init_gatt()).unwrap();
+    block!(bt.read_event(&mut uart)).unwrap();
+
+    // block!(bt.init_gap(role))
 
     // block!(bt.le_set_random_address()).unwrap();
     // block!(bt.read_event(&mut uart)).unwrap();
+
+    let stm32_uuid = 0x1FFF7A10;
 
     // static ble_name: &'static [u8; 7] = b"DRN1120";
 

@@ -2,6 +2,7 @@ pub mod ev_command;
 pub mod events;
 
 pub mod command;
+pub mod gap;
 pub mod gatt;
 pub mod opcode;
 pub mod rx_buffer;
