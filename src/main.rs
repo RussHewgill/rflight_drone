@@ -53,10 +53,6 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-use rtic::app;
-
-use crate::bluetooth::gatt::CharacteristicHandle;
-
 #[cfg(feature = "nope")]
 // #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
@@ -135,7 +131,7 @@ mod app {
     }
 }
 
-// #[entry]
+#[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -296,10 +292,11 @@ fn main_bluetooth() -> ! {
 
     let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
 
-    bt.reset_with_delay(&mut delay, 5u32).unwrap();
-    block!(bt.read_event(&mut uart)).unwrap();
+    // bt.reset_with_delay(&mut delay, 5u32).unwrap();
+    // block!(bt.read_event(&mut uart)).unwrap();
 
-    // bt.init_bt(&mut uart, &mut delay).unwrap();
+    /// Device CF:74:D9:3D:C6:C3 DRN1120
+    bt.init_bt(&mut uart, &mut delay).unwrap();
 
     loop {
         // block!(bt.read_event(&mut uart)).unwrap();
@@ -370,7 +367,7 @@ fn main_bluetooth() -> ! {
     // loop {}
 }
 
-#[entry]
+// #[entry]
 fn main_uart2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
