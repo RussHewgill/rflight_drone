@@ -55,6 +55,8 @@ use stm32f4xx_hal::{
 
 use rtic::app;
 
+use crate::bluetooth::gatt::CharacteristicHandle;
+
 #[cfg(feature = "nope")]
 // #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
@@ -133,7 +135,7 @@ mod app {
     }
 }
 
-#[entry]
+// #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -295,51 +297,62 @@ fn main_bluetooth() -> ! {
     let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
 
     bt.reset_with_delay(&mut delay, 5u32).unwrap();
-
-    uprintln!(uart, "wat 1");
-
-    // uprintln!(uart, "c = {:?}", crate::bluetooth::opcode::GATT_INIT);
-
-    use bluetooth_hci::host::uart::Hci as HciUart;
-    use bluetooth_hci::host::Hci;
-    use bluetooth_hci::Controller;
-
-    bt.read_event(&mut uart).unwrap();
-
-    // let e = block!(bt.read_local_version_information()).unwrap();
-    // // let e = block!(bt.read_local_supported_commands()).unwrap();
-    // uprintln!(uart, "e = {:?}", e);
-
-    use crate::bluetooth::gap::Commands as GapCommands;
-    use crate::bluetooth::gatt::Commands as GattCommands;
-
-    block!(bt.init_gatt()).unwrap();
     block!(bt.read_event(&mut uart)).unwrap();
 
-    let role = crate::bluetooth::gap::Role::PERIPHERAL;
-    block!(bt.init_gap(role, false, 7)).unwrap();
-    // block!(bt.read_event(&mut uart)).unwrap();
-    let gap = block!(bt.read_event_gap_init(&mut uart)).unwrap();
-
-    // block!(bt.le_set_random_address()).unwrap();
-    // block!(bt.read_event(&mut uart)).unwrap();
-
-    let stm32_uuid = 0x1FFF7A10;
-
-    // static ble_name: &'static [u8; 7] = b"DRN1120";
-
-    // let ps = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
-    //     service_handle,
-    //     characteristic_handle,
-    //     offset: 0,
-    //     value: &ble_name,
-    // };
-
-    // block!(bt.update_characteristic_value(ps)).unwrap();
-    // block!(bt.read_event(&mut uart).unwrap());
+    // bt.init_bt(&mut uart, &mut delay).unwrap();
 
     loop {
+        // block!(bt.read_event(&mut uart)).unwrap();
+    }
+
+    #[cfg(feature = "nope")]
+    {
+        bt.reset_with_delay(&mut delay, 5u32).unwrap();
+
+        uprintln!(uart, "wat 1");
+
+        // uprintln!(uart, "c = {:?}", crate::bluetooth::opcode::GATT_INIT);
+
+        use bluetooth_hci::host::uart::Hci as HciUart;
+        use bluetooth_hci::host::Hci;
+        use bluetooth_hci::Controller;
+
+        bt.read_event(&mut uart).unwrap();
+
+        // let e = block!(bt.read_local_version_information()).unwrap();
+        // // let e = block!(bt.read_local_supported_commands()).unwrap();
+        // uprintln!(uart, "e = {:?}", e);
+
+        block!(bt.init_gatt()).unwrap();
         block!(bt.read_event(&mut uart)).unwrap();
+
+        let role = crate::bluetooth::gap::Role::PERIPHERAL;
+        block!(bt.init_gap(role, false, 7)).unwrap();
+        let gap = block!(bt.read_event_gap_init(&mut uart)).unwrap();
+
+        // block!(bt.le_set_random_address()).unwrap();
+        // block!(bt.read_event(&mut uart)).unwrap();
+
+        // let stm32_uuid = 0x1FFF7A10;
+
+        // static BLE_NAME: &'static [u8; 7] = b"DRN1120";
+
+        // let ps = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
+        //     service_handle: gap.service_handle,
+        //     characteristic_handle: CharacteristicHandle(0),
+        //     offset: 0,
+        //     value: &BLE_NAME[..],
+        // };
+
+        // block!(bt.update_characteristic_value(&ps)).unwrap();
+        // block!(bt.read_event(&mut uart)).unwrap();
+
+        block!(bt.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1)).unwrap();
+        block!(bt.read_event(&mut uart)).unwrap();
+
+        loop {
+            block!(bt.read_event(&mut uart)).unwrap();
+        }
     }
 
     // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
@@ -357,7 +370,7 @@ fn main_bluetooth() -> ! {
     // loop {}
 }
 
-// #[entry]
+#[entry]
 fn main_uart2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
