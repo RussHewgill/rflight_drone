@@ -55,9 +55,10 @@ use stm32f4xx_hal::{
 
 #[cfg(feature = "nope")]
 // #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+
 mod app {
+
     use cortex_m_semihosting::{debug, hprintln};
-    // use embedded_time::{clock, duration::*, rate::*, Instant, Timer};
     use stm32f4::stm32f401::{self, TIM2};
     // use stm32f4xx_hal::prelude::*;
 
@@ -65,7 +66,7 @@ mod app {
     use systick_monotonic::{ExtU64, Systick};
 
     // use crate::time::*;
-    use crate::{init::*, uart::*, uprint, uprintln};
+    use crate::{bt_control::BTController, init::*, uart::*, uprint, uprintln};
 
     #[shared]
     struct Shared {
@@ -75,6 +76,7 @@ mod app {
 
     #[local]
     struct Local {
+        // bt: BTController<'static>,
         //
     }
 
@@ -94,13 +96,22 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        let (mut uart, clocks, mono) = init_all(cp, dp);
+        init_all_pre(&mut cp, &mut dp);
+
+        // let (mut uart, clocks, mono) = init_all(cp, dp);
+        let init_struct = init_all(cp, dp);
+
+        let mut uart = init_struct.uart;
+        let clocks = init_struct.clocks;
+        let mono = init_struct.mono;
 
         // uprintln!(uart, "wat 0");
         uprintln!(uart, "hclk() = {:?}", clocks.hclk());
         uprintln!(uart, "sysclk() = {:?}", clocks.sysclk());
 
-        let local = Local {};
+        let local = Local {
+            // bt,
+        };
 
         let shared = Shared {
             //
@@ -112,6 +123,11 @@ mod app {
 
         // (shared, Local {}, init::Monotonics())
         (shared, local, init::Monotonics(mono))
+    }
+
+    #[task(binds = EXTI4, )]
+    fn bt_irq(mut cx: bt_irq::Context) {
+        unimplemented!()
     }
 
     #[task(capacity = 3, shared = [uart])]
@@ -161,12 +177,12 @@ fn main_bluetooth() -> ! {
 
     /// Reset pin config, PB2
     {
-        // dp.GPIOB.moder.modify(|_, w| w.moder2().output());
-        dp.GPIOB.pupdr.modify(|_, w| w.pupdr2().pull_up());
-        dp.GPIOB.otyper.modify(|r, w| w.ot2().push_pull());
-        dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr2().low_speed());
-        /// Added to avoid spurious interrupt from the BlueNRG
-        dp.GPIOB.bsrr.write(|w| w.br2().clear_bit());
+        // // dp.GPIOB.moder.modify(|_, w| w.moder2().output());
+        // dp.GPIOB.pupdr.modify(|_, w| w.pupdr2().pull_up());
+        // dp.GPIOB.otyper.modify(|r, w| w.ot2().push_pull());
+        // dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr2().low_speed());
+        // /// Added to avoid spurious interrupt from the BlueNRG
+        // dp.GPIOB.bsrr.write(|w| w.br2().clear_bit());
     }
     /// SCLK pin config, PA5
     {
@@ -200,11 +216,11 @@ fn main_bluetooth() -> ! {
     }
     /// CS pin config, PB0
     {
-        dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr0().high_speed());
-        dp.GPIOB.pupdr.modify(|r, w| w.pupdr0().pull_up());
+        // dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr0().high_speed());
+        // dp.GPIOB.pupdr.modify(|r, w| w.pupdr0().pull_up());
 
-        // XXX: ?
-        dp.GPIOB.moder.modify(|r, w| w.moder0().output());
+        // // XXX: ?
+        // dp.GPIOB.moder.modify(|r, w| w.moder0().output());
     }
     /// IRQ, PA4
     #[cfg(feature = "nope")]
@@ -225,18 +241,28 @@ fn main_bluetooth() -> ! {
         });
     }
     {
-        dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr4().high_speed());
-        dp.GPIOA.pupdr.modify(|r, w| w.pupdr4().floating());
+        // dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr4().high_speed());
+        // dp.GPIOA.pupdr.modify(|r, w| w.pupdr4().floating());
     }
 
     let mut gpioa = dp.GPIOA.split();
     let mut gpiob = dp.GPIOB.split();
 
-    let mut cs = gpiob.pb0.into_push_pull_output().speed(Speed::High);
+    let mut cs = gpiob
+        .pb0
+        .internal_resistor(stm32f4xx_hal::gpio::Pull::Up)
+        .into_push_pull_output()
+        .speed(Speed::High);
     cs.set_high();
-    let mut reset = gpiob.pb2.into_push_pull_output().speed(Speed::Low);
+
+    let mut reset = gpiob
+        .pb2
+        .internal_resistor(stm32f4xx_hal::gpio::Pull::Up)
+        .into_push_pull_output()
+        .speed(Speed::Low);
     // reset.set_low();
 
+    /// Speed is only for inputs
     let input = gpioa.pa4.into_pull_down_input();
 
     let sck = gpioa.pa5.into_push_pull_output().into_alternate::<5>();
@@ -290,10 +316,17 @@ fn main_bluetooth() -> ! {
 
     let mut delay = cp.SYST.delay(&clocks);
 
-    let mut bt = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
+    let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
 
     // bt.reset_with_delay(&mut delay, 5u32).unwrap();
     // block!(bt.read_event(&mut uart)).unwrap();
+
+    // // let id: &'static [u8; 12] = unsafe { &*DEVICE_ID_PTR.cast::<[u8; 12]>() };
+    // pub fn device_id() -> &'static [u8; 12] {
+    //     const DEVICE_ID_PTR: *const u8 = 0x1FF0_7A10 as _;
+    //     unsafe { &*DEVICE_ID_PTR.cast::<[u8; 12]>() }
+    // }
+    // let id = device_id();
 
     /// Device CF:74:D9:3D:C6:C3 DRN1120
     bt.init_bt(&mut uart, &mut delay).unwrap();
