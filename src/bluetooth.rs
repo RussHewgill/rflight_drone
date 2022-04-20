@@ -129,11 +129,8 @@ pub enum BTError<SpiError, GpioError> {
     Gpio(GpioError),
 }
 
-// pub struct BluetoothSpi<SPI, CS, Reset, Input, GpioError, PinError> {
 pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
-    // pub struct BluetoothSpi<CS, Reset, Input> {
-    // spi: Spi4,
-    // spi: BtSpi,
+    // pub struct BluetoothSpi<SPI, CS, Reset, Input> {
     spi: SPI,
     cs: CS,
     reset: Reset,
@@ -144,15 +141,12 @@ pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
 
 /// new
 impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
-    // impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
-    // pub fn new(spi: Spi4, cs: CS, reset: Reset, input: Input) -> Self {
     pub fn new(spi: SPI, cs: CS, reset: Reset, input: Input, buffer: &'buf mut [u8]) -> Self {
         Self {
             spi,
             cs,
             reset,
             input,
-            // buffer: ArrayVec::default(),
             buffer: Buffer::new(buffer),
         }
     }

@@ -1,14 +1,14 @@
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
-use stm32f4::stm32f401::{RCC, SPI1};
+use stm32f4::stm32f401::{RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
     block,
     gpio::{Alternate, Input, Output, Pin, PA4, PA5, PA6, PA7, PB0, PB2},
     nb,
     prelude::*,
     spi::{Error as SpiError, NoMiso, Spi1},
-    timer::SysDelay,
+    timer::{DelayMs, SysDelay},
 };
 
 use bluetooth_hci::{host::Hci, ConnectionHandle};
@@ -91,7 +91,7 @@ where
     pub fn init_bt(
         &mut self,
         uart: &mut UART,
-        delay: &mut SysDelay,
+        delay: &mut DelayMs<TIM2>,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         self.reset_with_delay(delay, 5u32).unwrap();
         block!(self.read_event(uart))?;

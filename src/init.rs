@@ -1,10 +1,14 @@
+use cortex_m::peripheral::NVIC;
 // use dwt_systick_monotonic::DwtSystick;
-use stm32f4::stm32f401::{self, RCC, TIM2};
+use stm32f4::stm32f401::{self, RCC, SPI1, TIM2};
 use stm32f401::{CorePeripherals, Peripherals};
 use stm32f4xx_hal::gpio::{Pull, Speed, PA4, PA5, PA6, PA7, PB2};
 use stm32f4xx_hal::rcc::Clocks;
+use stm32f4xx_hal::spi::Mode;
+use stm32f4xx_hal::timer::{DelayMs, SysDelay};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
+use crate::bluetooth::BluetoothSpi;
 // use crate::time::MonoTimer;
 use crate::{bt_control::BTController, uart::UART};
 
@@ -33,9 +37,14 @@ pub struct InitStruct {
     pub clocks: Clocks,
     pub mono: Systick<1_000>,
     pub bt: BTController<'static>,
+    pub delay_bt: DelayMs<TIM2>,
 }
 
-pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
+pub fn init_all(
+    mut cp: CorePeripherals,
+    mut dp: Peripherals,
+    bt_buf: &'static mut [u8],
+) -> InitStruct {
     // let (clocks, mono) = init_clocks(dp.TIM2, dp.RCC);
     let clocks = init_clocks(dp.RCC);
 
@@ -47,12 +56,17 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
     // let mono = DwtSystick::<1_000>::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.sysclk().raw());
     // let mono = DwtSystick::<1_000>::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.hclk().raw());
 
+    // let mut bt_delay = cp.SYST.delay(&clocks);
+    let bt_delay = dp.TIM2.delay_ms(&clocks);
+
     let mono = Systick::new(cp.SYST, clocks.sysclk().raw());
 
     // (uart, clocks, mono)
 
+    init_bt_interrupt(&mut cp.NVIC);
+
     let bt = init_bt(
-        gpiob.pb0, gpiob.pb2, gpioa.pa4, gpioa.pa5, gpioa.pa6, gpioa.pa7,
+        dp.SPI1, gpiob.pb0, gpiob.pb2, gpioa.pa4, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks, bt_buf,
     );
 
     InitStruct {
@@ -60,16 +74,26 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
         clocks,
         mono,
         bt,
+        delay_bt: bt_delay,
     }
 }
 
-pub fn init_bt(
+fn init_bt_interrupt(nvic: &mut NVIC) {
+    use cortex_m::interrupt::InterruptNumber;
+    nvic.unmask()
+    unimplemented!()
+}
+
+fn init_bt(
+    spi1: SPI1,
     cs: PB0,
     reset: PB2,
     input: PA4,
     sck: PA5,
     miso: PA6,
     mosi: PA7,
+    clocks: &Clocks,
+    buf: &'static mut [u8],
 ) -> BTController<'static> {
     let mut cs = cs
         .internal_resistor(Pull::Up)
@@ -82,7 +106,33 @@ pub fn init_bt(
         .into_push_pull_output()
         .speed(Speed::Low);
 
-    unimplemented!()
+    let input = input.into_pull_down_input();
+
+    let sck = sck
+        .internal_resistor(stm32f4xx_hal::gpio::Pull::Down)
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .into_alternate::<5>();
+    let miso = miso.into_alternate::<5>();
+    let mosi = mosi
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .into_alternate::<5>();
+
+    let mode = Mode {
+        polarity: stm32f4xx_hal::spi::Polarity::IdleLow,
+        phase: stm32f4xx_hal::spi::Phase::CaptureOnFirstTransition,
+    };
+
+    let mut spi = spi1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);
+
+    // let mut buffer = [0u8; 512];
+
+    // let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
+    let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, buf);
+
+    bt
+    // unimplemented!()
 }
 
 fn init_clocks(rcc: RCC) -> Clocks {

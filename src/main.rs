@@ -53,14 +53,15 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-#[cfg(feature = "nope")]
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-
+// #[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
     use stm32f4::stm32f401::{self, TIM2};
     // use stm32f4xx_hal::prelude::*;
+
+    use stm32f4xx_hal::{block, prelude::_embedded_hal_blocking_delay_DelayMs, timer::DelayMs};
 
     // use dwt_systick_monotonic::{DwtSystick, ExtU32};
     use systick_monotonic::{ExtU64, Systick};
@@ -71,12 +72,13 @@ mod app {
     #[shared]
     struct Shared {
         uart: UART,
+        bt: BTController<'static>,
+        delay_bt: DelayMs<TIM2>,
         //
     }
 
     #[local]
     struct Local {
-        // bt: BTController<'static>,
         //
     }
 
@@ -89,7 +91,7 @@ mod app {
     // #[monotonic(binds = SysTick, default = true)]
     // type MonoTick = MonoTimer<TIM2, 1_000>; // 1000 Hz
 
-    #[init]
+    #[init(local = [bt_buf: [u8; 512] = [0u8; 512]])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         // debug::exit(debug::EXIT_SUCCESS); // Exit QEMU simulator
 
@@ -98,46 +100,71 @@ mod app {
 
         init_all_pre(&mut cp, &mut dp);
 
+        // let mut bt_buf = [0u8; 512];
+
+        let bt_buf = cx.local.bt_buf;
+
         // let (mut uart, clocks, mono) = init_all(cp, dp);
-        let init_struct = init_all(cp, dp);
+        let init_struct = init_all(cp, dp, &mut bt_buf[..]);
 
         let mut uart = init_struct.uart;
         let clocks = init_struct.clocks;
         let mono = init_struct.mono;
 
-        // uprintln!(uart, "wat 0");
-        uprintln!(uart, "hclk() = {:?}", clocks.hclk());
-        uprintln!(uart, "sysclk() = {:?}", clocks.sysclk());
+        // uprintln!(uart, "hclk() = {:?}", clocks.hclk());
+        // uprintln!(uart, "sysclk() = {:?}", clocks.sysclk());
 
-        let local = Local {
-            // bt,
-        };
+        let mut bt = init_struct.bt;
+        let mut delay_bt = init_struct.delay_bt;
+
+        bt.init_bt(&mut uart, &mut delay_bt).unwrap();
 
         let shared = Shared {
             //
+            bt,
+            delay_bt,
             uart,
         };
 
-        test_uart::spawn().unwrap();
+        let local = Local {};
+
+        // rtic::pend(stm32f4xx_hal::interrupt::EXTI4);
+
+        // setup_bt::spawn().unwrap();
+
+        // test_uart::spawn().unwrap();
         // test_uart::spawn_after(1.secs()).unwrap();
 
         // (shared, Local {}, init::Monotonics())
         (shared, local, init::Monotonics(mono))
     }
 
-    #[task(binds = EXTI4, )]
+    // // #[task(capacity = 3, local = [bt, delay_bt], shared = [uart])]
+    // #[task(capacity = 3, shared = [bt, delay_bt, uart], priority = 10)]
+    // fn setup_bt(mut cx: setup_bt::Context) {
+    //     (cx.shared.uart, cx.shared.bt, cx.shared.delay_bt).lock(|uart, bt, delay_bt| {
+    //         uprintln!(uart, "test_bt");
+    //         // let delay: &mut DelayMs<TIM2> = cx.local.delay_bt;
+    //         // cx.local.bt.init_bt(uart, delay).unwrap();
+    //         bt.init_bt(uart, delay_bt).unwrap();
+    //     });
+    // }
+
+    #[task(binds = EXTI4, shared = [bt, uart], priority = 9)]
     fn bt_irq(mut cx: bt_irq::Context) {
-        unimplemented!()
-    }
-
-    #[task(capacity = 3, shared = [uart])]
-    fn test_uart(mut cx: test_uart::Context) {
-        cx.shared.uart.lock(|uart| {
-            uprintln!(uart, "wat 1");
+        (cx.shared.uart, cx.shared.bt).lock(|uart, bt| {
+            //
+            // block!(bt.read_event(uart)).unwrap();
         });
-
-        test_uart::spawn_after(1.secs()).unwrap();
     }
+
+    // #[task(capacity = 3, shared = [uart])]
+    // fn test_uart(mut cx: test_uart::Context) {
+    //     cx.shared.uart.lock(|uart| {
+    //         uprintln!(uart, "wat 1");
+    //     });
+    //     test_uart::spawn_after(1.secs()).unwrap();
+    // }
 
     #[idle]
     fn idle(cx: idle::Context) -> ! {
@@ -147,7 +174,7 @@ mod app {
     }
 }
 
-#[entry]
+// #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -186,33 +213,33 @@ fn main_bluetooth() -> ! {
     }
     /// SCLK pin config, PA5
     {
-        dp.GPIOA.ospeedr.modify(|_, w| w.ospeedr5().high_speed());
-        dp.GPIOA.pupdr.modify(|r, w| w.pupdr5().pull_down());
+        // dp.GPIOA.ospeedr.modify(|_, w| w.ospeedr5().high_speed());
+        // dp.GPIOA.pupdr.modify(|r, w| w.pupdr5().pull_down());
 
-        // XXX: ?
-        dp.GPIOA.otyper.modify(|r, w| w.ot5().push_pull());
-        dp.GPIOA.moder.modify(|r, w| w.moder5().alternate());
-        dp.GPIOA.afrl.modify(|r, w| w.afrl5().af5());
+        // // XXX: ?
+        // dp.GPIOA.otyper.modify(|r, w| w.ot5().push_pull());
+        // dp.GPIOA.moder.modify(|r, w| w.moder5().alternate());
+        // dp.GPIOA.afrl.modify(|r, w| w.afrl5().af5());
     }
     /// MISO pin config, PA6
     {
-        dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr6().high_speed());
-        dp.GPIOA.pupdr.modify(|r, w| w.pupdr6().floating());
+        // dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr6().high_speed());
+        // dp.GPIOA.pupdr.modify(|r, w| w.pupdr6().floating());
 
-        // // XXX: ?
-        // dp.GPIOA.otyper.modify(|r, w| w.ot6().push_pull());
-        // dp.GPIOA.moder.modify(|r, w| w.moder6().alternate());
-        // dp.GPIOA.afrl.modify(|r, w| w.afrl6().af5());
+        // // // XXX: ?
+        // // dp.GPIOA.otyper.modify(|r, w| w.ot6().push_pull());
+        // // dp.GPIOA.moder.modify(|r, w| w.moder6().alternate());
+        // // dp.GPIOA.afrl.modify(|r, w| w.afrl6().af5());
     }
     /// MOSI pin config, PA7
     {
-        dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr7().high_speed());
-        dp.GPIOA.pupdr.modify(|r, w| w.pupdr7().floating());
+        // dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr7().high_speed());
+        // dp.GPIOA.pupdr.modify(|r, w| w.pupdr7().floating());
 
-        // XXX: ?
-        dp.GPIOA.otyper.modify(|r, w| w.ot7().push_pull());
-        dp.GPIOA.moder.modify(|r, w| w.moder7().alternate());
-        dp.GPIOA.afrl.modify(|r, w| w.afrl7().af5());
+        // // XXX: ?
+        // dp.GPIOA.otyper.modify(|r, w| w.ot7().push_pull());
+        // dp.GPIOA.moder.modify(|r, w| w.moder7().alternate());
+        // dp.GPIOA.afrl.modify(|r, w| w.afrl7().af5());
     }
     /// CS pin config, PB0
     {
@@ -265,11 +292,20 @@ fn main_bluetooth() -> ! {
     /// Speed is only for inputs
     let input = gpioa.pa4.into_pull_down_input();
 
-    let sck = gpioa.pa5.into_push_pull_output().into_alternate::<5>();
+    let sck = gpioa
+        .pa5
+        .internal_resistor(stm32f4xx_hal::gpio::Pull::Down)
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .into_alternate::<5>();
     // let miso = gpioa.pa6.into_push_pull_output().into_alternate::<5>();
     // let mosi = gpioa.pa7.into_push_pull_output().into_alternate::<5>();
     let miso = gpioa.pa6.into_alternate::<5>();
-    let mosi = gpioa.pa7.into_push_pull_output().into_alternate::<5>();
+    let mosi = gpioa
+        .pa7
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .into_alternate::<5>();
 
     let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
@@ -328,8 +364,8 @@ fn main_bluetooth() -> ! {
     // }
     // let id = device_id();
 
-    /// Device CF:74:D9:3D:C6:C3 DRN1120
-    bt.init_bt(&mut uart, &mut delay).unwrap();
+    // /// Device CF:74:D9:3D:C6:C3 DRN1120
+    // bt.init_bt(&mut uart, &mut delay).unwrap();
 
     loop {
         // block!(bt.read_event(&mut uart)).unwrap();
