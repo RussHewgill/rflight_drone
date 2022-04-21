@@ -66,7 +66,11 @@ mod app {
     // use dwt_systick_monotonic::{DwtSystick, ExtU32};
     use systick_monotonic::{ExtU64, Systick};
 
-    // use crate::time::*;
+    use crate::bluetooth::gap::Commands as GapCommands;
+    use crate::bluetooth::gatt::Commands as GattCommands;
+    use crate::bluetooth::hal_bt::Commands as HalCommands;
+    use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
+
     use crate::{bt_control::BTController, init::*, uart::*, uprint, uprintln};
 
     #[shared]
@@ -128,12 +132,12 @@ mod app {
 
         let local = Local {};
 
-        // rtic::pend(stm32f4xx_hal::interrupt::EXTI4);
-
         // setup_bt::spawn().unwrap();
 
-        // test_uart::spawn().unwrap();
+        test_uart::spawn().unwrap();
         // test_uart::spawn_after(1.secs()).unwrap();
+
+        // rtic::pend(stm32f4xx_hal::interrupt::EXTI4);
 
         // (shared, Local {}, init::Monotonics())
         (shared, local, init::Monotonics(mono))
@@ -153,18 +157,33 @@ mod app {
     #[task(binds = EXTI4, shared = [bt, uart], priority = 9)]
     fn bt_irq(mut cx: bt_irq::Context) {
         (cx.shared.uart, cx.shared.bt).lock(|uart, bt| {
-            //
-            // block!(bt.read_event(uart)).unwrap();
+            uprintln!(uart, "bt_irq");
+            match block!(bt.read_event(uart)) {
+                Ok(_) => {
+                    uprintln!(uart, "read event");
+                }
+                Err(e) => {
+                    uprintln!(uart, "error 1 = {:?}", e);
+                }
+            }
         });
     }
 
-    // #[task(capacity = 3, shared = [uart])]
-    // fn test_uart(mut cx: test_uart::Context) {
-    //     cx.shared.uart.lock(|uart| {
-    //         uprintln!(uart, "wat 1");
-    //     });
-    //     test_uart::spawn_after(1.secs()).unwrap();
-    // }
+    #[task(capacity = 3, shared = [bt, uart], priority = 10)]
+    fn test_uart(mut cx: test_uart::Context) {
+        (cx.shared.uart, cx.shared.bt).lock(|uart, bt| {
+            uprintln!(uart, "wat 1");
+            match block!(bt.read_bd_addr()) {
+                Ok(_) => {
+                    uprintln!(uart, "send read addr command");
+                }
+                Err(e) => {
+                    uprintln!(uart, "error 0 = {:?}", e);
+                }
+            }
+        });
+        // test_uart::spawn_after(1.secs()).unwrap();
+    }
 
     #[idle]
     fn idle(cx: idle::Context) -> ! {

@@ -1,10 +1,11 @@
 use cortex_m::peripheral::NVIC;
 // use dwt_systick_monotonic::DwtSystick;
-use stm32f4::stm32f401::{self, RCC, SPI1, TIM2};
+use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, TIM2};
 use stm32f401::{CorePeripherals, Peripherals};
-use stm32f4xx_hal::gpio::{Pull, Speed, PA4, PA5, PA6, PA7, PB2};
+use stm32f4xx_hal::gpio::{Input, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PB2};
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::Mode;
+use stm32f4xx_hal::syscfg::SysCfg;
 use stm32f4xx_hal::timer::{DelayMs, SysDelay};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
@@ -30,6 +31,9 @@ pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
 
     /// Enable SPI2 clock
     dp.RCC.apb1enr.write(|w| w.spi2en().set_bit());
+
+    /// Enable SYSCFG clock
+    dp.RCC.apb2enr.modify(|r, w| w.syscfgen().set_bit());
 }
 
 pub struct InitStruct {
@@ -63,10 +67,12 @@ pub fn init_all(
 
     // (uart, clocks, mono)
 
-    init_bt_interrupt(&mut cp.NVIC);
+    let mut syscfg = dp.SYSCFG.constrain();
+
+    let bt_irq = init_bt_interrupt(&mut dp.EXTI, &mut syscfg, gpioa.pa4);
 
     let bt = init_bt(
-        dp.SPI1, gpiob.pb0, gpiob.pb2, gpioa.pa4, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks, bt_buf,
+        dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks, bt_buf,
     );
 
     InitStruct {
@@ -78,10 +84,12 @@ pub fn init_all(
     }
 }
 
-fn init_bt_interrupt(nvic: &mut NVIC) {
-    use cortex_m::interrupt::InterruptNumber;
-    nvic.unmask()
-    unimplemented!()
+fn init_bt_interrupt(exti: &mut EXTI, syscfg: &mut SysCfg, mut pa4: PA4) -> Pin<'A', 4, Input> {
+    pa4.make_interrupt_source(syscfg);
+    pa4.enable_interrupt(exti);
+    pa4.trigger_on_edge(exti, stm32f4xx_hal::gpio::Edge::Rising);
+    pa4.clear_interrupt_pending_bit();
+    pa4.into_input()
 }
 
 fn init_bt(
@@ -106,7 +114,7 @@ fn init_bt(
         .into_push_pull_output()
         .speed(Speed::Low);
 
-    let input = input.into_pull_down_input();
+    // let input = input.into_pull_down_input();
 
     let sck = sck
         .internal_resistor(stm32f4xx_hal::gpio::Pull::Down)
