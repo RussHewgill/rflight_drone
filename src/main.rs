@@ -66,17 +66,23 @@ mod app {
     // use dwt_systick_monotonic::{DwtSystick, ExtU32};
     use systick_monotonic::{ExtU64, Systick};
 
-    use crate::bluetooth::gap::Commands as GapCommands;
     use crate::bluetooth::gatt::Commands as GattCommands;
     use crate::bluetooth::hal_bt::Commands as HalCommands;
+    use crate::{bluetooth::gap::Commands as GapCommands, bt_control::BTState};
     use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
 
-    use crate::{bt_control::BTController, init::*, uart::*, uprint, uprintln};
+    use crate::{
+        bt_control::{BTController, BTEvent},
+        init::*,
+        uart::*,
+        uprint, uprintln,
+    };
 
     #[shared]
     struct Shared {
         uart: UART,
         bt: BTController<'static>,
+        bt_state: BTState,
         delay_bt: DelayMs<TIM2>,
         //
     }
@@ -126,6 +132,7 @@ mod app {
         let shared = Shared {
             //
             bt,
+            bt_state: BTState::Disconnected,
             delay_bt,
             uart,
         };
@@ -134,8 +141,8 @@ mod app {
 
         // setup_bt::spawn().unwrap();
 
-        test_uart::spawn().unwrap();
-        // test_uart::spawn_after(1.secs()).unwrap();
+        // test_uart::spawn().unwrap();
+        test_uart::spawn_after(2.secs()).unwrap();
 
         // rtic::pend(stm32f4xx_hal::interrupt::EXTI4);
 
@@ -154,35 +161,48 @@ mod app {
     //     });
     // }
 
-    #[task(binds = EXTI4, shared = [bt, uart], priority = 9)]
+    #[task(binds = EXTI4, shared = [bt, bt_state, uart], priority = 9)]
     fn bt_irq(mut cx: bt_irq::Context) {
-        (cx.shared.uart, cx.shared.bt).lock(|uart, bt| {
+        (cx.shared.uart, cx.shared.bt, cx.shared.bt_state).lock(|uart, bt, bt_state| {
             uprintln!(uart, "bt_irq");
-            match block!(bt.read_event(uart)) {
-                Ok(_) => {
-                    uprintln!(uart, "read event");
-                }
+
+            let event: BTEvent = match block!(bt._read_event(uart)) {
+                Ok(ev) => ev,
                 Err(e) => {
-                    uprintln!(uart, "error 1 = {:?}", e);
+                    uprintln!(uart, "read event error = {:?}", e);
+                    unimplemented!()
                 }
-            }
+            };
+
+            bt_state.handle_event(bt, uart, event);
+
+            // match block!(bt.read_event(uart)) {
+            //     Ok(_) => {
+            //         uprintln!(uart, "read event");
+            //     }
+            //     Err(e) => {
+            //         uprintln!(uart, "error 1 = {:?}", e);
+            //     }
+            // }
         });
     }
 
-    #[task(capacity = 3, shared = [bt, uart], priority = 10)]
+    #[task(capacity = 3, shared = [bt, uart], priority = 8)]
     fn test_uart(mut cx: test_uart::Context) {
         (cx.shared.uart, cx.shared.bt).lock(|uart, bt| {
-            uprintln!(uart, "wat 1");
-            match block!(bt.read_bd_addr()) {
+            uprintln!(uart, "test_uart");
+
+            let buf = [1, 2, 3, 4];
+
+            match block!(bt.log_write(uart, &buf)) {
                 Ok(_) => {
-                    uprintln!(uart, "send read addr command");
+                    uprintln!(uart, "send log write command");
                 }
                 Err(e) => {
                     uprintln!(uart, "error 0 = {:?}", e);
                 }
             }
         });
-        // test_uart::spawn_after(1.secs()).unwrap();
     }
 
     #[idle]

@@ -42,7 +42,7 @@ use bluetooth_hci::{host::HciHeader, Controller, Opcode};
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::{spi::Spi4, uart::*, uprint, uprintln};
+use crate::{bt_control::service_log::SvLogger, spi::Spi4, uart::*, uprint, uprintln};
 
 use self::rx_buffer::Buffer;
 
@@ -137,6 +137,8 @@ pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     input: Input,
     // buffer: ArrayVec<u8, 256>,
     buffer: Buffer<'buf, u8>,
+
+    pub services: Option<SvLogger>,
 }
 
 /// new
@@ -148,7 +150,16 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
             reset,
             input,
             buffer: Buffer::new(buffer),
+
+            services: None,
         }
+    }
+}
+
+/// services
+impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
+    pub fn sv_get_logger(&self) -> Option<SvLogger> {
+        self.services
     }
 }
 
