@@ -38,6 +38,7 @@ pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
 
 pub struct InitStruct {
     pub uart: UART,
+    pub exti: EXTI,
     pub clocks: Clocks,
     pub mono: Systick<1_000>,
     pub bt: BTController<'static>,
@@ -77,6 +78,7 @@ pub fn init_all(
 
     InitStruct {
         uart,
+        exti: dp.EXTI,
         clocks,
         mono,
         bt,

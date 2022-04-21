@@ -58,7 +58,7 @@ use stm32f4xx_hal::{
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
-    use stm32f4::stm32f401::{self, TIM2};
+    use stm32f4::stm32f401::{self, EXTI, TIM2};
     // use stm32f4xx_hal::prelude::*;
 
     use stm32f4xx_hal::{block, prelude::_embedded_hal_blocking_delay_DelayMs, timer::DelayMs};
@@ -81,8 +81,9 @@ mod app {
     #[shared]
     struct Shared {
         uart: UART,
+        exti: EXTI,
         bt: BTController<'static>,
-        bt_state: BTState,
+        // bt_state: BTState,
         delay_bt: DelayMs<TIM2>,
         //
     }
@@ -128,13 +129,19 @@ mod app {
         let mut delay_bt = init_struct.delay_bt;
 
         bt.init_bt(&mut uart, &mut delay_bt).unwrap();
+        bt.clear_interrupt();
+
+        let i0 = bt.check_interrupt();
+        uprintln!(uart, "i0 = {:?}", i0);
+
+        bt.unpend();
 
         let shared = Shared {
-            //
-            bt,
-            bt_state: BTState::Disconnected,
-            delay_bt,
             uart,
+            exti: init_struct.exti,
+            bt,
+            // bt_state: BTState::Disconnected,
+            delay_bt,
         };
 
         let local = Local {};
@@ -161,10 +168,14 @@ mod app {
     //     });
     // }
 
-    #[task(binds = EXTI4, shared = [bt, bt_state, uart], priority = 9)]
+    #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 9)]
     fn bt_irq(mut cx: bt_irq::Context) {
-        (cx.shared.uart, cx.shared.bt, cx.shared.bt_state).lock(|uart, bt, bt_state| {
+        (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "bt_irq");
+
+            // exti.pr.modify(|r, w| w.pr4().set_bit());
+            bt.clear_interrupt();
+            bt.pause_interrupt(exti);
 
             let event: BTEvent = match block!(bt._read_event(uart)) {
                 Ok(ev) => ev,
@@ -174,7 +185,9 @@ mod app {
                 }
             };
 
-            bt_state.handle_event(bt, uart, event);
+            bt.state.handle_event(uart, event);
+
+            bt.unpause_interrupt(exti);
 
             // match block!(bt.read_event(uart)) {
             //     Ok(_) => {
@@ -187,21 +200,34 @@ mod app {
         });
     }
 
-    #[task(capacity = 3, shared = [bt, uart], priority = 8)]
+    #[task(capacity = 3, shared = [bt, uart, exti], priority = 8)]
     fn test_uart(mut cx: test_uart::Context) {
-        (cx.shared.uart, cx.shared.bt).lock(|uart, bt| {
+        (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "test_uart");
+
+            bt.clear_interrupt();
+            bt.pause_interrupt(exti);
 
             let buf = [1, 2, 3, 4];
 
-            match block!(bt.log_write(uart, &buf)) {
-                Ok(_) => {
-                    uprintln!(uart, "send log write command");
-                }
-                Err(e) => {
-                    uprintln!(uart, "error 0 = {:?}", e);
+            if !bt.state.is_connected() {
+                uprintln!(uart, "not connected yet");
+                test_uart::spawn_after(1.secs()).unwrap();
+            } else {
+                match block!(bt.log_write(uart, &buf)) {
+                    Ok(_) => {
+                        uprintln!(uart, "send log write command");
+
+                        let i = bt.check_interrupt();
+                        uprintln!(uart, "i = {:?}", i);
+                    }
+                    Err(e) => {
+                        uprintln!(uart, "error 0 = {:?}", e);
+                    }
                 }
             }
+
+            bt.unpause_interrupt(exti);
         });
     }
 

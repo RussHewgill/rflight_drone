@@ -452,16 +452,18 @@ pub enum BTState {
 }
 
 impl BTState {
+    pub fn is_connected(&self) -> bool {
+        match self {
+            Self::Connected(_) => true,
+            _ => false,
+        }
+    }
+
     // fn new_conn(self, st: bluetooth_hci::event::ConnectionComplete<_>) -> Self {
     //     Self::Connected(st.conn_handle)
     // }
 
-    pub fn handle_event<'buf>(
-        &mut self,
-        bt: &mut BTController<'buf>,
-        uart: &mut UART,
-        event: BTEvent,
-    ) {
+    pub fn handle_event<'buf>(&mut self, uart: &mut UART, event: BTEvent) {
         match event {
             Event::LeConnectionComplete(status) => {
                 if status.status == bluetooth_hci::Status::Success {

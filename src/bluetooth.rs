@@ -11,7 +11,7 @@ pub mod hal_bt;
 
 use arrayvec::ArrayVec;
 use core::ptr;
-use cortex_m::peripheral::SYST;
+use cortex_m::peripheral::{NVIC, SYST};
 use cortex_m_semihosting::hprintln;
 use embedded_hal as hal;
 
@@ -25,10 +25,10 @@ use hal::digital::v2::{InputPin, OutputPin};
 //     },
 // };
 
-use stm32f4::stm32f401::{Peripherals, GPIOB, RCC, SPI1, SPI2};
+use stm32f4::stm32f401::{Peripherals, EXTI, GPIOB, RCC, SPI1, SPI2};
 use stm32f4xx_hal::{
     block,
-    gpio::{Alternate, Pin, PinExt, PA8, PB13, PB15},
+    gpio::{Alternate, Pin, PinExt, PA4, PA8, PB13, PB15},
     nb,
     prelude::*,
     rcc::Clocks,
@@ -42,7 +42,12 @@ use bluetooth_hci::{host::HciHeader, Controller, Opcode};
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::{bt_control::service_log::SvLogger, spi::Spi4, uart::*, uprint, uprintln};
+use crate::{
+    bt_control::{service_log::SvLogger, BTState},
+    spi::Spi4,
+    uart::*,
+    uprint, uprintln,
+};
 
 use self::rx_buffer::Buffer;
 
@@ -138,6 +143,7 @@ pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     // buffer: ArrayVec<u8, 256>,
     buffer: Buffer<'buf, u8>,
 
+    pub state: BTState,
     pub services: Option<SvLogger>,
 }
 
@@ -151,6 +157,7 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
             input,
             buffer: Buffer::new(buffer),
 
+            state: BTState::Disconnected,
             services: None,
         }
     }
@@ -160,6 +167,35 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
 impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     pub fn sv_get_logger(&self) -> Option<SvLogger> {
         self.services
+    }
+}
+
+impl<'buf, SPI, CS, Reset, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, PA4>
+where
+    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+        + hal::blocking::spi::Write<u8, Error = SpiError>,
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+{
+    pub fn unpend(&mut self) {
+        cortex_m::peripheral::NVIC::unpend(self.input.interrupt());
+    }
+
+    pub fn check_interrupt(&mut self) -> bool {
+        self.input.check_interrupt()
+    }
+
+    pub fn clear_interrupt(&mut self) {
+        // exti.pr.modify(|r, w| w.pr4().set_bit());
+        self.input.clear_interrupt_pending_bit();
+    }
+
+    pub fn pause_interrupt(&mut self, exti: &mut EXTI) {
+        self.input.disable_interrupt(exti);
+    }
+
+    pub fn unpause_interrupt(&mut self, exti: &mut EXTI) {
+        self.input.enable_interrupt(exti);
     }
 }
 

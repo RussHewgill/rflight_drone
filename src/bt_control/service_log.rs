@@ -59,6 +59,7 @@ where
             logger
         } else {
             uprintln!(uart, "no logger?");
+            // uprintln!(uart, "");
             return Ok(());
         };
 
@@ -105,7 +106,9 @@ where
             service_handle: service.service_handle,
             characteristic_uuid: UUID_CONSOLE_LOG_CHAR,
             characteristic_value_len: 8,
-            characteristic_properties: CharacteristicProperty::NOTIFY,
+            // characteristic_properties: CharacteristicProperty::NOTIFY,
+            characteristic_properties: CharacteristicProperty::WRITE
+                | CharacteristicProperty::WRITE_WITHOUT_RESPONSE,
             // characteristic_properties: CharacteristicProperty::READ
             //     | CharacteristicProperty::WRITE
             //     | CharacteristicProperty::NOTIFY,
