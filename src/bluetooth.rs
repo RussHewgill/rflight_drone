@@ -44,7 +44,6 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use crate::{
     bt_control::{service_log::SvLogger, service_sensors::SvSensors, BTState},
-    spi::Spi4,
     uart::*,
     uprint, uprintln,
 };
@@ -121,7 +120,7 @@ use self::rx_buffer::Buffer;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccessByte {
     Write = 0x0A,
-    Read = 0x0B,
+    Read  = 0x0B,
 }
 
 #[derive(Debug, PartialEq)]
@@ -136,27 +135,33 @@ pub enum BTError<SpiError, GpioError> {
 
 pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     // pub struct BluetoothSpi<SPI, CS, Reset, Input> {
-    spi: SPI,
-    cs: CS,
-    reset: Reset,
-    input: Input,
+    spi:    SPI,
+    cs:     CS,
+    reset:  Reset,
+    input:  Input,
     // buffer: ArrayVec<u8, 256>,
     buffer: Buffer<'buf, u8>,
 
-    pub state: BTState,
+    pub state:    BTState,
     // pub services: Option<SvLogger>,
     pub services: BTServices,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BTServices {
-    pub logger: Option<SvLogger>,
+    pub logger:  Option<SvLogger>,
     pub sensors: Option<SvSensors>,
 }
 
 /// new
 impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
-    pub fn new(spi: SPI, cs: CS, reset: Reset, input: Input, buffer: &'buf mut [u8]) -> Self {
+    pub fn new(
+        spi: SPI,
+        cs: CS,
+        reset: Reset,
+        input: Input,
+        buffer: &'buf mut [u8],
+    ) -> Self {
         Self {
             spi,
             cs,
@@ -442,7 +447,10 @@ where
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
 {
-    pub fn test1(&mut self, uart: &mut UART) -> nb::Result<usize, BTError<SpiError, GpioError>> {
+    pub fn test1(
+        &mut self,
+        uart: &mut UART,
+    ) -> nb::Result<usize, BTError<SpiError, GpioError>> {
         while !self
             .data_ready()
             .map_err(BTError::Gpio)
@@ -523,7 +531,10 @@ where
         Ok(())
     }
 
-    pub fn test3(&mut self, uart: &mut UART) -> nb::Result<(), BTError<SpiError, GpioError>> {
+    pub fn test3(
+        &mut self,
+        uart: &mut UART,
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         // let e = block!(self.read_local_version_information())?;
         // uprintln!(uart, "e = {:?}", e);
 
@@ -689,9 +700,9 @@ impl<VS> LocalVersionInfoExt for bluetooth_hci::event::command::LocalVersionInfo
     fn bluenrg_version(&self) -> Version {
         Version {
             hw_version: (self.hci_revision >> 8) as u8,
-            major: (self.hci_revision & 0xFF) as u8,
-            minor: ((self.lmp_subversion >> 4) & 0xF) as u8,
-            patch: (self.lmp_subversion & 0xF) as u8,
+            major:      (self.hci_revision & 0xFF) as u8,
+            minor:      ((self.lmp_subversion >> 4) & 0xF) as u8,
+            patch:      (self.lmp_subversion & 0xF) as u8,
         }
     }
 }

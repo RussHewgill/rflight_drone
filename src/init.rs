@@ -4,7 +4,8 @@ use embedded_hal::spi::MODE_3;
 use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, SPI2, TIM2};
 use stm32f401::{CorePeripherals, Peripherals};
 use stm32f4xx_hal::gpio::{
-    Alternate, Input, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PA8, PB12, PB13, PB15, PB2, PC13,
+    Alternate, Input, Output, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PA8, PB12, PB13,
+    PB15, PB2, PC13,
 };
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Mode, NoMiso};
@@ -13,8 +14,11 @@ use stm32f4xx_hal::timer::{DelayMs, SysDelay};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
+use crate::sensors::barometer::Barometer;
 use crate::sensors::imu::IMU;
+use crate::sensors::magneto::Magnetometer;
 use crate::sensors::Sensors;
+use crate::spi::Spi3;
 // use crate::time::MonoTimer;
 use crate::{bt_control::BTController, uart::UART};
 
@@ -42,11 +46,13 @@ pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
 }
 
 pub struct InitStruct {
-    pub uart: UART,
-    pub exti: EXTI,
-    pub clocks: Clocks,
-    pub mono: Systick<1_000>,
-    pub bt: BTController<'static>,
+    pub uart:     UART,
+    pub exti:     EXTI,
+    pub clocks:   Clocks,
+    pub mono:     Systick<1_000>,
+    pub sensors:  Sensors,
+    // pub sensors:  (SensSpi, Pin<'B', 12, Output>),
+    pub bt:       BTController<'static>,
     pub delay_bt: DelayMs<TIM2>,
 }
 
@@ -60,6 +66,7 @@ pub fn init_all(
 
     let mut gpioa = dp.GPIOA.split();
     let mut gpiob = dp.GPIOB.split();
+    let mut gpioc = dp.GPIOC.split();
 
     let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
@@ -78,7 +85,12 @@ pub fn init_all(
     let bt_irq = init_bt_interrupt(&mut dp.EXTI, &mut syscfg, gpioa.pa4);
 
     let bt = init_bt(
-        dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks, bt_buf,
+        dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks,
+        bt_buf,
+    );
+
+    let sensors = init_sensors(
+        dp.SPI2, gpiob.pb13, gpiob.pb15, gpioa.pa8, gpiob.pb12, gpioc.pc13, &clocks,
     );
 
     InitStruct {
@@ -86,6 +98,7 @@ pub fn init_all(
         exti: dp.EXTI,
         clocks,
         mono,
+        sensors,
         bt,
         delay_bt: bt_delay,
     }
@@ -103,17 +116,24 @@ fn init_sensors(
     pc13: PC13,
 
     clocks: &Clocks,
-    // ) -> Sensors {
-) -> stm32f4xx_hal::spi::Spi<
-    SPI2,
-    (
-        Pin<'A', 13, Alternate<5>>,
-        stm32f4xx_hal::gpio::NoPin,
-        Pin<'A', 15, Alternate<5>>,
-    ),
-    stm32f4xx_hal::spi::TransferModeBidi,
-> {
-    // let mut imu = IMU::new(pa8);
+) -> Sensors {
+    let mut cs_imu = pa8
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .internal_resistor(Pull::None);
+    cs_imu.set_high();
+
+    let mut cs_mag = pb12
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .internal_resistor(Pull::None);
+    cs_mag.set_high();
+
+    let mut cs_baro = pc13
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .internal_resistor(Pull::None);
+    cs_baro.set_high();
 
     let sck = pb13
         .into_push_pull_output()
@@ -129,13 +149,24 @@ fn init_sensors(
     /// Mode3 = IdleHigh, Capture 2nd
     let mode = MODE_3;
 
-    let mut spi = spi2.spi_bidi((sck, NoMiso {}, mosi), mode, 10.MHz(), &clocks);
+    // let mut spi = spi2.spi_bidi((sck, NoMiso {}, mosi), mode, 10.MHz(), &clocks);
 
-    // unimplemented!()
-    spi
+    let mut spi = Spi3::new(spi2, mode, sck, mosi);
+
+    let imu = IMU::new(cs_imu);
+    let mag = Magnetometer::new(cs_mag);
+    let baro = Barometer::new(cs_baro);
+
+    Sensors::new(spi, imu, mag, baro)
+
+    // (spi, cs_mag)
 }
 
-fn init_bt_interrupt(exti: &mut EXTI, syscfg: &mut SysCfg, mut pa4: PA4) -> Pin<'A', 4, Input> {
+fn init_bt_interrupt(
+    exti: &mut EXTI,
+    syscfg: &mut SysCfg,
+    mut pa4: PA4,
+) -> Pin<'A', 4, Input> {
     pa4.make_interrupt_source(syscfg);
     pa4.enable_interrupt(exti);
     pa4.trigger_on_edge(exti, stm32f4xx_hal::gpio::Edge::Rising);
@@ -180,7 +211,7 @@ fn init_bt(
 
     let mode = Mode {
         polarity: stm32f4xx_hal::spi::Polarity::IdleLow,
-        phase: stm32f4xx_hal::spi::Phase::CaptureOnFirstTransition,
+        phase:    stm32f4xx_hal::spi::Phase::CaptureOnFirstTransition,
     };
 
     let mut spi = spi1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);

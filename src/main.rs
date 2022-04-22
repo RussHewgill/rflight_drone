@@ -61,13 +61,17 @@ mod app {
     use stm32f4::stm32f401::{self, EXTI, TIM2};
     // use stm32f4xx_hal::prelude::*;
 
-    use stm32f4xx_hal::{block, prelude::_embedded_hal_blocking_delay_DelayMs, timer::DelayMs};
+    use stm32f4xx_hal::gpio::{Output, Pin};
+    use stm32f4xx_hal::{
+        block, prelude::_embedded_hal_blocking_delay_DelayMs, timer::DelayMs,
+    };
 
     // use dwt_systick_monotonic::{DwtSystick, ExtU32};
     use systick_monotonic::{ExtU64, Systick};
 
     use crate::bluetooth::gatt::Commands as GattCommands;
     use crate::bluetooth::hal_bt::Commands as HalCommands;
+    use crate::sensors::Sensors;
     use crate::{bluetooth::gap::Commands as GapCommands, bt_control::BTState};
     use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
 
@@ -80,9 +84,9 @@ mod app {
 
     #[shared]
     struct Shared {
-        uart: UART,
-        exti: EXTI,
-        bt: BTController<'static>,
+        uart:     UART,
+        exti:     EXTI,
+        bt:       BTController<'static>,
         // bt_state: BTState,
         delay_bt: DelayMs<TIM2>,
         //
@@ -91,6 +95,7 @@ mod app {
     #[local]
     struct Local {
         //
+        sensors: Sensors,
     }
 
     // #[monotonic(binds = SysTick, default = true)]
@@ -144,17 +149,37 @@ mod app {
             delay_bt,
         };
 
-        let local = Local {};
+        let local = Local {
+            sensors: init_struct.sensors,
+        };
 
         // setup_bt::spawn().unwrap();
 
         // test_uart::spawn().unwrap();
-        test_uart::spawn_after(2.secs()).unwrap();
+        // test_uart::spawn_after(2.secs()).unwrap();
 
-        // rtic::pend(stm32f4xx_hal::interrupt::EXTI4);
+        test_sens::spawn().unwrap();
 
         // (shared, Local {}, init::Monotonics())
         (shared, local, init::Monotonics(mono))
+    }
+
+    #[task(capacity = 3, shared = [uart], local = [sensors], priority = 8)]
+    fn test_sens(mut cx: test_sens::Context) {
+        cx.shared.uart.lock(|uart| {
+            uprintln!(uart, "test_sens");
+            let sensors: &mut Sensors = &mut cx.local.sensors;
+
+            sensors.with_spi_mag(|spi, mag| {
+                let b = mag
+                    .read_reg(spi, crate::sensors::magneto::MagRegister::WHO_AM_I)
+                    .unwrap();
+                uprintln!(uart, "b2: {:#010b}", b);
+            });
+
+            uprintln!(uart, "test_sens done");
+            //
+        });
     }
 
     // // #[task(capacity = 3, local = [bt, delay_bt], shared = [uart])]
@@ -168,7 +193,8 @@ mod app {
     //     });
     // }
 
-    #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 9)]
+    #[cfg(feature = "nope")]
+    // #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 9)]
     fn bt_irq(mut cx: bt_irq::Context) {
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "bt_irq");
@@ -200,7 +226,8 @@ mod app {
         });
     }
 
-    #[task(capacity = 3, shared = [bt, uart, exti], priority = 8)]
+    #[cfg(feature = "nope")]
+    // #[task(capacity = 3, shared = [bt, uart, exti], priority = 8)]
     fn test_uart(mut cx: test_uart::Context) {
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "test_uart start");
@@ -267,7 +294,7 @@ fn main_bluetooth() -> ! {
 
     let mode = Mode {
         polarity: Polarity::IdleLow,
-        phase: Phase::CaptureOnFirstTransition,
+        phase:    Phase::CaptureOnFirstTransition,
     };
 
     /// Reset pin config, PB2
@@ -704,7 +731,8 @@ fn main_imu2() -> ! {
 
     let mode = MODE_3;
 
-    let (mut cs_magno, mut spi) = Spi3::new(&dp.RCC, dp.GPIOB, dp.SPI2, mode, 10.MHz());
+    let (mut cs_magno, mut spi) =
+        Spi3::new_full_config(&dp.RCC, dp.GPIOB, dp.SPI2, mode, 10.MHz());
 
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();

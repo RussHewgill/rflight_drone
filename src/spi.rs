@@ -1,6 +1,7 @@
 pub use self::spi3::*;
-pub use self::spi4::*;
+// pub use self::spi4::*;
 
+#[cfg(feature = "nope")]
 mod spi4 {
     use core::ptr;
     use embedded_hal::spi::*;
@@ -15,8 +16,8 @@ mod spi4 {
     };
 
     pub struct Spi4 {
-        spi: SPI1,
-        sck: Pin<'A', 5, Alternate<5>>,
+        spi:  SPI1,
+        sck:  Pin<'A', 5, Alternate<5>>,
         miso: Pin<'A', 6, Alternate<5>>,
         mosi: Pin<'A', 7, Alternate<5>>,
     }
@@ -43,7 +44,11 @@ mod spi4 {
             unimplemented!()
         }
 
-        pub fn transfer(&mut self, read: &mut [u8], send: &[u8]) -> nb::Result<(), SpiError> {
+        pub fn transfer(
+            &mut self,
+            read: &mut [u8],
+            send: &[u8],
+        ) -> nb::Result<(), SpiError> {
             self.enable(true);
 
             while self.spi_is_busy() {
@@ -179,16 +184,67 @@ mod spi3 {
     };
 
     pub struct Spi3 {
-        spi: SPI2,
-        sck: Pin<'B', 13, Alternate<5>>,
-        mosi: Pin<'B', 15, Alternate<5>>,
-        miso: NoMiso,
+        spi:         SPI2,
+        sck:         Pin<'B', 13, Alternate<5>>,
+        mosi:        Pin<'B', 15, Alternate<5>>,
+        miso:        NoMiso,
         output_mode: bool,
     }
 
     /// new
     impl Spi3 {
         pub fn new(
+            spi: SPI2,
+            mode: Mode,
+            sck: Pin<'B', 13, Alternate<5>>,
+            mosi: Pin<'B', 15, Alternate<5>>,
+        ) -> Self {
+            spi.cr1.modify(|_, w| {
+                w.cpha() // clock phase
+                    .bit(mode.phase == Phase::CaptureOnSecondTransition)
+                    .cpol() // clock polarity
+                    .bit(mode.polarity == Polarity::IdleHigh)
+                    .bidimode() // bidirectional half duplex mode
+                    .set_bit()
+                    .bidioe() // bidi output mode
+                    .set_bit()
+                    .br() // baud rate = 1/16 f_PCLK
+                    .div16()
+                    .mstr() // master mode enabled
+                    .set_bit()
+                    .ssm() // software slave management
+                    .set_bit()
+                    .ssi()
+                    .set_bit()
+                    .dff() // 8 bit data frame format
+                    .eight_bit()
+                    .lsbfirst() // MSB first
+                    .clear_bit()
+                    .crcen() // hardware CRC disabled (?)
+                    .clear_bit()
+            });
+
+            spi.cr2.modify(|_, w| {
+                w.ssoe()
+                    .set_bit() // SS output enabled
+                    .frf()
+                    .clear_bit() // Motorola frame format (not TI)
+            });
+
+            let mut out = Self {
+                spi,
+                sck,
+                mosi,
+                miso: NoMiso {},
+                output_mode: true,
+            };
+
+            out.enable(true);
+
+            out
+        }
+
+        pub fn new_full_config(
             // dp: &Peripherals,
             rcc: &RCC,
             gpiob: GPIOB,
