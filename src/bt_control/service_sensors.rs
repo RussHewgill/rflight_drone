@@ -36,7 +36,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct SvLogger {
+pub struct SvSensors {
     service_handle: ServiceHandle,
     char_handle: CharacteristicHandle,
 }
@@ -50,41 +50,7 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
-    pub fn log_write(
-        &mut self,
-        uart: &mut UART,
-        data: &[u8],
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        let logger = if let Some(logger) = self.services.logger {
-            logger
-        } else {
-            uprintln!(uart, "no logger?");
-            // uprintln!(uart, "");
-            return Ok(());
-        };
-
-        let val = UpdateCharacteristicValueParameters {
-            service_handle: logger.service_handle,
-            characteristic_handle: logger.char_handle,
-            offset: 0,
-            value: &data,
-        };
-        block!(self.update_characteristic_value(&val)).unwrap();
-
-        // let val = CharacteristicValue {
-        //     service_handle: console_service.0,
-        //     characteristic_handle: console_service.1,
-        //     offset: 0,
-        //     value: &data,
-        // };
-        // block!(self.write_characteristic_value(&val)).unwrap();
-
-        block!(self.read_event(uart))?;
-
-        Ok(())
-    }
-
-    pub fn init_console_log_service(
+    pub fn init_sensor_service(
         &mut self,
         uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
@@ -140,14 +106,12 @@ where
 
         uprintln!(uart, "c = {:?}", c);
 
-        let logger = SvLogger {
+        let logger = SvSensors {
             service_handle: service.service_handle,
             char_handle: c.characteristic_handle,
         };
 
-        self.services.logger = Some(logger);
-
-        self.log_write(uart, "wat".as_bytes()).unwrap();
+        // self.services = Some(logger);
 
         Ok(())
     }

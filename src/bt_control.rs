@@ -1,4 +1,5 @@
 pub mod service_log;
+pub mod service_sensors;
 
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
@@ -74,14 +75,20 @@ mod uuids {
         crate::bluetooth::gatt::Uuid::Uuid128(x)
     }
 
+    /// Logger
     pub const UUID_CONSOLE_LOG_SERVICE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x3f44d56a86074db0945b6c285b73d48a);
 
-    pub const UUID_CONSOLE_LOG_CHAR_WRITE: crate::bluetooth::gatt::Uuid =
+    pub const UUID_CONSOLE_LOG_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x1450781d919c49f0a16c0ec28dfb83d5);
 
-    pub const UUID_CONSOLE_LOG_CHAR_NOTIFY: crate::bluetooth::gatt::Uuid =
-        uuid_from_hex(0xe5bb737a4d8a4911a38fb23d4536bd4c);
+    /// Sensors
+
+    pub const UUID_SENSOR_SERVICE: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x639d0157e75a4eb9835298b676f51912);
+
+    pub const UUID_SENSOR_CHAR: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x4f1f7252db544d4faa8f208d48637b3f);
 }
 
 /// init
@@ -94,6 +101,12 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
+    fn init_services(&mut self, uart: &mut UART) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        self.init_console_log_service(uart)?;
+        self.init_sensor_service(uart)?;
+        Ok(())
+    }
+
     pub fn init_bt(
         &mut self,
         uart: &mut UART,
@@ -139,7 +152,7 @@ where
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
 
-        let console_service = self.init_console_log_service(uart)?;
+        self.init_services(uart)?;
 
         // let addr = BdAddr([
         //     0x43 | 0b1100_0000,

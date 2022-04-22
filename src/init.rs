@@ -1,15 +1,20 @@
 use cortex_m::peripheral::NVIC;
+use embedded_hal::spi::MODE_3;
 // use dwt_systick_monotonic::DwtSystick;
-use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, TIM2};
+use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, SPI2, TIM2};
 use stm32f401::{CorePeripherals, Peripherals};
-use stm32f4xx_hal::gpio::{Input, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PB2};
+use stm32f4xx_hal::gpio::{
+    Alternate, Input, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PA8, PB12, PB13, PB15, PB2, PC13,
+};
 use stm32f4xx_hal::rcc::Clocks;
-use stm32f4xx_hal::spi::Mode;
+use stm32f4xx_hal::spi::{Mode, NoMiso};
 use stm32f4xx_hal::syscfg::SysCfg;
 use stm32f4xx_hal::timer::{DelayMs, SysDelay};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
+use crate::sensors::imu::IMU;
+use crate::sensors::Sensors;
 // use crate::time::MonoTimer;
 use crate::{bt_control::BTController, uart::UART};
 
@@ -84,6 +89,50 @@ pub fn init_all(
         bt,
         delay_bt: bt_delay,
     }
+}
+
+fn init_sensors(
+    //
+    spi2: SPI2,
+
+    pb13: PB13,
+    pb15: PB15,
+
+    pa8: PA8,
+    pb12: PB12,
+    pc13: PC13,
+
+    clocks: &Clocks,
+    // ) -> Sensors {
+) -> stm32f4xx_hal::spi::Spi<
+    SPI2,
+    (
+        Pin<'A', 13, Alternate<5>>,
+        stm32f4xx_hal::gpio::NoPin,
+        Pin<'A', 15, Alternate<5>>,
+    ),
+    stm32f4xx_hal::spi::TransferModeBidi,
+> {
+    // let mut imu = IMU::new(pa8);
+
+    let sck = pb13
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .internal_resistor(Pull::None)
+        .into_alternate::<5>();
+    let mosi = pb15
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .internal_resistor(Pull::None)
+        .into_alternate::<5>();
+
+    /// Mode3 = IdleHigh, Capture 2nd
+    let mode = MODE_3;
+
+    let mut spi = spi2.spi_bidi((sck, NoMiso {}, mosi), mode, 10.MHz(), &clocks);
+
+    // unimplemented!()
+    spi
 }
 
 fn init_bt_interrupt(exti: &mut EXTI, syscfg: &mut SysCfg, mut pa4: PA4) -> Pin<'A', 4, Input> {
