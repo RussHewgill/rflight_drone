@@ -77,8 +77,11 @@ mod uuids {
     pub const UUID_CONSOLE_LOG_SERVICE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x3f44d56a86074db0945b6c285b73d48a);
 
-    pub const UUID_CONSOLE_LOG_CHAR: crate::bluetooth::gatt::Uuid =
+    pub const UUID_CONSOLE_LOG_CHAR_WRITE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x1450781d919c49f0a16c0ec28dfb83d5);
+
+    pub const UUID_CONSOLE_LOG_CHAR_NOTIFY: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0xe5bb737a4d8a4911a38fb23d4536bd4c);
 }
 
 /// init
@@ -114,6 +117,9 @@ where
         block!(self.init_gap(role, false, 7))?;
         let gap: GapInit = block!(self.read_event_gap_init(uart))?;
 
+        // block!(self.clear_security_database())?;
+        // block!(self.read_event(uart))?;
+
         // uprintln!(uart, "gap = {:?}", gap);
 
         static BLE_NAME: &'static str = "DRN1120";
@@ -144,15 +150,15 @@ where
         //     0x4f | 0b1100_0000,
         // ]);
 
-        // let requirements = AuthenticationRequirements {
-        //     mitm_protection_required: true,
-        //     out_of_band_auth: gap::OutOfBandAuthentication::Disabled,
-        //     encryption_key_size_range: (7, 16),
-        //     fixed_pin: super::gap::Pin::Fixed(1234),
-        //     bonding_required: true,
-        // };
-        // block!(self.set_authentication_requirement(&requirements)).unwrap();
-        // block!(self.read_event(uart))?;
+        let requirements = AuthenticationRequirements {
+            mitm_protection_required: true,
+            out_of_band_auth: gap::OutOfBandAuthentication::Disabled,
+            encryption_key_size_range: (7, 16),
+            fixed_pin: super::gap::Pin::Fixed(1),
+            bonding_required: true,
+        };
+        block!(self.set_authentication_requirement(&requirements)).unwrap();
+        block!(self.read_event(uart))?;
 
         let ad_params = AdvertisingParameters {
             advertising_interval: AdvertisingInterval::for_type(

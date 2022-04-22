@@ -203,31 +203,34 @@ mod app {
     #[task(capacity = 3, shared = [bt, uart, exti], priority = 8)]
     fn test_uart(mut cx: test_uart::Context) {
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
-            uprintln!(uart, "test_uart");
+            uprintln!(uart, "test_uart start");
 
-            bt.clear_interrupt();
+            // let buf = [1, 2, 3, 4];
+            let buf = "asdf";
+
+            // bt.clear_interrupt();
             bt.pause_interrupt(exti);
-
-            let buf = [1, 2, 3, 4];
-
-            if !bt.state.is_connected() {
-                uprintln!(uart, "not connected yet");
-                test_uart::spawn_after(1.secs()).unwrap();
-            } else {
-                match block!(bt.log_write(uart, &buf)) {
-                    Ok(_) => {
-                        uprintln!(uart, "send log write command");
-
-                        let i = bt.check_interrupt();
-                        uprintln!(uart, "i = {:?}", i);
-                    }
-                    Err(e) => {
-                        uprintln!(uart, "error 0 = {:?}", e);
-                    }
+            // match block!(bt.log_write(uart, buf.as_bytes())) {
+            match bt.log_write(uart, buf.as_bytes()) {
+                Ok(_) => {
+                    uprintln!(uart, "sent log write command");
+                    // let i = bt.check_interrupt();
+                    // uprintln!(uart, "i = {:?}", i);
+                }
+                Err(e) => {
+                    uprintln!(uart, "error 0 = {:?}", e);
                 }
             }
-
             bt.unpause_interrupt(exti);
+
+            uprintln!(uart, "test_uart done");
+            test_uart::spawn_after(1.secs()).unwrap();
+
+            // if !bt.state.is_connected() {
+            //     // uprintln!(uart, "not connected yet");
+            //     test_uart::spawn_after(1.secs()).unwrap();
+            // } else {
+            // }
         });
     }
 

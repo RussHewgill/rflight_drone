@@ -21,7 +21,7 @@ use crate::{
         AddCharacteristicParameters, CharacteristicEvent, CharacteristicPermission,
         CharacteristicProperty, Commands as GattCommands, EncryptionKeySize,
     },
-    bt_control::UUID_CONSOLE_LOG_CHAR,
+    bt_control::UUID_CONSOLE_LOG_CHAR_WRITE,
     uprint, uprintln,
 };
 
@@ -87,7 +87,6 @@ where
     pub fn init_console_log_service(
         &mut self,
         uart: &mut UART,
-        // ) -> nb::Result<SvLogger, BTError<SpiError, GpioError>> {
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         let params = AddServiceParameters {
             uuid: UUID_CONSOLE_LOG_SERVICE,
@@ -102,23 +101,35 @@ where
         };
         uprintln!(uart, "service = {:?}", service);
 
-        let params = AddCharacteristicParameters {
+        let params0 = AddCharacteristicParameters {
             service_handle: service.service_handle,
-            characteristic_uuid: UUID_CONSOLE_LOG_CHAR,
-            characteristic_value_len: 8,
-            // characteristic_properties: CharacteristicProperty::NOTIFY,
-            characteristic_properties: CharacteristicProperty::WRITE
-                | CharacteristicProperty::WRITE_WITHOUT_RESPONSE,
-            // characteristic_properties: CharacteristicProperty::READ
-            //     | CharacteristicProperty::WRITE
-            //     | CharacteristicProperty::NOTIFY,
+            characteristic_uuid: UUID_CONSOLE_LOG_CHAR_WRITE,
+            characteristic_value_len: 18,
+            characteristic_properties: CharacteristicProperty::NOTIFY,
+            // characteristic_properties: CharacteristicProperty::NOTIFY
+            // | CharacteristicProperty::READ,
             security_permissions: CharacteristicPermission::NONE,
             gatt_event_mask: CharacteristicEvent::NONE,
+            // gatt_event_mask: CharacteristicEvent::CONFIRM_READ,
             encryption_key_size: EncryptionKeySize::with_value(7).unwrap(),
             is_variable: true,
-            fw_version_before_v72: false,
+            fw_version_before_v72: true,
         };
-        block!(self.add_characteristic(&params))?;
+        block!(self.add_characteristic(&params0))?;
+
+        // let params1 = AddCharacteristicParameters {
+        //     service_handle: service.service_handle,
+        //     characteristic_uuid: UUID_CONSOLE_LOG_CHAR_WRITE,
+        //     characteristic_value_len: 18,
+        //     characteristic_properties: CharacteristicProperty::WRITE
+        //         | CharacteristicProperty::WRITE_WITHOUT_RESPONSE,
+        //     security_permissions: CharacteristicPermission::NONE,
+        //     gatt_event_mask: CharacteristicEvent::NONE,
+        //     encryption_key_size: EncryptionKeySize::with_value(7).unwrap(),
+        //     is_variable: true,
+        //     fw_version_before_v72: true,
+        // };
+        // block!(self.add_characteristic(&params1))?;
 
         // block!(self.read_event(uart))?;
 
@@ -135,6 +146,8 @@ where
         };
 
         self.services = Some(logger);
+
+        self.log_write(uart, "wat".as_bytes()).unwrap();
 
         Ok(())
     }
