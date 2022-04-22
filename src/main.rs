@@ -24,6 +24,7 @@ use sensors::imu::*;
 use sensors::magneto::*;
 use sensors::*;
 use spi::*;
+use stm32f4xx_hal::dwt::DwtExt;
 // use time::*;
 use uart::*;
 
@@ -61,6 +62,7 @@ mod app {
     use stm32f4::stm32f401::{self, EXTI, TIM2};
     // use stm32f4xx_hal::prelude::*;
 
+    use stm32f4xx_hal::dwt::Dwt;
     use stm32f4xx_hal::gpio::{Output, Pin};
     use stm32f4xx_hal::{
         block, prelude::_embedded_hal_blocking_delay_DelayMs, timer::DelayMs,
@@ -84,6 +86,7 @@ mod app {
 
     #[shared]
     struct Shared {
+        dwt:      Dwt,
         uart:     UART,
         exti:     EXTI,
         bt:       BTController<'static>,
@@ -142,6 +145,7 @@ mod app {
         bt.unpend();
 
         let shared = Shared {
+            dwt: init_struct.dwt,
             uart,
             exti: init_struct.exti,
             bt,
@@ -164,20 +168,22 @@ mod app {
         (shared, local, init::Monotonics(mono))
     }
 
-    #[task(capacity = 3, shared = [uart], local = [sensors], priority = 8)]
+    #[task(capacity = 3, shared = [uart, dwt], local = [sensors], priority = 8)]
     fn test_sens(mut cx: test_sens::Context) {
-        cx.shared.uart.lock(|uart| {
+        (cx.shared.uart, cx.shared.dwt).lock(|uart, dwt| {
             uprintln!(uart, "test_sens");
             let sensors: &mut Sensors = &mut cx.local.sensors;
 
-            sensors.with_spi_mag(|spi, mag| {
-                let b = mag
-                    .read_reg(spi, crate::sensors::magneto::MagRegister::WHO_AM_I)
-                    .unwrap();
-                uprintln!(uart, "b2: {:#010b}", b);
+            let t = dwt.measure(|| {
+                sensors.with_spi_mag(|spi, mag| {
+                    let b = mag
+                        .read_reg(spi, crate::sensors::magneto::MagRegister::WHO_AM_I)
+                        .unwrap();
+                    uprintln!(uart, "b2: {:#010b}", b);
+                });
             });
 
-            uprintln!(uart, "test_sens done");
+            uprintln!(uart, "test_sens done, t = {:?}", t.as_micros());
             //
         });
     }

@@ -189,6 +189,11 @@ mod spi3 {
         mosi:        Pin<'B', 15, Alternate<5>>,
         miso:        NoMiso,
         output_mode: bool,
+        dma:         Option<Spi3Dma>,
+    }
+
+    pub struct Spi3Dma {
+        //
     }
 
     /// new
@@ -237,6 +242,7 @@ mod spi3 {
                 mosi,
                 miso: NoMiso {},
                 output_mode: true,
+                dma: None,
             };
 
             out.enable(true);
@@ -329,11 +335,26 @@ mod spi3 {
                 mosi,
                 miso: NoMiso {},
                 output_mode: true,
+                dma: None,
             };
 
             out.enable(true);
 
             (cs_magno, out)
+        }
+    }
+
+    /// DMA
+    impl Spi3 {
+        pub fn init_dma(&mut self) {
+            self.spi
+                .cr2
+                .modify(|r, w| w.txdmaen().enabled().rxdmaen().enabled());
+
+            self.dma = Some(Spi3Dma {});
+
+            // self.dma = true;
+            // unimplemented!()
         }
     }
 

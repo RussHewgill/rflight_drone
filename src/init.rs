@@ -3,6 +3,7 @@ use embedded_hal::spi::MODE_3;
 // use dwt_systick_monotonic::DwtSystick;
 use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, SPI2, TIM2};
 use stm32f401::{CorePeripherals, Peripherals};
+use stm32f4xx_hal::dwt::{Dwt, DwtExt};
 use stm32f4xx_hal::gpio::{
     Alternate, Input, Output, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PA8, PB12, PB13,
     PB15, PB2, PC13,
@@ -46,6 +47,7 @@ pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
 }
 
 pub struct InitStruct {
+    pub dwt:      Dwt,
     pub uart:     UART,
     pub exti:     EXTI,
     pub clocks:   Clocks,
@@ -84,16 +86,21 @@ pub fn init_all(
 
     let bt_irq = init_bt_interrupt(&mut dp.EXTI, &mut syscfg, gpioa.pa4);
 
+    uart.pause();
     let bt = init_bt(
         dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks,
         bt_buf,
     );
+    uart.unpause();
 
     let sensors = init_sensors(
         dp.SPI2, gpiob.pb13, gpiob.pb15, gpioa.pa8, gpiob.pb12, gpioc.pc13, &clocks,
     );
 
+    let dwt = cp.DWT.constrain(cp.DCB, &clocks);
+
     InitStruct {
+        dwt,
         uart,
         exti: dp.EXTI,
         clocks,
@@ -105,16 +112,12 @@ pub fn init_all(
 }
 
 fn init_sensors(
-    //
     spi2: SPI2,
-
     pb13: PB13,
     pb15: PB15,
-
     pa8: PA8,
     pb12: PB12,
     pc13: PC13,
-
     clocks: &Clocks,
 ) -> Sensors {
     let mut cs_imu = pa8
@@ -158,8 +161,6 @@ fn init_sensors(
     let baro = Barometer::new(cs_baro);
 
     Sensors::new(spi, imu, mag, baro)
-
-    // (spi, cs_mag)
 }
 
 fn init_bt_interrupt(

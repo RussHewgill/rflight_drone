@@ -9,8 +9,9 @@ use stm32f4xx_hal::{
 pub use core::fmt::Write as CoreWrite;
 
 pub struct UART {
-    pub tx: Tx<USART1, u8>,
-    pub rx: Rx<USART1, u8>,
+    enabled: bool,
+    pub tx:  Tx<USART1, u8>,
+    pub rx:  Rx<USART1, u8>,
 }
 
 /// new
@@ -32,7 +33,18 @@ impl UART {
             .with_u8_data();
         let (tx, rx) = serial.split();
 
-        Self { tx, rx }
+        Self {
+            enabled: true,
+            tx,
+            rx,
+        }
+    }
+
+    pub fn pause(&mut self) {
+        self.enabled = false;
+    }
+    pub fn unpause(&mut self) {
+        self.enabled = true;
     }
 }
 
@@ -46,7 +58,11 @@ impl UART {
 
 impl core::fmt::Write for UART {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.tx.write_str(s)
+        if self.enabled {
+            self.tx.write_str(s)
+        } else {
+            Ok(())
+        }
     }
 }
 
