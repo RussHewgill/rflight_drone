@@ -4,6 +4,7 @@ pub mod magneto;
 
 use stm32f4::stm32f401::SPI2;
 use stm32f4xx_hal::gpio::{Alternate, Output, Pin};
+use stm32f4xx_hal::nb;
 
 use crate::spi::Spi3;
 
@@ -108,9 +109,12 @@ impl Sensors {
 /// read data
 impl Sensors {
     pub fn read_data_imu(&mut self) {
-        if let Ok((data_gyro, data_acc)) =
-            self.with_spi_imu(|spi, imu| imu.read_data(spi))
-        {
+        if let Ok((data_gyro, data_acc)) = self.with_spi_imu(|spi, imu| {
+            while !(imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)) {
+                cortex_m::asm::nop();
+            }
+            imu.read_data(spi)
+        }) {
             self.data.imu_gyro.update(data_gyro);
             self.data.imu_acc.update(data_acc);
         } else {
@@ -119,10 +123,16 @@ impl Sensors {
     }
 
     pub fn read_data_mag(&mut self) {
-        if let Ok(data) = self.with_spi_mag(|spi, mag| mag.read_data(spi)) {
+        if let Ok(data) = self.with_spi_mag(|spi, mag| {
+            if mag.read_new_data_available(spi).unwrap() {
+                mag.read_data(spi)
+            } else {
+                Err(nb::Error::WouldBlock)
+            }
+        }) {
             self.data.magnetometer.update(data);
         } else {
-            unimplemented!()
+            // unimplemented!()
         }
     }
 

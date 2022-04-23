@@ -1,7 +1,7 @@
 use cortex_m::peripheral::NVIC;
 use embedded_hal::spi::MODE_3;
 // use dwt_systick_monotonic::DwtSystick;
-use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, SPI2, TIM2, TIM5};
+use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, SPI2, TIM2, TIM5, TIM9};
 use stm32f401::{CorePeripherals, Peripherals};
 use stm32f4xx_hal::dwt::{Dwt, DwtExt};
 use stm32f4xx_hal::gpio::{
@@ -11,7 +11,7 @@ use stm32f4xx_hal::gpio::{
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Mode, NoMiso};
 use stm32f4xx_hal::syscfg::SysCfg;
-use stm32f4xx_hal::timer::{DelayMs, SysDelay, Timer};
+use stm32f4xx_hal::timer::{CounterMs, DelayMs, SysDelay, Timer};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
@@ -24,7 +24,7 @@ use crate::time::MonoTimer;
 // use crate::time::MonoTimer;
 use crate::{bt_control::BTController, uart::UART};
 
-use systick_monotonic::{ExtU64, Systick};
+// use systick_monotonic::{ExtU64, Systick};
 
 // pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
 pub fn init_all_pre(rcc: &mut RCC) {
@@ -52,6 +52,7 @@ pub struct InitStruct {
     pub dwt:      Dwt,
     pub uart:     UART,
     pub exti:     EXTI,
+    pub tim9:     CounterMs<TIM9>,
     pub clocks:   Clocks,
     // pub mono:     Systick<1_000>,
     pub mono:     MonoTimer<TIM5, 1_000_000>,
@@ -91,8 +92,10 @@ pub fn init_all(
     // tim9.sta
     // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
-    // let mut tim9 = dp.TIM9.counter(&clocks);
-    // tim9.start(1.secs());
+    /// TIM9: periodic sensor polling
+    let mut tim9: stm32f4xx_hal::timer::CounterMs<TIM9> = dp.TIM9.counter(&clocks);
+    tim9.start(1.secs()).unwrap();
+    tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
     // (uart, clocks, mono)
 
@@ -107,7 +110,7 @@ pub fn init_all(
     );
     uart.unpause();
 
-    let sensors = init_sensors(
+    let mut sensors = init_sensors(
         dp.SPI2, gpiob.pb13, gpiob.pb15, gpioa.pa8, gpiob.pb12, gpioc.pc13, &clocks,
     );
 
@@ -117,6 +120,8 @@ pub fn init_all(
         dwt,
         uart,
         exti: dp.EXTI,
+        // tim9: dp.TIM9,
+        tim9,
         clocks,
         mono,
         sensors,
@@ -174,7 +179,14 @@ fn init_sensors(
     let mag = Magnetometer::new(cs_mag);
     let baro = Barometer::new(cs_baro);
 
-    Sensors::new(spi, imu, mag, baro)
+    let mut out = Sensors::new(spi, imu, mag, baro);
+
+    out.with_spi_mag(|spi, mag| {
+        // mag.init_continuous(spi).unwrap();
+        mag.init_single(spi).unwrap();
+    });
+
+    out
 }
 
 fn init_bt_interrupt(

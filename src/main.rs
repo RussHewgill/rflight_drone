@@ -60,12 +60,13 @@ use stm32f4xx_hal::{
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
-    use stm32f4::stm32f401::{self, EXTI, TIM2, TIM5};
+    use stm32f4::stm32f401::{self, EXTI, TIM2, TIM5, TIM9};
     // use stm32f4xx_hal::prelude::*;
 
     use stm32f4xx_hal::dma::StreamsTuple;
     use stm32f4xx_hal::dwt::Dwt;
     use stm32f4xx_hal::gpio::{Output, Pin};
+    use stm32f4xx_hal::timer::CounterMs;
     use stm32f4xx_hal::{block, prelude::*, timer::DelayMs};
 
     // // use dwt_systick_monotonic::{DwtSystick, ExtU32};
@@ -100,6 +101,7 @@ mod app {
     struct Local {
         //
         sensors: Sensors,
+        tim9:    CounterMs<TIM9>,
     }
 
     // #[monotonic(binds = SysTick, default = true)]
@@ -151,6 +153,7 @@ mod app {
 
         let local = Local {
             sensors: init_struct.sensors,
+            tim9:    init_struct.tim9,
         };
 
         // setup_bt::spawn().unwrap();
@@ -160,19 +163,30 @@ mod app {
 
         // test_sens::spawn().unwrap();
 
-        tim9_sensors::spawn().unwrap();
+        // tim9_sensors::spawn().unwrap();
 
         // (shared, Local {}, init::Monotonics())
         (shared, local, init::Monotonics(mono))
     }
 
-    // #[task(binds = TIM1_BRK_TIM9, shared = [uart], local = [sensors], priority = 2)]
-    #[task(capacity = 3, shared = [uart], local = [], priority = 8)]
+    #[task(binds = TIM1_BRK_TIM9, shared = [uart], local = [tim9,sensors], priority = 2)]
+    // #[task(capacity = 3, shared = [uart], local = [], priority = 8)]
     fn tim9_sensors(mut cx: tim9_sensors::Context) {
+        cx.local
+            .tim9
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        let sensors: &mut Sensors = cx.local.sensors;
+
+        sensors.read_data_mag();
+
         cx.shared.uart.lock(|uart| {
-            uprintln!(uart, "wat");
+            // uprintln!(uart, "wat");
+            let xs = sensors.data.magnetometer.read_and_reset();
+            uprintln!(uart, "xs[0] = {:.4}", xs[0]);
+            uprintln!(uart, "xs[1] = {:.4}", xs[1]);
+            uprintln!(uart, "xs[2] = {:.4}", xs[2]);
         });
-        tim9_sensors::spawn_after(1.secs()).unwrap();
+        // tim9_sensors::spawn_after(1.secs()).unwrap();
     }
 
     #[cfg(feature = "nope")]
