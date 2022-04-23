@@ -183,18 +183,19 @@ mod spi3 {
         time::*,
     };
 
+    #[derive(Debug)]
     pub struct Spi3 {
         spi:         SPI2,
         sck:         Pin<'B', 13, Alternate<5>>,
         mosi:        Pin<'B', 15, Alternate<5>>,
         miso:        NoMiso,
         output_mode: bool,
-        dma:         Option<Spi3Dma>,
+        // dma:         Option<Spi3Dma>,
     }
 
-    pub struct Spi3Dma {
-        //
-    }
+    // pub struct Spi3Dma {
+    //     //
+    // }
 
     /// new
     impl Spi3 {
@@ -242,7 +243,7 @@ mod spi3 {
                 mosi,
                 miso: NoMiso {},
                 output_mode: true,
-                dma: None,
+                // dma: None,
             };
 
             out.enable(true);
@@ -335,7 +336,7 @@ mod spi3 {
                 mosi,
                 miso: NoMiso {},
                 output_mode: true,
-                dma: None,
+                // dma: None,
             };
 
             out.enable(true);
@@ -344,19 +345,17 @@ mod spi3 {
         }
     }
 
-    /// DMA
-    impl Spi3 {
-        pub fn init_dma(&mut self) {
-            self.spi
-                .cr2
-                .modify(|r, w| w.txdmaen().enabled().rxdmaen().enabled());
-
-            self.dma = Some(Spi3Dma {});
-
-            // self.dma = true;
-            // unimplemented!()
-        }
-    }
+    // /// DMA
+    // impl Spi3 {
+    //     pub fn init_dma(&mut self) {
+    //         self.spi
+    //             .cr2
+    //             .modify(|r, w| w.txdmaen().enabled().rxdmaen().enabled());
+    //         self.dma = Some(Spi3Dma {});
+    //         // self.dma = true;
+    //         // unimplemented!()
+    //     }
+    // }
 
     #[cfg(feature = "nope")]
     impl Spi3 {
@@ -591,7 +590,7 @@ mod spi3 {
             unimplemented!()
         }
 
-        pub fn send(&mut self, byte: u8) -> nb::Result<(), SpiError> {
+        pub fn send_blocking(&mut self, byte: u8) -> nb::Result<(), SpiError> {
             while self.spi_is_busy() {
                 cortex_m::asm::nop();
             }

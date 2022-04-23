@@ -22,13 +22,25 @@ impl UART {
         // rx_pin: Pin<'A', 10, Alternate<7>>,
         tx_pin: PA9,
         rx_pin: PA10,
+
+        // bps: Option<stm32f4xx_hal::time::Bps>,
         clocks: &Clocks,
     ) -> Self {
         let tx_pin = tx_pin.into_alternate();
         let rx_pin = rx_pin.into_alternate();
 
+        // let bps = 9600.bps();
+        let bps = 19200.bps();
+
         let mut serial = usart1
-            .serial((tx_pin, rx_pin), 115200.bps(), &clocks)
+            // .serial((tx_pin, rx_pin), 115200.bps(), &clocks)
+            // .serial((tx_pin, rx_pin), 9600.bps(), &clocks)
+            .serial(
+                (tx_pin, rx_pin),
+                stm32f4xx_hal::serial::Config::default().baudrate(bps),
+                &clocks,
+            )
+            // .serial((tx_pin, rx_pin), 57600.bps(), &clocks)
             .unwrap()
             .with_u8_data();
         let (tx, rx) = serial.split();

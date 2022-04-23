@@ -13,19 +13,20 @@ pub mod init;
 pub mod pid;
 pub mod sensors;
 pub mod spi;
-// pub mod time;
+pub mod time;
 pub mod uart;
 
 use adc::*;
 use bluetooth::*;
 use bt_control::*;
+use init::init_all_pre;
 use sensors::barometer::*;
 use sensors::imu::*;
 use sensors::magneto::*;
 use sensors::*;
 use spi::*;
 use stm32f4xx_hal::dwt::DwtExt;
-// use time::*;
+use time::*;
 use uart::*;
 
 use byteorder::ByteOrder;
@@ -59,21 +60,21 @@ use stm32f4xx_hal::{
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
-    use stm32f4::stm32f401::{self, EXTI, TIM2};
+    use stm32f4::stm32f401::{self, EXTI, TIM2, TIM5};
     // use stm32f4xx_hal::prelude::*;
 
+    use stm32f4xx_hal::dma::StreamsTuple;
     use stm32f4xx_hal::dwt::Dwt;
     use stm32f4xx_hal::gpio::{Output, Pin};
-    use stm32f4xx_hal::{
-        block, prelude::_embedded_hal_blocking_delay_DelayMs, timer::DelayMs,
-    };
+    use stm32f4xx_hal::{block, prelude::*, timer::DelayMs};
 
-    // use dwt_systick_monotonic::{DwtSystick, ExtU32};
-    use systick_monotonic::{ExtU64, Systick};
+    // // use dwt_systick_monotonic::{DwtSystick, ExtU32};
+    // use systick_monotonic::{ExtU64, Systick};
 
     use crate::bluetooth::gatt::Commands as GattCommands;
     use crate::bluetooth::hal_bt::Commands as HalCommands;
     use crate::sensors::Sensors;
+    use crate::time::MonoTimer;
     use crate::{bluetooth::gap::Commands as GapCommands, bt_control::BTState};
     use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
 
@@ -104,11 +105,11 @@ mod app {
     // #[monotonic(binds = SysTick, default = true)]
     // type MonoTick = DwtSystick<1_000>; // 1000 Hz
 
-    #[monotonic(binds = SysTick, default = true)]
-    type MonoTick = Systick<1_000>; // 1000 Hz
-
     // #[monotonic(binds = SysTick, default = true)]
-    // type MonoTick = MonoTimer<TIM2, 1_000>; // 1000 Hz
+    // type MonoTick = Systick<1_000>; // 1000 Hz
+
+    #[monotonic(binds = TIM5, default = true)]
+    type MonoTick = MonoTimer<TIM5, 1_000_000>; // 1 MHz
 
     #[init(local = [bt_buf: [u8; 512] = [0u8; 512]])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -117,30 +118,25 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        init_all_pre(&mut cp, &mut dp);
-
-        // let mut bt_buf = [0u8; 512];
-
         let bt_buf = cx.local.bt_buf;
 
-        // let (mut uart, clocks, mono) = init_all(cp, dp);
         let init_struct = init_all(cp, dp, &mut bt_buf[..]);
 
         let mut uart = init_struct.uart;
         let clocks = init_struct.clocks;
         let mono = init_struct.mono;
 
+        // hprintln!("hclk() = {:?}", clocks.hclk());
         // uprintln!(uart, "hclk() = {:?}", clocks.hclk());
         // uprintln!(uart, "sysclk() = {:?}", clocks.sysclk());
 
         let mut bt = init_struct.bt;
         let mut delay_bt = init_struct.delay_bt;
 
+        uart.pause();
         bt.init_bt(&mut uart, &mut delay_bt).unwrap();
         bt.clear_interrupt();
-
-        let i0 = bt.check_interrupt();
-        uprintln!(uart, "i0 = {:?}", i0);
+        uart.unpause();
 
         bt.unpend();
 
@@ -162,42 +158,74 @@ mod app {
         // test_uart::spawn().unwrap();
         // test_uart::spawn_after(2.secs()).unwrap();
 
-        test_sens::spawn().unwrap();
+        // test_sens::spawn().unwrap();
+
+        tim9_sensors::spawn().unwrap();
 
         // (shared, Local {}, init::Monotonics())
         (shared, local, init::Monotonics(mono))
     }
 
-    #[task(capacity = 3, shared = [uart, dwt], local = [sensors], priority = 8)]
+    // #[task(binds = TIM1_BRK_TIM9, shared = [uart], local = [sensors], priority = 2)]
+    #[task(capacity = 3, shared = [uart], local = [], priority = 8)]
+    fn tim9_sensors(mut cx: tim9_sensors::Context) {
+        cx.shared.uart.lock(|uart| {
+            uprintln!(uart, "wat");
+        });
+        tim9_sensors::spawn_after(1.secs()).unwrap();
+    }
+
+    #[cfg(feature = "nope")]
+    // #[task(capacity = 3, shared = [uart, dwt], local = [sensors], priority = 8)]
     fn test_sens(mut cx: test_sens::Context) {
         (cx.shared.uart, cx.shared.dwt).lock(|uart, dwt| {
             uprintln!(uart, "test_sens");
             let sensors: &mut Sensors = &mut cx.local.sensors;
 
-            let t = dwt.measure(|| {
-                sensors.with_spi_mag(|spi, mag| {
-                    let b = mag
-                        .read_reg(spi, crate::sensors::magneto::MagRegister::WHO_AM_I)
-                        .unwrap();
-                    uprintln!(uart, "b2: {:#010b}", b);
-                });
-            });
+            // sensors.with_spi_mag(|spi, mag| {
+            //     mag.init_continuous(spi).unwrap();
+            //     while !mag.read_new_data_available(spi).unwrap() {
+            //         cortex_m::asm::nop();
+            //     }
+            // });
 
-            uprintln!(uart, "test_sens done, t = {:?}", t.as_micros());
+            // sensors.with_spi_mag(|spi, mag| {
+            //     let t = dwt.measure(|| {
+            //         let data = mag.read_data(spi).unwrap();
+            //     });
+            //     uprintln!(uart, "test_sens done, t = {:?}", t.as_micros());
+            // });
+
+            // sensors.with_spi_mag(|spi, mag| {
+            //     mag.init_single(spi).unwrap();
+            //     while !mag.read_new_data_available(spi).unwrap() {
+            //         cortex_m::asm::nop();
+            //     }
+            // });
+
+            // sensors.with_spi_mag(|spi, mag| {
+            //     /// 32 MHz = 39 us
+            //     let t = dwt.measure(|| {
+            //         let data = mag.read_data(spi).unwrap();
+            //     });
+            //     // uprintln!(uart, "x = {:?}", data[0]);
+            //     // uprintln!(uart, "y = {:?}", data[1]);
+            //     // uprintln!(uart, "z = {:?}", data[2]);
+            //     uprintln!(uart, "test_sens done, t = {:?}", t.as_micros());
+            //     // let b = mag
+            //     //     .read_reg(spi, crate::sensors::magneto::MagRegister::WHO_AM_I)
+            //     //     .unwrap();
+            //     // uprintln!(uart, "b2: {:#010b}", b);
+            // });
+
+            // sensors.with_spi_mag(|spi, mag| {
+            //     // let streams = StreamsTuple::new(dp.DMA1)
+            //     unimplemented!()
+            // });
+
             //
         });
     }
-
-    // // #[task(capacity = 3, local = [bt, delay_bt], shared = [uart])]
-    // #[task(capacity = 3, shared = [bt, delay_bt, uart], priority = 10)]
-    // fn setup_bt(mut cx: setup_bt::Context) {
-    //     (cx.shared.uart, cx.shared.bt, cx.shared.delay_bt).lock(|uart, bt, delay_bt| {
-    //         uprintln!(uart, "test_bt");
-    //         // let delay: &mut DelayMs<TIM2> = cx.local.delay_bt;
-    //         // cx.local.bt.init_bt(uart, delay).unwrap();
-    //         bt.init_bt(uart, delay_bt).unwrap();
-    //     });
-    // }
 
     #[cfg(feature = "nope")]
     // #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 9)]
@@ -684,6 +712,34 @@ fn main_adc() -> ! {
     let vbat = ((adc_val as f32 * v_ref) / d) * ((r_up + r_down) / r_down);
 
     hprintln!("v = {:?}", vbat);
+
+    loop {}
+}
+
+// #[entry]
+fn main_imu3() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    init_all_pre(&mut dp.RCC);
+
+    let mut rcc = dp.RCC.constrain();
+    let clocks = rcc.cfgr.freeze();
+
+    let mut gpioa = dp.GPIOA.split();
+    let mut gpiob = dp.GPIOB.split();
+    let mut gpioc = dp.GPIOC.split();
+
+    let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
+
+    // let mut sensors = init_sensors(
+    //     dp.SPI2, gpiob.pb13, gpiob.pb15, gpioa.pa8, gpiob.pb12, gpioc.pc13, &clocks,
+    // );
+
+    // sensors.with_spi_mag(|spi, mag| {
+    //     //
+    //     unimplemented!()
+    // });
 
     loop {}
 }

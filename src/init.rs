@@ -1,7 +1,7 @@
 use cortex_m::peripheral::NVIC;
 use embedded_hal::spi::MODE_3;
 // use dwt_systick_monotonic::DwtSystick;
-use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, SPI2, TIM2};
+use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, SPI2, TIM2, TIM5};
 use stm32f401::{CorePeripherals, Peripherals};
 use stm32f4xx_hal::dwt::{Dwt, DwtExt};
 use stm32f4xx_hal::gpio::{
@@ -11,7 +11,7 @@ use stm32f4xx_hal::gpio::{
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Mode, NoMiso};
 use stm32f4xx_hal::syscfg::SysCfg;
-use stm32f4xx_hal::timer::{DelayMs, SysDelay};
+use stm32f4xx_hal::timer::{DelayMs, SysDelay, Timer};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
@@ -20,14 +20,16 @@ use crate::sensors::imu::IMU;
 use crate::sensors::magneto::Magnetometer;
 use crate::sensors::Sensors;
 use crate::spi::Spi3;
+use crate::time::MonoTimer;
 // use crate::time::MonoTimer;
 use crate::{bt_control::BTController, uart::UART};
 
 use systick_monotonic::{ExtU64, Systick};
 
-pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
+// pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
+pub fn init_all_pre(rcc: &mut RCC) {
     /// Enable GPIOA + GPIOB + GPIOC
-    dp.RCC.ahb1enr.modify(|r, w| {
+    rcc.ahb1enr.modify(|r, w| {
         w.gpioaen()
             .set_bit()
             .gpioben()
@@ -37,13 +39,13 @@ pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
     });
 
     /// Enable SPI1 clock
-    dp.RCC.apb2enr.modify(|r, w| w.spi1en().set_bit());
+    rcc.apb2enr.modify(|r, w| w.spi1en().set_bit());
 
     /// Enable SPI2 clock
-    dp.RCC.apb1enr.write(|w| w.spi2en().set_bit());
+    rcc.apb1enr.write(|w| w.spi2en().set_bit());
 
     /// Enable SYSCFG clock
-    dp.RCC.apb2enr.modify(|r, w| w.syscfgen().set_bit());
+    rcc.apb2enr.modify(|r, w| w.syscfgen().set_bit());
 }
 
 pub struct InitStruct {
@@ -51,7 +53,8 @@ pub struct InitStruct {
     pub uart:     UART,
     pub exti:     EXTI,
     pub clocks:   Clocks,
-    pub mono:     Systick<1_000>,
+    // pub mono:     Systick<1_000>,
+    pub mono:     MonoTimer<TIM5, 1_000_000>,
     pub sensors:  Sensors,
     // pub sensors:  (SensSpi, Pin<'B', 12, Output>),
     pub bt:       BTController<'static>,
@@ -63,6 +66,8 @@ pub fn init_all(
     mut dp: Peripherals,
     bt_buf: &'static mut [u8],
 ) -> InitStruct {
+    init_all_pre(&mut dp.RCC);
+
     // let (clocks, mono) = init_clocks(dp.TIM2, dp.RCC);
     let clocks = init_clocks(dp.RCC);
 
@@ -78,7 +83,16 @@ pub fn init_all(
     // let mut bt_delay = cp.SYST.delay(&clocks);
     let bt_delay = dp.TIM2.delay_ms(&clocks);
 
-    let mono = Systick::new(cp.SYST, clocks.sysclk().raw());
+    // let mono = Systick::new(cp.SYST, clocks.sysclk().raw());
+
+    let mono = MonoTimer::<TIM5, 1_000_000>::new(dp.TIM5, &clocks);
+
+    // let mut tim9 = Timer::new(dp.TIM9, &clocks);
+    // tim9.sta
+    // tim9.listen(stm32f4xx_hal::timer::Event::Update);
+
+    // let mut tim9 = dp.TIM9.counter(&clocks);
+    // tim9.start(1.secs());
 
     // (uart, clocks, mono)
 
@@ -230,7 +244,27 @@ fn init_clocks(rcc: RCC) -> Clocks {
     let mut rcc = rcc.constrain();
     // let clocks = rcc.cfgr.use_hse(25.MHz()).sysclk(32.MHz()).freeze();
     // let clocks = rcc.cfgr.sysclk(32.MHz()).freeze();
-    let clocks = rcc.cfgr.freeze();
+
+    // /// Works, any change makes UART stop working
+    // let clocks = rcc.cfgr.sysclk(16.MHz()).use_hse(16.MHz()).freeze();
+
+    let clocks = rcc
+        .cfgr
+        //
+        .use_hse(16.MHz())
+        .sysclk(32.MHz())
+        // .require_pll48clk()
+        .freeze();
+
+    // /// max speed
+    // let clocks = rcc
+    //     .cfgr
+    //     //
+    //     .use_hse(25.MHz())
+    //     .sysclk(84.MHz())
+    //     // .require_pll48clk()
+    //     .freeze();
+
     clocks
 }
 
