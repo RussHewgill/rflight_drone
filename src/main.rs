@@ -10,6 +10,7 @@ pub mod adc;
 pub mod bluetooth;
 pub mod bt_control;
 pub mod init;
+pub mod math;
 pub mod pid;
 pub mod sensors;
 pub mod spi;
@@ -20,6 +21,7 @@ use adc::*;
 use bluetooth::*;
 use bt_control::*;
 use init::init_all_pre;
+use math::*;
 use sensors::barometer::*;
 use sensors::imu::*;
 use sensors::magneto::*;
@@ -74,6 +76,7 @@ mod app {
 
     use crate::bluetooth::gatt::Commands as GattCommands;
     use crate::bluetooth::hal_bt::Commands as HalCommands;
+    use crate::sensors::ahrs::AHRS;
     use crate::sensors::Sensors;
     use crate::time::MonoTimer;
     use crate::{bluetooth::gap::Commands as GapCommands, bt_control::BTState};
@@ -82,6 +85,7 @@ mod app {
     use crate::{
         bt_control::{BTController, BTEvent},
         init::*,
+        math::*,
         uart::*,
         uprint, uprintln,
     };
@@ -91,10 +95,9 @@ mod app {
         dwt:      Dwt,
         uart:     UART,
         exti:     EXTI,
+        ahrs:     AHRS,
         bt:       BTController<'static>,
-        // bt_state: BTState,
         delay_bt: DelayMs<TIM2>,
-        //
     }
 
     #[local]
@@ -146,8 +149,8 @@ mod app {
             dwt: init_struct.dwt,
             uart,
             exti: init_struct.exti,
+            ahrs: AHRS::default(),
             bt,
-            // bt_state: BTState::Disconnected,
             delay_bt,
         };
 
@@ -169,8 +172,7 @@ mod app {
         (shared, local, init::Monotonics(mono))
     }
 
-    #[task(binds = TIM1_BRK_TIM9, shared = [uart], local = [tim9,sensors], priority = 2)]
-    // #[task(capacity = 3, shared = [uart], local = [], priority = 8)]
+    #[task(binds = TIM1_BRK_TIM9, shared = [uart, ahrs], local = [tim9,sensors], priority = 2)]
     fn tim9_sensors(mut cx: tim9_sensors::Context) {
         cx.local
             .tim9
@@ -178,14 +180,30 @@ mod app {
         let sensors: &mut Sensors = cx.local.sensors;
 
         sensors.read_data_mag();
+        // sensors.read_data_imu();
 
-        cx.shared.uart.lock(|uart| {
-            // uprintln!(uart, "wat");
+        (cx.shared.uart, cx.shared.ahrs).lock(|uart, ahrs| {
+            // let quat = ahrs
+            //     .update_uart(
+            //         uart,
+            //         sensors.data.imu_gyro.read_and_reset(),
+            //         sensors.data.imu_acc.read_and_reset(),
+            //         sensors.data.magnetometer.read_and_reset(),
+            //     )
+            //     .unwrap();
+
+            // let (roll, pitch, yaw) = quat.euler_angles();
+
+            // uprintln!(uart, "roll  = {:.1}", rad_to_deg(roll));
+            // uprintln!(uart, "pitch = {:.1}", rad_to_deg(pitch));
+            // uprintln!(uart, "yaw   = {:.1}", rad_to_deg(yaw));
+
             let xs = sensors.data.magnetometer.read_and_reset();
             uprintln!(uart, "xs[0] = {:.4}", xs[0]);
             uprintln!(uart, "xs[1] = {:.4}", xs[1]);
             uprintln!(uart, "xs[2] = {:.4}", xs[2]);
         });
+
         // tim9_sensors::spawn_after(1.secs()).unwrap();
     }
 

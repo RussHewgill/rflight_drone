@@ -16,6 +16,7 @@ use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
 use crate::sensors::barometer::Barometer;
+use crate::sensors::imu::config::ImuConfig;
 use crate::sensors::imu::IMU;
 use crate::sensors::magneto::Magnetometer;
 use crate::sensors::Sensors;
@@ -110,7 +111,7 @@ pub fn init_all(
     );
     uart.unpause();
 
-    let mut sensors = init_sensors(
+    let mut sensors = init_sensors_spi(
         dp.SPI2, gpiob.pb13, gpiob.pb15, gpioa.pa8, gpiob.pb12, gpioc.pc13, &clocks,
     );
 
@@ -130,7 +131,7 @@ pub fn init_all(
     }
 }
 
-fn init_sensors(
+fn init_sensors_spi(
     spi2: SPI2,
     pb13: PB13,
     pb15: PB15,
@@ -187,6 +188,31 @@ fn init_sensors(
     });
 
     out
+}
+
+fn init_sensors(sensors: &mut Sensors) {
+    use crate::sensors::imu::config::*;
+
+    let mut imu_cfg = ImuConfig::default();
+    imu_cfg.block_data_update = true;
+
+    imu_cfg.acc_power = AccelPowerModes::Normal104;
+    // imu_cfg.acc_power = AccelPowerModes::High6660;
+    imu_cfg.acc_scale = AccelScaleFactor::S4;
+
+    imu_cfg.acc_filter_input_composite = true;
+    imu_cfg.acc_bandwidth = AccelBandwidth::OdrLowPass400;
+
+    imu_cfg.gyro_power = GyroPowerModes::Normal104;
+    // imu_cfg.gyro_power = GyroPowerModes::High416;
+    imu_cfg.gyro_scale = GyroScaleFactor::S2000;
+    imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
+
+    // sensors.read_data_imu(true);
+
+    // sensors.with_spi_mag(|spi, mag| {
+    //     mag.init_continuous(spi)
+    // });
 }
 
 fn init_bt_interrupt(

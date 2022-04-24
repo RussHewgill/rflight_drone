@@ -1,3 +1,4 @@
+pub mod ahrs;
 pub mod barometer;
 pub mod imu;
 pub mod magneto;
@@ -8,6 +9,8 @@ use stm32f4xx_hal::nb;
 
 use crate::spi::Spi3;
 
+use nalgebra::{UnitQuaternion, Vector3};
+
 use self::{barometer::Barometer, imu::IMU, magneto::Magnetometer};
 
 // #[derive(Debug, Clone, Copy, PartialEq)]
@@ -17,15 +20,8 @@ use self::{barometer::Barometer, imu::IMU, magneto::Magnetometer};
 //     Baro,
 // }
 
-// pub type SensSpi = stm32f4xx_hal::spi::Spi<
-//     SPI2,
-//     (
-//         Pin<'B', 13, Alternate<5>>,
-//         stm32f4xx_hal::gpio::NoPin,
-//         Pin<'B', 15, Alternate<5>>,
-//     ),
-//     stm32f4xx_hal::spi::TransferModeBidi,
-// >;
+pub type V3 = Vector3<f32>;
+pub type Quat = UnitQuaternion<f32>;
 
 #[derive(Debug)]
 pub struct Sensors {
@@ -40,7 +36,8 @@ pub struct Sensors {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DataVal {
-    data:    [f32; 3],
+    // data:    [f32; 3],
+    data:    V3,
     changed: bool,
 }
 
@@ -54,10 +51,10 @@ pub struct SensorData {
 
 impl DataVal {
     pub fn update(&mut self, data: [f32; 3]) {
-        self.data = data;
+        self.data = data.into();
         self.changed = true;
     }
-    pub fn read_and_reset(&mut self) -> [f32; 3] {
+    pub fn read_and_reset(&mut self) -> V3 {
         self.changed = false;
         self.data
     }
@@ -108,17 +105,19 @@ impl Sensors {
 
 /// read data
 impl Sensors {
-    pub fn read_data_imu(&mut self) {
+    pub fn read_data_imu(&mut self, discard: bool) {
         if let Ok((data_gyro, data_acc)) = self.with_spi_imu(|spi, imu| {
             while !(imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)) {
                 cortex_m::asm::nop();
             }
             imu.read_data(spi)
         }) {
-            self.data.imu_gyro.update(data_gyro);
-            self.data.imu_acc.update(data_acc);
+            if !discard {
+                self.data.imu_gyro.update(data_gyro);
+                self.data.imu_acc.update(data_acc);
+            }
         } else {
-            unimplemented!()
+            // unimplemented!()
         }
     }
 

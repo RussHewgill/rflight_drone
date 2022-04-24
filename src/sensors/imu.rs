@@ -16,38 +16,22 @@ use derive_new::new;
 
 use crate::spi::{Spi3, SpiError};
 
+use self::config::ImuConfig;
+
 /// https://www.st.com/resource/en/datasheet/lsm6dsl.pdf
 
 // #[derive(new)]
 #[derive(Debug)]
 pub struct IMU<CS> {
-    cs:         CS,
-    acc_scale:  AccScale,
-    gyro_scale: GyroScale,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum AccScale {
-    S2  = 2,
-    S4  = 4,
-    S8  = 8,
-    S16 = 16,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum GyroScale {
-    S250  = 250,
-    S500  = 500,
-    S1000 = 1000,
-    S2000 = 2000,
+    cs:  CS,
+    cfg: ImuConfig,
 }
 
 impl<CS> IMU<CS> {
     pub fn new(cs: CS) -> Self {
         Self {
             cs,
-            acc_scale: AccScale::S2,
-            gyro_scale: GyroScale::S250,
+            cfg: ImuConfig::default(),
         }
     }
 }
@@ -60,10 +44,11 @@ where
     // CS: hal::digital::blocking::OutputPin<Error = PinError>,
     CS: OutputPin<Error = PinError>,
 {
-    pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
-        unimplemented!()
-    }
+    // pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+    //     unimplemented!()
+    // }
 
+    #[cfg(feature = "nope")]
     pub fn init(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
         let val = 0b0000_0000
             // | 0b0100_0000 // Block Data Update
@@ -84,6 +69,11 @@ where
         self.write_reg(spi, IMURegister::CTRL2_G, 0b0100_0000)?;
 
         Ok(())
+    }
+
+    pub fn init(&mut self, spi: &mut Spi3, cfg: ImuConfig) -> nb::Result<(), SpiError> {
+        // Ok(())
+        unimplemented!()
     }
 
     pub fn power_down(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
@@ -123,62 +113,49 @@ where
         let gyro_data = &data[0..6];
 
         let gyro = [
-            Self::convert_raw_data(gyro_data[0], gyro_data[1], self.gyro_scale as u8),
-            Self::convert_raw_data(gyro_data[2], gyro_data[3], self.gyro_scale as u8),
-            Self::convert_raw_data(gyro_data[4], gyro_data[5], self.gyro_scale as u8),
+            Self::convert_raw_data(
+                gyro_data[0],
+                gyro_data[1],
+                self.cfg.gyro_scale.to_scale(),
+            ),
+            Self::convert_raw_data(
+                gyro_data[2],
+                gyro_data[3],
+                self.cfg.gyro_scale.to_scale(),
+            ),
+            Self::convert_raw_data(
+                gyro_data[4],
+                gyro_data[5],
+                self.cfg.gyro_scale.to_scale(),
+            ),
         ];
 
         let acc_data = &data[6..12];
 
         let acc = [
-            Self::convert_raw_data(acc_data[0], acc_data[1], self.acc_scale as u8),
-            Self::convert_raw_data(acc_data[2], acc_data[3], self.acc_scale as u8),
-            Self::convert_raw_data(acc_data[4], acc_data[5], self.acc_scale as u8),
+            Self::convert_raw_data(
+                acc_data[0],
+                acc_data[1],
+                self.cfg.acc_scale.to_scale(),
+            ),
+            Self::convert_raw_data(
+                acc_data[2],
+                acc_data[3],
+                self.cfg.acc_scale.to_scale(),
+            ),
+            Self::convert_raw_data(
+                acc_data[4],
+                acc_data[5],
+                self.cfg.acc_scale.to_scale(),
+            ),
         ];
 
         Ok((gyro, acc))
     }
 
-    // pub fn read_accel_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
-    //     // let outx_l = self.read_reg(spi, IMURegister::OUTX_L_XL)?;
-    //     // let outx_h = self.read_reg(spi, IMURegister::OUTX_H_XL)?;
-
-    //     // let outy_l = self.read_reg(spi, IMURegister::OUTY_L_XL)?;
-    //     // let outy_h = self.read_reg(spi, IMURegister::OUTY_H_XL)?;
-
-    //     // let outz_l = self.read_reg(spi, IMURegister::OUTZ_L_XL)?;
-    //     // let outz_h = self.read_reg(spi, IMURegister::OUTZ_H_XL)?;
-
-    //     let mut data = [0u8; 6];
-
-    //     self.read_reg_mult(spi, IMURegister::OUTX_L_XL, bytes)
-
-    //     Ok([
-    //         Self::convert_raw_data(outx_h, outx_l, self.acc_scale),
-    //         Self::convert_raw_data(outy_h, outy_l, self.acc_scale),
-    //         Self::convert_raw_data(outz_h, outz_l, self.acc_scale),
-    //     ])
-    // }
-    // pub fn read_gyro_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
-    //     let outx_l = self.read_reg(spi, IMURegister::OUTX_L_G)?;
-    //     let outx_h = self.read_reg(spi, IMURegister::OUTX_H_G)?;
-
-    //     let outy_l = self.read_reg(spi, IMURegister::OUTY_L_G)?;
-    //     let outy_h = self.read_reg(spi, IMURegister::OUTY_H_G)?;
-
-    //     let outz_l = self.read_reg(spi, IMURegister::OUTZ_L_G)?;
-    //     let outz_h = self.read_reg(spi, IMURegister::OUTZ_H_G)?;
-
-    //     Ok([
-    //         Self::convert_raw_data(outx_h, outx_l, self.gyro_scale),
-    //         Self::convert_raw_data(outy_h, outy_l, self.gyro_scale),
-    //         Self::convert_raw_data(outz_h, outz_l, self.gyro_scale),
-    //     ])
-    // }
-
-    fn convert_raw_data(l: u8, h: u8, scale: u8) -> f32 {
+    fn convert_raw_data(l: u8, h: u8, scale: f32) -> f32 {
         let v0 = l as i16 | ((h as i16) << 8);
-        ((v0 as f32) / (i16::MAX as f32)) * scale as f32
+        ((v0 as f32) / (i16::MAX as f32)) * scale
     }
 }
 
@@ -292,20 +269,359 @@ mod prev {
     }
 }
 
-#[derive(Debug)]
-#[rustfmt::skip]
-#[repr(u8)]
-pub enum AccelPowerModes {
-    PowerDown = 0b0000,
-    Low26     = 0b0010,
-    Low52     = 0b0011,
-    Normal104 = 0b0100,
-    Normal208 = 0b0101,
-}
+pub mod config {
 
-impl AccelPowerModes {
-    pub fn to_val(self) -> u8 {
-        (self as u8) << 4
+    pub use self::accel::*;
+    pub use self::gyro::*;
+
+    pub trait ImuSetting {
+        fn to_val(self) -> u8;
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct ImuConfig {
+        /// General
+        pub block_data_update:           bool,
+        /// Accelerometer
+        pub acc_power:                   AccelPowerModes,
+        pub acc_scale:                   AccelScaleFactor,
+        // pub acc_lp_filter_lpf2:          bool, // LPF2_XL_EN
+        pub acc_bandwidth:               AccelBandwidth,
+        // pub acc_comp_filter_input:       AccelCompFilterInput, // LPF2_XL_EN
+        pub acc_filter_input_composite:  bool,
+        // pub acc_slope_filter:            bool,                 // HP_SLOPE_XL_EN
+        // pub acc_lp_filter_6d:            bool,                 // LOW_PASS_ON_6D
+        /// Gyro
+        pub gyro_power:                  GyroPowerModes,
+        pub gyro_scale:                  GyroScaleFactor,
+        pub gyro_high_perf_mode_disable: bool,
+        pub gyro_hp_filter_enable:       bool,
+        pub gyro_hp_filter_cutoff:       GyroHpFilterCutoff,
+        pub gyro_lp_bandwidth:           GyroLpBandwidth,
+    }
+
+    impl Default for ImuConfig {
+        fn default() -> Self {
+            Self {
+                /// General
+                block_data_update:           false,
+                /// Accelerometer
+                acc_power:                   AccelPowerModes::PowerDown,
+                acc_scale:                   AccelScaleFactor::S2,
+                // acc_lp_filter_lpf2:          false,
+                // acc_comp_filter_input:       AccelCompFilterInput::ODR2,
+                acc_bandwidth:               AccelBandwidth::Odr2,
+                acc_filter_input_composite:  false,
+                // acc_slope_filter:            false,
+                // acc_lp_filter_6d:            false,
+                /// Gyro
+                gyro_power:                  GyroPowerModes::PowerDown,
+                gyro_scale:                  GyroScaleFactor::S250,
+                gyro_high_perf_mode_disable: false,
+                gyro_hp_filter_enable:       false,
+                gyro_hp_filter_cutoff:       GyroHpFilterCutoff::C16,
+                gyro_lp_bandwidth:           GyroLpBandwidth::Normal,
+            }
+        }
+    }
+
+    impl ImuConfig {
+        pub fn reg_ctrl1_xl(&self) -> u8 {
+            let mut out = 0b0000_0000;
+            out |= self.acc_power.to_val();
+
+            let out = self.acc_bandwidth.reg_ctrl1_xl(out);
+
+            out
+        }
+
+        pub fn reg_ctrl2_g(&self) -> u8 {
+            let mut out = 0b0000_0000;
+            out
+        }
+
+        pub fn reg_ctrl3_c(&self) -> u8 {
+            let mut out = 0b0000_0100;
+
+            out |= 0b0000_1000; // SPI 3-wire mode
+
+            if self.block_data_update {
+                out |= 0b0100_0000;
+            }
+            out
+        }
+
+        pub fn reg_ctrl4_c(&self) -> u8 {
+            let mut out = 0b0000_0000;
+            out
+        }
+
+        pub fn reg_ctrl5_c(&self) -> u8 {
+            let mut out = 0b0000_0000;
+            out
+        }
+
+        pub fn reg_ctrl6_c(&self) -> u8 {
+            let mut out = 0b0000_0000;
+            out
+        }
+
+        pub fn reg_ctrl7_g(&self) -> u8 {
+            let mut out = 0b0000_0000;
+
+            if !self.gyro_high_perf_mode_disable {
+                out |= !0b1000_0000;
+            }
+            if self.gyro_hp_filter_enable {
+                out |= 0b0100_0000;
+            }
+            out |= self.gyro_hp_filter_cutoff.to_val();
+
+            out
+        }
+
+        pub fn reg_ctrl8_xl(&self) -> u8 {
+            let mut out = 0b0000_0000;
+
+            if self.acc_filter_input_composite {
+                out |= 0b0000_1000;
+            }
+
+            let out = self.acc_bandwidth.reg_ctrl8_xl(out);
+
+            out
+        }
+
+        pub fn reg_ctrl9_xl(&self) -> u8 {
+            let mut out = 0b0000_0000;
+            out
+        }
+    }
+
+    mod accel {
+        use super::ImuSetting;
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        /// CTRL1_XL:
+        ///   LPF1_BW_SEL
+        /// CTRL8_XL:
+        ///   HP_SLOPE_XL_EN
+        ///   HPCF_XL[1:0]
+        ///   LPF2_XL_EN
+        ///   INPUT_COMPOSITE
+        pub enum AccelBandwidth {
+            Odr2,
+            Odr4,
+
+            OdrLowPass50,
+            OdrLowPass100,
+            OdrLowPass9,
+            OdrLowPass400,
+
+            OdrHighPass4,
+            OdrHighPass100,
+            OdrHighPass9,
+            OdrHighPass400,
+        }
+
+        impl AccelBandwidth {
+            pub fn reg_ctrl1_xl(self, mut b: u8) -> u8 {
+                use self::AccelBandwidth::*;
+                match self {
+                    Odr2 => b |= 0b00,
+                    Odr4 => b |= 0b10,
+                    _ => {}
+                }
+                b
+            }
+
+            pub fn reg_ctrl8_xl(self, mut b: u8) -> u8 {
+                use self::AccelBandwidth::*;
+                match self {
+                    Odr2 | Odr4 => b &= !(0b1000_0000),
+
+                    OdrLowPass50 => {
+                        b |= 0b1000_0000; // LPF2_XL_EN
+                    }
+                    OdrLowPass100 => {
+                        b |= 0b1000_0000; // LPF2_XL_EN
+                        b |= 0b0010_0000; // HPCF_XL[1:0]
+                    }
+                    OdrLowPass9 => {
+                        b |= 0b1000_0000; // LPF2_XL_EN
+                        b |= 0b0100_0000; // HPCF_XL[1:0]
+                    }
+                    OdrLowPass400 => {
+                        b |= 0b1000_0000; // LPF2_XL_EN
+                        b |= 0b0110_0000; // HPCF_XL[1:0]
+                    }
+
+                    OdrHighPass4 => {
+                        b &= !(0b0000_1000); // INPUT_COMPOSITE
+                    }
+                    OdrHighPass100 => {
+                        b &= !(0b0000_1000); // INPUT_COMPOSITE
+                        b |= 0b0010_0000; // HPCF_XL[1:0]
+                    }
+                    OdrHighPass9 => {
+                        b &= !(0b0000_1000); // INPUT_COMPOSITE
+                        b |= 0b0100_0000; // HPCF_XL[1:0]
+                    }
+                    OdrHighPass400 => {
+                        b &= !(0b0000_1000); // INPUT_COMPOSITE
+                        b |= 0b0110_0000; // HPCF_XL[1:0]
+                    }
+                }
+                b
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        pub enum AccelCompFilterInput {
+            ODR2 = 0b0,
+            ODR4 = 0b1,
+        }
+
+        impl ImuSetting for AccelCompFilterInput {
+            fn to_val(self) -> u8 {
+                (self as u8) << 3
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        pub enum AccelScaleFactor {
+            S2  = 2,
+            S4  = 4,
+            S8  = 8,
+            S16 = 16,
+        }
+
+        impl ImuSetting for AccelScaleFactor {
+            fn to_val(self) -> u8 {
+                (self as u8) << 2
+            }
+        }
+
+        impl AccelScaleFactor {
+            pub fn to_scale(self) -> f32 {
+                match self {
+                    Self::S2 => 2.0,
+                    Self::S4 => 4.0,
+                    Self::S8 => 8.0,
+                    Self::S16 => 16.0,
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        pub enum AccelPowerModes {
+            PowerDown = 0b0000,
+            Low1p6    = 0b1011,
+            Low12p5   = 0b0001,
+            Low26     = 0b0010,
+            Low52     = 0b0011,
+            Normal104 = 0b0100,
+            Normal208 = 0b0101,
+            High416   = 0b0110,
+            High833   = 0b0111,
+            High1660  = 0b1000,
+            High3330  = 0b1001,
+            High6660  = 0b1010,
+        }
+
+        impl ImuSetting for AccelPowerModes {
+            fn to_val(self) -> u8 {
+                (self as u8) << 4
+            }
+        }
+    }
+
+    mod gyro {
+        use super::ImuSetting;
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        pub enum GyroLpBandwidth {
+            Normal     = 0b00,
+            Narrow     = 0b01,
+            VeryNarrow = 0b10,
+            Wide       = 0b11,
+        }
+
+        impl ImuSetting for GyroLpBandwidth {
+            fn to_val(self) -> u8 {
+                // (self as u8) << 0
+                self as u8
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        pub enum GyroScaleFactor {
+            S250  = 0b00,
+            S500  = 0b01,
+            S1000 = 0b10,
+            S2000 = 0b11,
+        }
+
+        impl ImuSetting for GyroScaleFactor {
+            fn to_val(self) -> u8 {
+                (self as u8) << 2
+            }
+        }
+
+        impl GyroScaleFactor {
+            pub fn to_scale(self) -> f32 {
+                match self {
+                    Self::S250 => 250.0,
+                    Self::S500 => 500.0,
+                    Self::S1000 => 1000.0,
+                    Self::S2000 => 2000.0,
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        /// in milliHertz
+        pub enum GyroHpFilterCutoff {
+            C16   = 0b00,
+            C65   = 0b01,
+            C260  = 0b10,
+            C1040 = 0b11,
+        }
+
+        impl ImuSetting for GyroHpFilterCutoff {
+            fn to_val(self) -> u8 {
+                (self as u8) << 4
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        pub enum GyroPowerModes {
+            PowerDown = 0b0000,
+            Low12p5   = 0b0001,
+            Low26     = 0b0010,
+            Low52     = 0b0011,
+            Normal104 = 0b0100,
+            Normal208 = 0b0101,
+            High416   = 0b0110,
+            High833   = 0b0111,
+            High1660  = 0b1000,
+            High3330  = 0b1001,
+            High6660  = 0b1011,
+        }
+
+        impl ImuSetting for GyroPowerModes {
+            fn to_val(self) -> u8 {
+                (self as u8) << 4
+            }
+        }
     }
 }
 
