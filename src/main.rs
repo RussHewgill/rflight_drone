@@ -179,10 +179,24 @@ mod app {
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
         let sensors: &mut Sensors = cx.local.sensors;
 
-        sensors.read_data_mag();
-        // sensors.read_data_imu();
+        // sensors.read_data_mag();
+        sensors.read_data_imu(false);
 
         (cx.shared.uart, cx.shared.ahrs).lock(|uart, ahrs| {
+            let gyro = sensors.data.imu_gyro.read_and_reset();
+            let acc = sensors.data.imu_acc.read_and_reset();
+
+            uprintln!(
+                uart,
+                "({:.5},{:.5},{:.5}), ({:.5},{:.5},{:.5})",
+                gyro.x,
+                gyro.y,
+                gyro.z,
+                acc.x,
+                acc.y,
+                acc.z,
+            );
+
             // let quat = ahrs
             //     .update_uart(
             //         uart,
@@ -198,10 +212,10 @@ mod app {
             // uprintln!(uart, "pitch = {:.1}", rad_to_deg(pitch));
             // uprintln!(uart, "yaw   = {:.1}", rad_to_deg(yaw));
 
-            let xs = sensors.data.magnetometer.read_and_reset();
-            uprintln!(uart, "xs[0] = {:.4}", xs[0]);
-            uprintln!(uart, "xs[1] = {:.4}", xs[1]);
-            uprintln!(uart, "xs[2] = {:.4}", xs[2]);
+            // let xs = sensors.data.magnetometer.read_and_reset();
+            // uprintln!(uart, "xs[0] = {:.4}", xs[0]);
+            // uprintln!(uart, "xs[1] = {:.4}", xs[1]);
+            // uprintln!(uart, "xs[2] = {:.4}", xs[2]);
         });
 
         // tim9_sensors::spawn_after(1.secs()).unwrap();

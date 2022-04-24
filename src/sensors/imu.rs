@@ -72,8 +72,14 @@ where
     }
 
     pub fn init(&mut self, spi: &mut Spi3, cfg: ImuConfig) -> nb::Result<(), SpiError> {
-        // Ok(())
-        unimplemented!()
+        self.write_reg(spi, IMURegister::CTRL1_XL, cfg.reg_ctrl1_xl())?;
+        self.write_reg(spi, IMURegister::CTRL2_G, cfg.reg_ctrl2_g())?;
+        self.write_reg(spi, IMURegister::CTRL3_C, cfg.reg_ctrl3_c())?;
+        // self.write_reg(spi, IMURegister::CTRL6_C, cfg.reg_ctrl6_c())?;
+        // self.write_reg(spi, IMURegister::CTRL7_G, cfg.reg_ctrl7_g())?;
+        // self.write_reg(spi, IMURegister::CTRL8_XL, cfg.reg_ctrl8_xl())?;
+
+        Ok(())
     }
 
     pub fn power_down(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
@@ -217,58 +223,6 @@ where
     }
 }
 
-#[cfg(feature = "nope")]
-mod prev {
-
-    pub struct IMU<SPI, CS> {
-        spi: SPI,
-        cs:  CS,
-    }
-
-    impl<SPI, CS> IMU<SPI, CS> {
-        pub fn new(spi: SPI, cs: CS) -> Self {
-            Self { spi, cs }
-        }
-    }
-
-    /// datasheet: 6.4.1, 6.4.2
-    const SPI_READ: u8 = 0x01;
-    const SPI_WRITE: u8 = 0x00;
-
-    impl<SPI, CS, E, PinError> IMU<SPI, CS>
-    where
-        // SPI: Transfer<u8, Error = E> + Write<u8, Error = E> + Read<u8, Error = E>,
-        SPI: Write<u8, Error = E> + Read<u8, Error = E>,
-        CS: hal::digital::blocking::OutputPin<Error = PinError>,
-    {
-        // pub fn set_3wire(&mut self) {
-        // }
-
-        pub fn write_reg(&mut self, reg: u8, val: u8) {
-            let mut bytes = [(reg << 1) | SPI_WRITE, val];
-            self.cs.set_low().ok();
-            self.spi.write(&mut bytes).ok();
-            self.cs.set_high().ok();
-        }
-
-        pub fn read_reg(&mut self, reg: u8, buf: &mut [u8]) {
-            // let mut bytes = [(reg << 1) | SPI_READ, 0];
-            self.cs.set_low().ok();
-            //
-            self.cs.set_high().ok();
-            // buf[0] = bytes[1];
-        }
-
-        // pub fn read_reg(&mut self, reg: u8, buf: &mut [u8]) {
-        //     let mut bytes = [(reg << 1) | SPI_WRITE, 0];
-        //     self.cs.set_low().ok();
-        //     // self.spi.transfer(&mut bytes).ok();
-        //     self.cs.set_high().ok();
-        //     buf[0] = bytes[1];
-        // }
-    }
-}
-
 pub mod config {
 
     pub use self::accel::*;
@@ -285,12 +239,9 @@ pub mod config {
         /// Accelerometer
         pub acc_power:                   AccelPowerModes,
         pub acc_scale:                   AccelScaleFactor,
-        // pub acc_lp_filter_lpf2:          bool, // LPF2_XL_EN
+        pub acc_high_perf_mode_disable:  bool,
         pub acc_bandwidth:               AccelBandwidth,
-        // pub acc_comp_filter_input:       AccelCompFilterInput, // LPF2_XL_EN
         pub acc_filter_input_composite:  bool,
-        // pub acc_slope_filter:            bool,                 // HP_SLOPE_XL_EN
-        // pub acc_lp_filter_6d:            bool,                 // LOW_PASS_ON_6D
         /// Gyro
         pub gyro_power:                  GyroPowerModes,
         pub gyro_scale:                  GyroScaleFactor,
@@ -308,12 +259,9 @@ pub mod config {
                 /// Accelerometer
                 acc_power:                   AccelPowerModes::PowerDown,
                 acc_scale:                   AccelScaleFactor::S2,
-                // acc_lp_filter_lpf2:          false,
-                // acc_comp_filter_input:       AccelCompFilterInput::ODR2,
+                acc_high_perf_mode_disable:  false,
                 acc_bandwidth:               AccelBandwidth::Odr2,
                 acc_filter_input_composite:  false,
-                // acc_slope_filter:            false,
-                // acc_lp_filter_6d:            false,
                 /// Gyro
                 gyro_power:                  GyroPowerModes::PowerDown,
                 gyro_scale:                  GyroScaleFactor::S250,
@@ -337,11 +285,15 @@ pub mod config {
 
         pub fn reg_ctrl2_g(&self) -> u8 {
             let mut out = 0b0000_0000;
+            out |= self.gyro_power.to_val();
+            out |= self.gyro_scale.to_val();
             out
         }
 
         pub fn reg_ctrl3_c(&self) -> u8 {
-            let mut out = 0b0000_0100;
+            let mut out = 0b0000_0000;
+
+            out |= 0b0000_0100; // address increment
 
             out |= 0b0000_1000; // SPI 3-wire mode
 
@@ -351,18 +303,25 @@ pub mod config {
             out
         }
 
-        pub fn reg_ctrl4_c(&self) -> u8 {
-            let mut out = 0b0000_0000;
-            out
-        }
+        // pub fn reg_ctrl4_c(&self) -> u8 {
+        //     let mut out = 0b0000_0000;
+        //     out
+        // }
 
-        pub fn reg_ctrl5_c(&self) -> u8 {
-            let mut out = 0b0000_0000;
-            out
-        }
+        // pub fn reg_ctrl5_c(&self) -> u8 {
+        //     let mut out = 0b0000_0000;
+        //     out
+        // }
 
         pub fn reg_ctrl6_c(&self) -> u8 {
             let mut out = 0b0000_0000;
+
+            if self.acc_high_perf_mode_disable {
+                out |= 0b0001_0000;
+            }
+
+            out |= self.gyro_lp_bandwidth.to_val();
+
             out
         }
 
@@ -392,10 +351,10 @@ pub mod config {
             out
         }
 
-        pub fn reg_ctrl9_xl(&self) -> u8 {
-            let mut out = 0b0000_0000;
-            out
-        }
+        // pub fn reg_ctrl9_xl(&self) -> u8 {
+        //     let mut out = 0b0000_0000;
+        //     out
+        // }
     }
 
     mod accel {

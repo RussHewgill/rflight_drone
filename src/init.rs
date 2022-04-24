@@ -115,6 +115,8 @@ pub fn init_all(
         dp.SPI2, gpiob.pb13, gpiob.pb15, gpioa.pa8, gpiob.pb12, gpioc.pc13, &clocks,
     );
 
+    init_sensors(&mut sensors);
+
     let dwt = cp.DWT.constrain(cp.DCB, &clocks);
 
     InitStruct {
@@ -200,15 +202,19 @@ fn init_sensors(sensors: &mut Sensors) {
     // imu_cfg.acc_power = AccelPowerModes::High6660;
     imu_cfg.acc_scale = AccelScaleFactor::S4;
 
-    imu_cfg.acc_filter_input_composite = true;
-    imu_cfg.acc_bandwidth = AccelBandwidth::OdrLowPass400;
+    // imu_cfg.acc_filter_input_composite = true;
+    // imu_cfg.acc_bandwidth = AccelBandwidth::OdrLowPass400;
 
     imu_cfg.gyro_power = GyroPowerModes::Normal104;
     // imu_cfg.gyro_power = GyroPowerModes::High416;
     imu_cfg.gyro_scale = GyroScaleFactor::S2000;
-    imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
+    // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
 
     // sensors.read_data_imu(true);
+
+    sensors.with_spi_imu(|spi, imu| {
+        imu.init(spi, imu_cfg).unwrap();
+    });
 
     // sensors.with_spi_mag(|spi, mag| {
     //     mag.init_continuous(spi)
