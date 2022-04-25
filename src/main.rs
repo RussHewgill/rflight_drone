@@ -143,7 +143,12 @@ mod app {
 
         // uart.pause();
         // bt.pause_interrupt(&mut exti);
-        bt.init_bt(&mut uart, &mut delay_bt).unwrap();
+        match bt.init_bt(&mut uart, &mut delay_bt) {
+            Ok(()) => {
+                test_sens::spawn_after(2.secs()).unwrap();
+            }
+            _ => unimplemented!(),
+        }
         // bt.unpause_interrupt(&mut exti);
         bt.clear_interrupt();
 
