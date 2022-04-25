@@ -38,7 +38,7 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 pub struct SvLogger {
     service_handle: ServiceHandle,
-    char_handle: CharacteristicHandle,
+    char_handle:    CharacteristicHandle,
 }
 
 impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
@@ -64,10 +64,10 @@ where
         };
 
         let val = UpdateCharacteristicValueParameters {
-            service_handle: logger.service_handle,
+            service_handle:        logger.service_handle,
             characteristic_handle: logger.char_handle,
-            offset: 0,
-            value: &data,
+            offset:                0,
+            value:                 &data,
         };
         block!(self.update_characteristic_value(&val)).unwrap();
 
@@ -89,8 +89,8 @@ where
         uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         let params = AddServiceParameters {
-            uuid: UUID_CONSOLE_LOG_SERVICE,
-            service_type: crate::bluetooth::gatt::ServiceType::Primary,
+            uuid:                  UUID_CONSOLE_LOG_SERVICE,
+            service_type:          crate::bluetooth::gatt::ServiceType::Primary,
             max_attribute_records: 8,
         };
         block!(self.add_service(&params))?;
@@ -102,18 +102,18 @@ where
         uprintln!(uart, "service = {:?}", service);
 
         let params0 = AddCharacteristicParameters {
-            service_handle: service.service_handle,
-            characteristic_uuid: UUID_CONSOLE_LOG_CHAR,
-            characteristic_value_len: 18,
-            characteristic_properties: CharacteristicProperty::NOTIFY,
-            // characteristic_properties: CharacteristicProperty::NOTIFY
-            // | CharacteristicProperty::READ,
-            security_permissions: CharacteristicPermission::NONE,
-            gatt_event_mask: CharacteristicEvent::NONE,
+            service_handle:            service.service_handle,
+            characteristic_uuid:       UUID_CONSOLE_LOG_CHAR,
+            characteristic_value_len:  18,
+            // characteristic_properties: CharacteristicProperty::NOTIFY,
+            characteristic_properties: CharacteristicProperty::NOTIFY
+                | CharacteristicProperty::READ,
+            security_permissions:      CharacteristicPermission::NONE,
+            gatt_event_mask:           CharacteristicEvent::NONE,
             // gatt_event_mask: CharacteristicEvent::CONFIRM_READ,
-            encryption_key_size: EncryptionKeySize::with_value(7).unwrap(),
-            is_variable: true,
-            fw_version_before_v72: true,
+            encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
+            is_variable:               true,
+            fw_version_before_v72:     true,
         };
         block!(self.add_characteristic(&params0))?;
 
@@ -142,7 +142,7 @@ where
 
         let logger = SvLogger {
             service_handle: service.service_handle,
-            char_handle: c.characteristic_handle,
+            char_handle:    c.characteristic_handle,
         };
 
         self.services.logger = Some(logger);
