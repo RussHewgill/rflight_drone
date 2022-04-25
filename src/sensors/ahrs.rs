@@ -74,7 +74,7 @@ impl AHRS {
         gyro: V3,
         acc: V3,
         mag: V3,
-    ) -> Option<()> {
+    ) -> Option<&UQuat> {
         if self.initializing {
             self.ramped_gain -= self.ramped_gain_step * self.sample_period;
 
@@ -187,7 +187,7 @@ impl AHRS {
         let v: V3 = adjusted_half_gyro * self.sample_period;
         self.quat = UQuat::from_quaternion(*self.quat + quat_mult_vec(*self.quat, v));
 
-        Some(())
+        Some(&self.quat)
     }
 
     pub fn set_heading(&mut self, heading: f32) {

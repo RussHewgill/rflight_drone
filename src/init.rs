@@ -11,7 +11,7 @@ use stm32f4xx_hal::gpio::{
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Mode, NoMiso};
 use stm32f4xx_hal::syscfg::SysCfg;
-use stm32f4xx_hal::timer::{CounterMs, DelayMs, SysDelay, Timer};
+use stm32f4xx_hal::timer::{CounterHz, CounterMs, DelayMs, SysDelay, Timer};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
@@ -53,7 +53,7 @@ pub struct InitStruct {
     pub dwt:      Dwt,
     pub uart:     UART,
     pub exti:     EXTI,
-    pub tim9:     CounterMs<TIM9>,
+    pub tim9:     CounterHz<TIM9>,
     pub clocks:   Clocks,
     // pub mono:     Systick<1_000>,
     pub mono:     MonoTimer<TIM5, 1_000_000>,
@@ -94,8 +94,9 @@ pub fn init_all(
     // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
     /// TIM9: periodic sensor polling
-    let mut tim9: stm32f4xx_hal::timer::CounterMs<TIM9> = dp.TIM9.counter(&clocks);
-    tim9.start(1.secs()).unwrap();
+    let mut tim9: stm32f4xx_hal::timer::CounterHz<TIM9> = dp.TIM9.counter_hz(&clocks);
+    // tim9.start(1.secs()).unwrap();
+    tim9.start(200.Hz()).unwrap();
     tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
     // (uart, clocks, mono)
@@ -104,12 +105,10 @@ pub fn init_all(
 
     let bt_irq = init_bt_interrupt(&mut dp.EXTI, &mut syscfg, gpioa.pa4);
 
-    uart.pause();
     let bt = init_bt(
         dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks,
         bt_buf,
     );
-    uart.unpause();
 
     let mut sensors = init_sensors_spi(
         dp.SPI2, gpiob.pb13, gpiob.pb15, gpioa.pa8, gpiob.pb12, gpioc.pc13, &clocks,
