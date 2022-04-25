@@ -21,7 +21,7 @@ use self::{barometer::Barometer, imu::IMU, magneto::Magnetometer};
 // }
 
 pub type V3 = Vector3<f32>;
-pub type Quat = UnitQuaternion<f32>;
+pub type UQuat = UnitQuaternion<f32>;
 
 #[derive(Debug)]
 pub struct Sensors {
