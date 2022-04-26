@@ -295,10 +295,10 @@ mod app {
         // tim9_sensors::spawn_after(1.secs()).unwrap();
     }
 
-    // #[task(binds = TIM3, priority = 1)]
-    // fn test_timer(mut cx: test_timer::Context) {
-    //     // unimplemented!()
-    // }
+    #[task(binds = TIM3, priority = 1)]
+    fn test_timer(mut cx: test_timer::Context) {
+        // unimplemented!()
+    }
 
     #[cfg(feature = "nope")]
     // #[task(shared = [uart, exti, bt], local = [x: f32 = 0.0, once: bool = true], priority = 8)]
