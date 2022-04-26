@@ -127,8 +127,10 @@ where
         block!(self.le_set_random_address(addr)).unwrap();
         block!(self.read_event_uart(uart))?;
 
+        uart.unpause();
         block!(self.init_gatt()).unwrap();
         block!(self.read_event_uart(uart))?;
+        uart.pause();
 
         let role = crate::bluetooth::gap::Role::PERIPHERAL;
         block!(self.init_gap(role, false, 7))?;
@@ -199,8 +201,10 @@ where
         block!(self.le_set_scan_response_data(&[])).unwrap();
         block!(self.read_event_uart(uart))?;
 
+        uart.unpause();
         block!(self.le_set_advertise_enable(true))?;
         block!(self.read_event_uart(uart))?;
+        uart.pause();
 
         let dev_name: &'static [u8; 7] = b"DRN1120";
 
@@ -223,6 +227,7 @@ where
         block!(self.set_nondiscoverable()).unwrap();
         block!(self.read_event_uart(uart))?;
 
+        uart.unpause();
         block!(self.set_discoverable(&d_params)).unwrap();
         block!(self.read_event_uart(uart))?;
 

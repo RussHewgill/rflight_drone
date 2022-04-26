@@ -144,8 +144,8 @@ mod app {
         let mut bt = init_struct.bt;
         let mut delay_bt = init_struct.delay_bt;
 
-        // uart.pause();
-        // bt.pause_interrupt(&mut exti);
+        uart.pause();
+        bt.pause_interrupt(&mut exti);
         match bt.init_bt(&mut uart, &mut delay_bt) {
             Ok(()) => {
                 // test_sens::spawn_after(2.secs()).unwrap();
@@ -160,7 +160,7 @@ mod app {
                 uprintln!(uart, "init_bt error = {:?}", e);
             }
         }
-        // bt.unpause_interrupt(&mut exti);
+        bt.unpause_interrupt(&mut exti);
         bt.clear_interrupt();
         // uart.unpause();
 
@@ -298,37 +298,43 @@ mod app {
         // tim9_sensors::spawn_after(1.secs()).unwrap();
     }
 
+    // // #[cfg(feature = "nope")]
+    // // #[task(binds = TIM3, shared = [], local = [tim3], priority = 3)]
+    // // #[task(binds = TIM3, shared = [], local = [tim3,sensors], priority = 3)]
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3,sensors], priority = 3)]
+    // fn test_timer(mut cx: test_timer::Context) {
+    //     cx.local
+    //         .tim3
+    //         .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+    // }
+
     // #[cfg(feature = "nope")]
-    #[task(binds = TIM3, shared = [], local = [tim3], priority = 3)]
-    // #[task(binds = TIM3, priority = 8)]
+    // #[task(binds = TIM3, shared = [], local = [tim3, sensors], priority = 3)]
+    // #[task(binds = TIM3, shared = [], local = [tim3], priority = 3)]
+    #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [sensors], priority = 3)]
     fn test_timer(mut cx: test_timer::Context) {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        // unimplemented!()
-    }
-
-    #[cfg(feature = "nope")]
-    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
-    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [sensors], priority = 3)]
-    fn test_timer(mut cx: test_timer::Context) {
-        // cx.local
-        //     .tim3
-        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        let sensors: &mut Sensors = cx.local.sensors;
+        // let sensors: &mut Sensors = cx.local.sensors;
+        // let sensors = cx.local.sensors;
 
         // cx.shared.uart.lock(|uart| {
         //     uprintln!(uart, "t");
         // });
 
-        // sensors.read_data_mag();
-        // sensors.read_data_imu(false);
+        cx.local.sensors.read_data_mag();
+        cx.local.sensors.read_data_imu(false);
 
-        #[cfg(feature = "nope")]
+        // #[cfg(feature = "nope")]
         (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
-            let gyro = sensors.data.imu_gyro.read_and_reset();
-            let acc = sensors.data.imu_acc.read_and_reset();
-            let mag = sensors.data.magnetometer.read_and_reset();
+            // let gyro = sensors.data.imu_gyro.read_and_reset();
+            // let acc = sensors.data.imu_acc.read_and_reset();
+            // let mag = sensors.data.magnetometer.read_and_reset();
+            let gyro = cx.local.sensors.data.imu_gyro.read_and_reset();
+            let acc = cx.local.sensors.data.imu_acc.read_and_reset();
+            let mag = cx.local.sensors.data.magnetometer.read_and_reset();
 
             if let Some(q) = ahrs.update(gyro, acc, mag) {
                 let qq = q.coords;
@@ -357,104 +363,104 @@ mod app {
         // unimplemented!()
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(shared = [uart, exti, bt], local = [x: f32 = 0.0, once: bool = true], priority = 8)]
-    fn test_sens(mut cx: test_sens::Context) {
-        (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
-            if bt.state.is_connected() {
-                uprintln!(uart, "test_sens");
+    // #[cfg(feature = "nope")]
+    // // #[task(shared = [uart, exti, bt], local = [x: f32 = 0.0, once: bool = true], priority = 8)]
+    // fn test_sens(mut cx: test_sens::Context) {
+    //     (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
+    //         if bt.state.is_connected() {
+    //             uprintln!(uart, "test_sens");
 
-                *cx.local.x += 1.0;
+    //             *cx.local.x += 1.0;
 
-                let qq = na::Quaternion::<f32>::new(*cx.local.x, 2.0, 3.0, 4.0);
-                let qq = qq.coords;
+    //             let qq = na::Quaternion::<f32>::new(*cx.local.x, 2.0, 3.0, 4.0);
+    //             let qq = qq.coords;
 
-                let mut buf = [0; 16];
+    //             let mut buf = [0; 16];
 
-                buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+    //             buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+    //             buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+    //             buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+    //             buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
-                if *cx.local.once {
-                    uprintln!(uart, "&buf[0..4] = {:?}", &buf[0..4]);
-                    uprintln!(uart, "&buf[4..8] = {:?}", &buf[4..8]);
-                    *cx.local.once = false;
-                }
+    //             if *cx.local.once {
+    //                 uprintln!(uart, "&buf[0..4] = {:?}", &buf[0..4]);
+    //                 uprintln!(uart, "&buf[4..8] = {:?}", &buf[4..8]);
+    //                 *cx.local.once = false;
+    //             }
 
-                bt.clear_interrupt();
-                bt.pause_interrupt(exti);
-                // bt.clear_interrupt();
-                match bt.log_write(uart, &buf) {
-                    Ok(_) => {
-                        uprintln!(uart, "sent log write command");
-                        // let i = bt.check_interrupt();
-                        // uprintln!(uart, "i = {:?}", i);
-                    }
-                    Err(e) => {
-                        uprintln!(uart, "error 0 = {:?}", e);
-                    }
-                }
-                bt.unpause_interrupt(exti);
-            } else {
-                uprintln!(uart, "not connected yet");
-            }
-        });
+    //             bt.clear_interrupt();
+    //             bt.pause_interrupt(exti);
+    //             // bt.clear_interrupt();
+    //             match bt.log_write(uart, &buf) {
+    //                 Ok(_) => {
+    //                     uprintln!(uart, "sent log write command");
+    //                     // let i = bt.check_interrupt();
+    //                     // uprintln!(uart, "i = {:?}", i);
+    //                 }
+    //                 Err(e) => {
+    //                     uprintln!(uart, "error 0 = {:?}", e);
+    //                 }
+    //             }
+    //             bt.unpause_interrupt(exti);
+    //         } else {
+    //             uprintln!(uart, "not connected yet");
+    //         }
+    //     });
 
-        test_sens::spawn_after(1.secs()).unwrap();
-    }
+    //     test_sens::spawn_after(1.secs()).unwrap();
+    // }
 
-    #[cfg(feature = "nope")]
-    // #[task(capacity = 3, shared = [uart, dwt], local = [sensors], priority = 8)]
-    fn test_sens(mut cx: test_sens::Context) {
-        (cx.shared.uart, cx.shared.dwt).lock(|uart, dwt| {
-            uprintln!(uart, "test_sens");
-            let sensors: &mut Sensors = &mut cx.local.sensors;
+    // #[cfg(feature = "nope")]
+    // // #[task(capacity = 3, shared = [uart, dwt], local = [sensors], priority = 8)]
+    // fn test_sens(mut cx: test_sens::Context) {
+    //     (cx.shared.uart, cx.shared.dwt).lock(|uart, dwt| {
+    //         uprintln!(uart, "test_sens");
+    //         let sensors: &mut Sensors = &mut cx.local.sensors;
 
-            // sensors.with_spi_mag(|spi, mag| {
-            //     mag.init_continuous(spi).unwrap();
-            //     while !mag.read_new_data_available(spi).unwrap() {
-            //         cortex_m::asm::nop();
-            //     }
-            // });
+    //         // sensors.with_spi_mag(|spi, mag| {
+    //         //     mag.init_continuous(spi).unwrap();
+    //         //     while !mag.read_new_data_available(spi).unwrap() {
+    //         //         cortex_m::asm::nop();
+    //         //     }
+    //         // });
 
-            // sensors.with_spi_mag(|spi, mag| {
-            //     let t = dwt.measure(|| {
-            //         let data = mag.read_data(spi).unwrap();
-            //     });
-            //     uprintln!(uart, "test_sens done, t = {:?}", t.as_micros());
-            // });
+    //         // sensors.with_spi_mag(|spi, mag| {
+    //         //     let t = dwt.measure(|| {
+    //         //         let data = mag.read_data(spi).unwrap();
+    //         //     });
+    //         //     uprintln!(uart, "test_sens done, t = {:?}", t.as_micros());
+    //         // });
 
-            // sensors.with_spi_mag(|spi, mag| {
-            //     mag.init_single(spi).unwrap();
-            //     while !mag.read_new_data_available(spi).unwrap() {
-            //         cortex_m::asm::nop();
-            //     }
-            // });
+    //         // sensors.with_spi_mag(|spi, mag| {
+    //         //     mag.init_single(spi).unwrap();
+    //         //     while !mag.read_new_data_available(spi).unwrap() {
+    //         //         cortex_m::asm::nop();
+    //         //     }
+    //         // });
 
-            // sensors.with_spi_mag(|spi, mag| {
-            //     /// 32 MHz = 39 us
-            //     let t = dwt.measure(|| {
-            //         let data = mag.read_data(spi).unwrap();
-            //     });
-            //     // uprintln!(uart, "x = {:?}", data[0]);
-            //     // uprintln!(uart, "y = {:?}", data[1]);
-            //     // uprintln!(uart, "z = {:?}", data[2]);
-            //     uprintln!(uart, "test_sens done, t = {:?}", t.as_micros());
-            //     // let b = mag
-            //     //     .read_reg(spi, crate::sensors::magneto::MagRegister::WHO_AM_I)
-            //     //     .unwrap();
-            //     // uprintln!(uart, "b2: {:#010b}", b);
-            // });
+    //         // sensors.with_spi_mag(|spi, mag| {
+    //         //     /// 32 MHz = 39 us
+    //         //     let t = dwt.measure(|| {
+    //         //         let data = mag.read_data(spi).unwrap();
+    //         //     });
+    //         //     // uprintln!(uart, "x = {:?}", data[0]);
+    //         //     // uprintln!(uart, "y = {:?}", data[1]);
+    //         //     // uprintln!(uart, "z = {:?}", data[2]);
+    //         //     uprintln!(uart, "test_sens done, t = {:?}", t.as_micros());
+    //         //     // let b = mag
+    //         //     //     .read_reg(spi, crate::sensors::magneto::MagRegister::WHO_AM_I)
+    //         //     //     .unwrap();
+    //         //     // uprintln!(uart, "b2: {:#010b}", b);
+    //         // });
 
-            // sensors.with_spi_mag(|spi, mag| {
-            //     // let streams = StreamsTuple::new(dp.DMA1)
-            //     unimplemented!()
-            // });
+    //         // sensors.with_spi_mag(|spi, mag| {
+    //         //     // let streams = StreamsTuple::new(dp.DMA1)
+    //         //     unimplemented!()
+    //         // });
 
-            //
-        });
-    }
+    //         //
+    //     });
+    // }
 
     /// disabling this makes init_bt hang
     // #[cfg(feature = "nope")]
@@ -490,40 +496,40 @@ mod app {
         });
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(capacity = 3, shared = [bt, uart, exti], priority = 8)]
-    fn test_uart(mut cx: test_uart::Context) {
-        (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
-            uprintln!(uart, "test_uart start");
+    // #[cfg(feature = "nope")]
+    // // #[task(capacity = 3, shared = [bt, uart, exti], priority = 8)]
+    // fn test_uart(mut cx: test_uart::Context) {
+    //     (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
+    //         uprintln!(uart, "test_uart start");
 
-            // let buf = [1, 2, 3, 4];
-            let buf = "wat";
+    //         // let buf = [1, 2, 3, 4];
+    //         let buf = "wat";
 
-            // bt.clear_interrupt();
-            bt.pause_interrupt(exti);
-            // match block!(bt.log_write(uart, buf.as_bytes())) {
-            match bt.log_write(uart, buf.as_bytes()) {
-                Ok(_) => {
-                    uprintln!(uart, "sent log write command");
-                    // let i = bt.check_interrupt();
-                    // uprintln!(uart, "i = {:?}", i);
-                }
-                Err(e) => {
-                    uprintln!(uart, "error 0 = {:?}", e);
-                }
-            }
-            bt.unpause_interrupt(exti);
+    //         // bt.clear_interrupt();
+    //         bt.pause_interrupt(exti);
+    //         // match block!(bt.log_write(uart, buf.as_bytes())) {
+    //         match bt.log_write(uart, buf.as_bytes()) {
+    //             Ok(_) => {
+    //                 uprintln!(uart, "sent log write command");
+    //                 // let i = bt.check_interrupt();
+    //                 // uprintln!(uart, "i = {:?}", i);
+    //             }
+    //             Err(e) => {
+    //                 uprintln!(uart, "error 0 = {:?}", e);
+    //             }
+    //         }
+    //         bt.unpause_interrupt(exti);
 
-            uprintln!(uart, "test_uart done");
-            test_uart::spawn_after(1.secs()).unwrap();
+    //         uprintln!(uart, "test_uart done");
+    //         test_uart::spawn_after(1.secs()).unwrap();
 
-            // if !bt.state.is_connected() {
-            //     // uprintln!(uart, "not connected yet");
-            //     test_uart::spawn_after(1.secs()).unwrap();
-            // } else {
-            // }
-        });
-    }
+    //         // if !bt.state.is_connected() {
+    //         //     // uprintln!(uart, "not connected yet");
+    //         //     test_uart::spawn_after(1.secs()).unwrap();
+    //         // } else {
+    //         // }
+    //     });
+    // }
 
     #[idle]
     fn idle(cx: idle::Context) -> ! {
