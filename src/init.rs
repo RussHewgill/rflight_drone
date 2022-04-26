@@ -53,7 +53,7 @@ pub struct InitStruct {
     pub dwt:      Dwt,
     pub uart:     UART,
     pub exti:     EXTI,
-    // pub tim3:     CounterHz<TIM3>,
+    pub tim3:     CounterHz<TIM3>,
     pub clocks:   Clocks,
     // pub mono:     Systick<1_000>,
     pub mono:     MonoTimer<TIM5, 1_000_000>,
@@ -97,7 +97,7 @@ pub fn init_all(
     /// TIM9: periodic sensor polling
     // let mut tim9: stm32f4xx_hal::timer::CounterHz<TIM9> = dp.TIM9.counter_hz(&clocks);
     // let mut tim10: stm32f4xx_hal::timer::CounterHz<TIM10> = dp.TIM10.counter_hz(&clocks);
-    // let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> = dp.TIM3.counter_hz(&clocks);
+    let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> = dp.TIM3.counter_hz(&clocks);
 
     // tim9.start(1.secs()).unwrap();
     // tim9.start(200.Hz()).unwrap();
@@ -127,7 +127,7 @@ pub fn init_all(
         dwt,
         uart,
         exti: dp.EXTI,
-        // tim3,
+        tim3,
         clocks,
         mono,
         sensors,

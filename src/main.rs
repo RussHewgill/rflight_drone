@@ -106,7 +106,7 @@ mod app {
     struct Local {
         //
         sensors: Sensors,
-        // tim3:    CounterHz<TIM3>,
+        tim3:    CounterHz<TIM3>,
     }
 
     // #[monotonic(binds = SysTick, default = true)]
@@ -166,8 +166,8 @@ mod app {
 
         bt.unpend();
 
-        // init_struct.tim9.start(main_period).unwrap();
-        // init_struct.tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        // init_struct.tim3.start(main_period).unwrap();
+        // init_struct.tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         // /// No debug
         // uart.pause();
@@ -190,7 +190,7 @@ mod app {
 
         let local = Local {
             sensors: init_struct.sensors,
-            // tim3:    init_struct.tim3,
+            tim3:    init_struct.tim3,
         };
 
         // setup_bt::spawn().unwrap();
@@ -207,26 +207,26 @@ mod app {
     }
 
     #[cfg(feature = "nope")]
-    // #[task(binds = TIM1_BRK_TIM9, shared = [bt, exti, ahrs], local = [tim9,sensors], priority = 2)]
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3,sensors], priority = 3)]
     // #[task(binds = TIM3, shared = [bt, uart, exti, ahrs], local = [tim3,sensors], priority = 9)]
     fn tim9_sensors(mut cx: tim9_sensors::Context) {
         cx.local
-            .tim10
+            .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        // let sensors: &mut Sensors = cx.local.sensors;
+        let sensors: &mut Sensors = cx.local.sensors;
 
-        // sensors.read_data_mag();
-        // sensors.read_data_imu(false);
+        sensors.read_data_mag();
+        sensors.read_data_imu(false);
 
         // // let mut quat = UQuat::default();
         // let mut quat: Option<UQuat> = None;
         // let q = &mut quat;
 
-        cx.shared.uart.lock(|uart| {
-            uprintln!(uart, "tim9_sensors");
-        });
+        // cx.shared.uart.lock(|uart| {
+        //     uprintln!(uart, "tim9_sensors");
+        // });
 
-        #[cfg(feature = "nope")]
+        // #[cfg(feature = "nope")]
         // (cx.shared.uart, cx.shared.ahrs, cx.shared.bt).lock(|uart, ahrs, bt| {
         // (cx.shared.uart, cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(
         (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
@@ -295,8 +295,51 @@ mod app {
         // tim9_sensors::spawn_after(1.secs()).unwrap();
     }
 
-    #[task(binds = TIM3, priority = 1)]
+    #[cfg(feature = "nope")]
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [sensors], priority = 3)]
     fn test_timer(mut cx: test_timer::Context) {
+        // cx.local
+        //     .tim3
+        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        let sensors: &mut Sensors = cx.local.sensors;
+
+        // cx.shared.uart.lock(|uart| {
+        //     uprintln!(uart, "test_timer");
+        // });
+
+        // sensors.read_data_mag();
+        // sensors.read_data_imu(false);
+
+        (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
+            let gyro = sensors.data.imu_gyro.read_and_reset();
+            let acc = sensors.data.imu_acc.read_and_reset();
+            let mag = sensors.data.magnetometer.read_and_reset();
+
+            if let Some(q) = ahrs.update(gyro, acc, mag) {
+                let qq = q.coords;
+
+                let mut buf = [0; 16];
+
+                buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+
+                bt.clear_interrupt();
+                bt.pause_interrupt(exti);
+                match bt.log_write(&buf) {
+                    Ok(_) => {
+                        // uprintln!(uart, "sent log write command");
+                    }
+                    Err(e) => {
+                        // uprintln!(uart, "error 0 = {:?}", e);
+                    }
+                }
+                bt.unpause_interrupt(exti);
+            }
+        });
+
         // unimplemented!()
     }
 
@@ -399,8 +442,9 @@ mod app {
         });
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 8)]
+    /// disabling this makes init_bt hang
+    // #[cfg(feature = "nope")]
+    #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "bt_irq");
