@@ -295,22 +295,24 @@ mod app {
         // tim9_sensors::spawn_after(1.secs()).unwrap();
     }
 
-    #[cfg(feature = "nope")]
+    // #[cfg(feature = "nope")]
     // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
-    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [sensors], priority = 3)]
+    #[task(binds = TIM3, shared = [bt, exti, ahrs, uart], local = [tim3, sensors], priority = 3)]
     fn test_timer(mut cx: test_timer::Context) {
-        // cx.local
-        //     .tim3
-        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        let sensors: &mut Sensors = cx.local.sensors;
+        cx.local
+            .tim3
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
 
-        // cx.shared.uart.lock(|uart| {
-        //     uprintln!(uart, "test_timer");
-        // });
+        // let sensors: &mut Sensors = cx.local.sensors;
+
+        cx.shared.uart.lock(|uart| {
+            uprintln!(uart, "t");
+        });
 
         // sensors.read_data_mag();
         // sensors.read_data_imu(false);
 
+        #[cfg(feature = "nope")]
         (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
             let gyro = sensors.data.imu_gyro.read_and_reset();
             let acc = sensors.data.imu_acc.read_and_reset();
