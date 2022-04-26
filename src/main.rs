@@ -141,7 +141,7 @@ mod app {
         let mut bt = init_struct.bt;
         let mut delay_bt = init_struct.delay_bt;
 
-        uart.pause();
+        // uart.pause();
         // bt.pause_interrupt(&mut exti);
         match bt.init_bt(&mut uart, &mut delay_bt) {
             Ok(()) => {
@@ -151,7 +151,7 @@ mod app {
         }
         // bt.unpause_interrupt(&mut exti);
         bt.clear_interrupt();
-        uart.unpause();
+        // uart.unpause();
 
         bt.unpend();
 

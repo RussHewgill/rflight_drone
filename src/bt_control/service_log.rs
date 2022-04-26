@@ -105,15 +105,16 @@ where
             service_handle:            service.service_handle,
             characteristic_uuid:       UUID_CONSOLE_LOG_CHAR,
             characteristic_value_len:  18,
-            // characteristic_properties: CharacteristicProperty::NOTIFY,
-            characteristic_properties: CharacteristicProperty::NOTIFY
-                | CharacteristicProperty::READ,
+            characteristic_properties: CharacteristicProperty::NOTIFY,
+            // characteristic_properties: CharacteristicProperty::NOTIFY
+            // | CharacteristicProperty::READ,
             security_permissions:      CharacteristicPermission::NONE,
             gatt_event_mask:           CharacteristicEvent::NONE,
             // gatt_event_mask: CharacteristicEvent::CONFIRM_READ,
             encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
             is_variable:               true,
             fw_version_before_v72:     true,
+            // fw_version_before_v72:     false,
         };
         block!(self.add_characteristic(&params0))?;
 
