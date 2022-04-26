@@ -296,8 +296,8 @@ mod app {
     }
 
     // #[cfg(feature = "nope")]
-    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
-    #[task(binds = TIM3, shared = [bt, exti, ahrs, uart], local = [tim3, sensors], priority = 3)]
+    #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs, uart], local = [tim3, sensors], priority = 3)]
     fn test_timer(mut cx: test_timer::Context) {
         cx.local
             .tim3
@@ -305,9 +305,9 @@ mod app {
 
         // let sensors: &mut Sensors = cx.local.sensors;
 
-        cx.shared.uart.lock(|uart| {
-            uprintln!(uart, "t");
-        });
+        // cx.shared.uart.lock(|uart| {
+        //     uprintln!(uart, "t");
+        // });
 
         // sensors.read_data_mag();
         // sensors.read_data_imu(false);
