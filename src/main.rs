@@ -166,8 +166,10 @@ mod app {
 
         bt.unpend();
 
-        // init_struct.tim3.start(main_period).unwrap();
-        // init_struct.tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
+            init_struct.tim3.counter_hz(&clocks);
+        tim3.start(main_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         // /// No debug
         // uart.pause();
@@ -190,7 +192,8 @@ mod app {
 
         let local = Local {
             sensors: init_struct.sensors,
-            tim3:    init_struct.tim3,
+            // tim3:    init_struct.tim3,
+            tim3,
         };
 
         // setup_bt::spawn().unwrap();
@@ -296,14 +299,23 @@ mod app {
     }
 
     // #[cfg(feature = "nope")]
-    #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
-    // #[task(binds = TIM3, shared = [bt, exti, ahrs, uart], local = [tim3, sensors], priority = 3)]
+    #[task(binds = TIM3, shared = [], local = [tim3], priority = 3)]
+    // #[task(binds = TIM3, priority = 8)]
     fn test_timer(mut cx: test_timer::Context) {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        // unimplemented!()
+    }
 
-        // let sensors: &mut Sensors = cx.local.sensors;
+    #[cfg(feature = "nope")]
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [sensors], priority = 3)]
+    fn test_timer(mut cx: test_timer::Context) {
+        // cx.local
+        //     .tim3
+        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        let sensors: &mut Sensors = cx.local.sensors;
 
         // cx.shared.uart.lock(|uart| {
         //     uprintln!(uart, "t");
