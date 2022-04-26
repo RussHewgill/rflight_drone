@@ -62,7 +62,7 @@ use stm32f4xx_hal::{
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
-    use stm32f4::stm32f401::{self, EXTI, TIM2, TIM5, TIM9};
+    use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM5, TIM9};
     // use stm32f4xx_hal::prelude::*;
 
     use stm32f4xx_hal::dma::StreamsTuple;
@@ -106,7 +106,7 @@ mod app {
     struct Local {
         //
         sensors: Sensors,
-        tim9:    CounterHz<TIM9>,
+        // tim3:    CounterHz<TIM3>,
     }
 
     // #[monotonic(binds = SysTick, default = true)]
@@ -127,7 +127,10 @@ mod app {
 
         let bt_buf = cx.local.bt_buf;
 
-        let init_struct = init_all(cp, dp, &mut bt_buf[..]);
+        // let main_period: stm32f4xx_hal::time::Hertz = 800.Hz();
+        let main_period: stm32f4xx_hal::time::Hertz = 20.Hz();
+
+        let mut init_struct = init_all(cp, dp, &mut bt_buf[..], main_period);
 
         let mut uart = init_struct.uart;
         let clocks = init_struct.clocks;
@@ -145,9 +148,17 @@ mod app {
         // bt.pause_interrupt(&mut exti);
         match bt.init_bt(&mut uart, &mut delay_bt) {
             Ok(()) => {
-                test_sens::spawn_after(2.secs()).unwrap();
+                // test_sens::spawn_after(2.secs()).unwrap();
+                // bt.unpause_interrupt(&mut exti);
+                // bt.clear_interrupt();
+                // bt.unpend();
+
+                // init_struct.tim9.start(main_period).unwrap();
+                // init_struct.tim9.listen(stm32f4xx_hal::timer::Event::Update);
             }
-            _ => unimplemented!(),
+            e => {
+                uprintln!(uart, "init_bt error = {:?}", e);
+            }
         }
         // bt.unpause_interrupt(&mut exti);
         bt.clear_interrupt();
@@ -155,9 +166,16 @@ mod app {
 
         bt.unpend();
 
+        // init_struct.tim9.start(main_period).unwrap();
+        // init_struct.tim9.listen(stm32f4xx_hal::timer::Event::Update);
+
+        // /// No debug
+        // uart.pause();
+
         let ahrs = AHRS::new(
             // 1.0 / 800.0, // 1.25 ms
-            1.0 / 200.0, // 5 ms
+            // 1.0 / 200.0, // 5 ms
+            1.0 / (main_period.raw() as f32),
             0.5,
         );
 
@@ -172,7 +190,7 @@ mod app {
 
         let local = Local {
             sensors: init_struct.sensors,
-            tim9:    init_struct.tim9,
+            // tim3:    init_struct.tim3,
         };
 
         // setup_bt::spawn().unwrap();
@@ -189,54 +207,63 @@ mod app {
     }
 
     #[cfg(feature = "nope")]
-    // #[task(binds = TIM1_BRK_TIM9, shared = [bt, uart, exti, ahrs], local = [tim9,sensors], priority = 2)]
+    // #[task(binds = TIM1_BRK_TIM9, shared = [bt, exti, ahrs], local = [tim9,sensors], priority = 2)]
+    // #[task(binds = TIM3, shared = [bt, uart, exti, ahrs], local = [tim3,sensors], priority = 9)]
     fn tim9_sensors(mut cx: tim9_sensors::Context) {
         cx.local
-            .tim9
+            .tim10
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        let sensors: &mut Sensors = cx.local.sensors;
+        // let sensors: &mut Sensors = cx.local.sensors;
 
-        sensors.read_data_mag();
-        sensors.read_data_imu(false);
+        // sensors.read_data_mag();
+        // sensors.read_data_imu(false);
 
-        // let mut quat = UQuat::default();
-        let mut quat: Option<UQuat> = None;
-        let q = &mut quat;
+        // // let mut quat = UQuat::default();
+        // let mut quat: Option<UQuat> = None;
+        // let q = &mut quat;
 
+        cx.shared.uart.lock(|uart| {
+            uprintln!(uart, "tim9_sensors");
+        });
+
+        #[cfg(feature = "nope")]
         // (cx.shared.uart, cx.shared.ahrs, cx.shared.bt).lock(|uart, ahrs, bt| {
-        (cx.shared.uart, cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(
-            |uart, ahrs, bt, exti| {
-                let gyro = sensors.data.imu_gyro.read_and_reset();
-                let acc = sensors.data.imu_acc.read_and_reset();
-                let mag = sensors.data.magnetometer.read_and_reset();
+        // (cx.shared.uart, cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(
+        (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
+            let gyro = sensors.data.imu_gyro.read_and_reset();
+            let acc = sensors.data.imu_acc.read_and_reset();
+            let mag = sensors.data.magnetometer.read_and_reset();
 
-                if let Some(new_quat) = ahrs.update_uart(uart, gyro, acc, mag) {
-                    *q = Some(*new_quat);
-                }
+            // if let Some(new_quat) = ahrs.update_uart(uart, gyro, acc, mag) {
+            //     *q = Some(*new_quat);
+            // }
 
-                // uprintln!(
-                //     uart,
-                //     "({:.5},{:.5},{:.5}), ({:.5},{:.5},{:.5})",
-                //     gyro.x,
-                //     gyro.y,
-                //     gyro.z,
-                //     acc.x,
-                //     acc.y,
-                //     acc.z,
-                // );
+            // uprintln!(
+            //     uart,
+            //     "({:.5},{:.5},{:.5}), ({:.5},{:.5},{:.5})",
+            //     gyro.x,
+            //     gyro.y,
+            //     gyro.z,
+            //     acc.x,
+            //     acc.y,
+            //     acc.z,
+            // );
 
-                // let (roll, pitch, yaw) = quat.euler_angles();
+            // let (roll, pitch, yaw) = quat.euler_angles();
 
-                // uprintln!(uart, "roll  = {:.1}", rad_to_deg(roll));
-                // uprintln!(uart, "pitch = {:.1}", rad_to_deg(pitch));
-                // uprintln!(uart, "yaw   = {:.1}", rad_to_deg(yaw));
+            // uprintln!(uart, "roll  = {:.1}", rad_to_deg(roll));
+            // uprintln!(uart, "pitch = {:.1}", rad_to_deg(pitch));
+            // uprintln!(uart, "yaw   = {:.1}", rad_to_deg(yaw));
 
-                // let xs = sensors.data.magnetometer.read_and_reset();
-                // uprintln!(uart, "xs[0] = {:.4}", xs[0]);
-                // uprintln!(uart, "xs[1] = {:.4}", xs[1]);
-                // uprintln!(uart, "xs[2] = {:.4}", xs[2]);
+            // let xs = sensors.data.magnetometer.read_and_reset();
+            // uprintln!(uart, "xs[0] = {:.4}", xs[0]);
+            // uprintln!(uart, "xs[1] = {:.4}", xs[1]);
+            // uprintln!(uart, "xs[2] = {:.4}", xs[2]);
 
-                let qq = q.clone().unwrap().coords;
+            // if let Some(q) = ahrs.update_uart(uart, gyro, acc, mag) {
+            if let Some(q) = ahrs.update(gyro, acc, mag) {
+                // let qq = q.clone().unwrap().coords;
+                let qq = q.coords;
 
                 let mut buf = [0; 16];
 
@@ -248,25 +275,33 @@ mod app {
                 // let buf = [0];
                 // let buf = q.to_be_bytes();
 
+                bt.clear_interrupt();
                 bt.pause_interrupt(exti);
-                match bt.log_write(uart, &buf) {
+                // match bt.log_write_uart(uart, &buf) {
+                match bt.log_write(&buf) {
                     Ok(_) => {
-                        uprintln!(uart, "sent log write command");
+                        // uprintln!(uart, "sent log write command");
                         // let i = bt.check_interrupt();
                         // uprintln!(uart, "i = {:?}", i);
                     }
                     Err(e) => {
-                        uprintln!(uart, "error 0 = {:?}", e);
+                        // uprintln!(uart, "error 0 = {:?}", e);
                     }
                 }
                 bt.unpause_interrupt(exti);
-            },
-        );
+            }
+        });
 
         // tim9_sensors::spawn_after(1.secs()).unwrap();
     }
 
-    #[task(shared = [uart, exti, bt], local = [x: f32 = 0.0, once: bool = true], priority = 8)]
+    // #[task(binds = TIM3, priority = 1)]
+    // fn test_timer(mut cx: test_timer::Context) {
+    //     // unimplemented!()
+    // }
+
+    #[cfg(feature = "nope")]
+    // #[task(shared = [uart, exti, bt], local = [x: f32 = 0.0, once: bool = true], priority = 8)]
     fn test_sens(mut cx: test_sens::Context) {
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             if bt.state.is_connected() {
@@ -364,8 +399,8 @@ mod app {
         });
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 9)]
+    #[cfg(feature = "nope")]
+    // #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "bt_irq");
@@ -404,7 +439,7 @@ mod app {
             uprintln!(uart, "test_uart start");
 
             // let buf = [1, 2, 3, 4];
-            let buf = "asdf";
+            let buf = "wat";
 
             // bt.clear_interrupt();
             bt.pause_interrupt(exti);

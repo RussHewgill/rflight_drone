@@ -52,6 +52,31 @@ where
 {
     pub fn log_write(
         &mut self,
+        data: &[u8],
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        let logger = if let Some(logger) = self.services.logger {
+            logger
+        } else {
+            // uprintln!(uart, "no logger?");
+            // uprintln!(uart, "");
+            return Ok(());
+        };
+
+        let val = UpdateCharacteristicValueParameters {
+            service_handle:        logger.service_handle,
+            characteristic_handle: logger.char_handle,
+            offset:                0,
+            value:                 &data,
+        };
+        block!(self.update_characteristic_value(&val)).unwrap();
+
+        block!(self.ignore_event())?;
+
+        Ok(())
+    }
+
+    pub fn log_write_uart(
+        &mut self,
         uart: &mut UART,
         data: &[u8],
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
@@ -79,7 +104,7 @@ where
         // };
         // block!(self.write_characteristic_value(&val)).unwrap();
 
-        block!(self.read_event(uart))?;
+        block!(self.read_event_uart(uart))?;
 
         Ok(())
     }
@@ -148,7 +173,7 @@ where
 
         self.services.logger = Some(logger);
 
-        self.log_write(uart, "wat".as_bytes()).unwrap();
+        self.log_write_uart(uart, "wat".as_bytes()).unwrap();
 
         Ok(())
     }

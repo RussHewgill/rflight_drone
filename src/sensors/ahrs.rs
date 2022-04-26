@@ -68,9 +68,9 @@ impl AHRS {
 
 /// update
 impl AHRS {
-    pub fn update_uart(
+    pub fn update(
         &mut self,
-        uart: &mut UART,
+        // uart: &mut UART,
         gyro: V3,
         acc: V3,
         mag: V3,
@@ -94,7 +94,7 @@ impl AHRS {
                 q.w * q.w - 0.5 + q.z * q.z,
             )
         };
-        uprintln!(uart, "half_gravity = {:?}", half_gravity);
+        // uprintln!(uart, "half_gravity = {:?}", half_gravity);
 
         // {
         //     let q = self.quat.as_ref();
