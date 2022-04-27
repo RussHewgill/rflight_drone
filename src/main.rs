@@ -98,8 +98,11 @@ mod app {
         uart:     UART,
         exti:     EXTI,
         ahrs:     AHRS,
+        // bt_chan:  heapless::spsc::Queue<>
         bt:       BTController<'static>,
-        delay_bt: DelayMs<TIM2>,
+        // delay_bt: DelayMs<TIM2>,
+        // delay_bt: TIM2,
+        delay_bt: CounterMs<TIM2>,
     }
 
     #[local]
@@ -149,6 +152,8 @@ mod app {
         let mut bt = init_struct.bt;
         let mut delay_bt = init_struct.delay_bt;
 
+        // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
+
         uart.pause();
         bt.pause_interrupt(&mut exti);
         match bt.init_bt(&mut uart, &mut delay_bt) {
@@ -171,6 +176,16 @@ mod app {
 
         bt.unpend();
 
+        // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
+        // const TRANSFER_SIZE: usize = 4;
+        // {
+        //     let writable = bt.buffer.next_mut_slice(TRANSFER_SIZE);
+        //     for i in 0..TRANSFER_SIZE {
+        //         writable[i] = 1 + i as u8;
+        //     }
+        // }
+        // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
+
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
         tim3.start(main_period).unwrap();
@@ -185,6 +200,9 @@ mod app {
             1.0 / (main_period.raw() as f32),
             0.5,
         );
+
+        let tim2 = delay_bt.release().release();
+        let delay_bt = tim2.counter_ms(&clocks);
 
         let shared = Shared {
             dwt: init_struct.dwt,
@@ -214,95 +232,6 @@ mod app {
         (shared, local, init::Monotonics(mono))
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3,sensors], priority = 3)]
-    // #[task(binds = TIM3, shared = [bt, uart, exti, ahrs], local = [tim3,sensors], priority = 9)]
-    fn tim9_sensors(mut cx: tim9_sensors::Context) {
-        cx.local
-            .tim3
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        let sensors: &mut Sensors = cx.local.sensors;
-
-        sensors.read_data_mag();
-        sensors.read_data_imu(false);
-
-        // // let mut quat = UQuat::default();
-        // let mut quat: Option<UQuat> = None;
-        // let q = &mut quat;
-
-        // cx.shared.uart.lock(|uart| {
-        //     uprintln!(uart, "tim9_sensors");
-        // });
-
-        // #[cfg(feature = "nope")]
-        // (cx.shared.uart, cx.shared.ahrs, cx.shared.bt).lock(|uart, ahrs, bt| {
-        // (cx.shared.uart, cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(
-        (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
-            let gyro = sensors.data.imu_gyro.read_and_reset();
-            let acc = sensors.data.imu_acc.read_and_reset();
-            let mag = sensors.data.magnetometer.read_and_reset();
-
-            // if let Some(new_quat) = ahrs.update_uart(uart, gyro, acc, mag) {
-            //     *q = Some(*new_quat);
-            // }
-
-            // uprintln!(
-            //     uart,
-            //     "({:.5},{:.5},{:.5}), ({:.5},{:.5},{:.5})",
-            //     gyro.x,
-            //     gyro.y,
-            //     gyro.z,
-            //     acc.x,
-            //     acc.y,
-            //     acc.z,
-            // );
-
-            // let (roll, pitch, yaw) = quat.euler_angles();
-
-            // uprintln!(uart, "roll  = {:.1}", rad_to_deg(roll));
-            // uprintln!(uart, "pitch = {:.1}", rad_to_deg(pitch));
-            // uprintln!(uart, "yaw   = {:.1}", rad_to_deg(yaw));
-
-            // let xs = sensors.data.magnetometer.read_and_reset();
-            // uprintln!(uart, "xs[0] = {:.4}", xs[0]);
-            // uprintln!(uart, "xs[1] = {:.4}", xs[1]);
-            // uprintln!(uart, "xs[2] = {:.4}", xs[2]);
-
-            // if let Some(q) = ahrs.update_uart(uart, gyro, acc, mag) {
-            if let Some(q) = ahrs.update(gyro, acc, mag) {
-                // let qq = q.clone().unwrap().coords;
-                let qq = q.coords;
-
-                let mut buf = [0; 16];
-
-                buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
-
-                // let buf = [0];
-                // let buf = q.to_be_bytes();
-
-                bt.clear_interrupt();
-                bt.pause_interrupt(exti);
-                // match bt.log_write_uart(uart, &buf) {
-                match bt.log_write(&buf) {
-                    Ok(_) => {
-                        // uprintln!(uart, "sent log write command");
-                        // let i = bt.check_interrupt();
-                        // uprintln!(uart, "i = {:?}", i);
-                    }
-                    Err(e) => {
-                        // uprintln!(uart, "error 0 = {:?}", e);
-                    }
-                }
-                bt.unpause_interrupt(exti);
-            }
-        });
-
-        // tim9_sensors::spawn_after(1.secs()).unwrap();
-    }
-
     // // #[cfg(feature = "nope")]
     // // #[task(binds = TIM3, shared = [], local = [tim3], priority = 3)]
     // // #[task(binds = TIM3, shared = [], local = [tim3,sensors], priority = 3)]
@@ -325,66 +254,104 @@ mod app {
     // }
 
     // #[cfg(feature = "nope")]
-    #[task(binds = TIM3, shared = [bt, exti, ahrs, uart, dwt],
-           local = [tim3, sensors, counter: u32 = 0], priority = 3)]
-    fn test_timer(mut cx: test_timer::Context) {
+    #[task(binds = TIM3, shared = [bt, delay_bt, exti, ahrs, uart, dwt],
+           local = [tim3, sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
+    fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        // let sensors: &mut Sensors = cx.local.sensors;
-        // let sensors = cx.local.sensors;
-
-        // cx.shared.uart.lock(|uart| {
-        //     uprintln!(uart, "t");
-        // });
 
         (cx.shared.dwt, cx.shared.uart).lock(|dwt, uart| {
             uprint!(uart, "s..");
             let t = dwt.measure(|| {
+                uprint!(uart, "0");
                 cx.local.sensors.read_data_mag();
+                uprint!(uart, "1");
                 cx.local.sensors.read_data_imu(false);
+                uprint!(uart, "2");
 
                 *cx.local.counter += 1;
 
                 // #[cfg(feature = "nope")]
-                (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
+                (cx.shared.ahrs, cx.shared.exti).lock(|ahrs, exti| {
                     // (cx.shared.ahrs, cx.shared.bt, cx.shared.exti, cx.shared.uart).lock(
                     //     |ahrs, bt, exti, uart| {
                     let gyro = cx.local.sensors.data.imu_gyro.read_and_reset();
                     let acc = cx.local.sensors.data.imu_acc.read_and_reset();
                     let mag = cx.local.sensors.data.magnetometer.read_and_reset();
 
+                    uprint!(uart, "3");
                     if let Some(q) = ahrs.update(gyro, acc, mag) {
                         if *cx.local.counter >= 10 {
-                            *cx.local.counter = 0;
+                            (cx.shared.bt, cx.shared.delay_bt).lock(|bt, delay_bt| {
+                                uprint!(uart, "4");
+                                // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
+                                *cx.local.counter = 0;
 
-                            // uprintln!(uart, "send");
+                                // uprintln!(uart, "send");
 
-                            let qq = q.coords;
+                                let qq = q.coords;
 
-                            let mut buf = [0; 16];
+                                // let mut buf = [0; 16];
 
-                            buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                            buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                            buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                            buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+                                cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                                cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                                cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                                cx.local.buf[12..16]
+                                    .copy_from_slice(&qq[3].to_be_bytes());
 
-                            bt.clear_interrupt();
-                            bt.pause_interrupt(exti);
-                            match bt.log_write(&buf) {
-                                Ok(_) => {
-                                    // uprintln!(uart, "sent log write command");
+                                uprint!(uart, "-1");
+                                bt.clear_interrupt();
+                                uprint!(uart, "-2");
+                                bt.pause_interrupt(exti);
+                                uprint!(uart, "-3");
+
+                                // let logger = if let Some(logger) = self.services.logger {
+                                //     logger
+                                // } else {
+                                //     // uprintln!(uart, "no logger?");
+                                //     // uprintln!(uart, "");
+                                //     return Ok(false);
+                                // };
+
+                                if let Some(logger) = bt.services.logger {
+                                    let val = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
+                                        service_handle:        logger.service_handle,
+                                        characteristic_handle: logger.char_handle,
+                                        offset:                0,
+                                        value:                 &cx.local.buf[..],
+                                    };
+                                    block!(bt.update_characteristic_value(&val)).unwrap();
+                                    uprint!(uart, "-4");
+
+                                    // block!(bt.ignore_event()).unwrap();
+                                    // block!(bt.ignore_event_timeout(uart, 100.millis())).unwrap();
+                                    block!(bt.ignore_event_timeout(delay_bt, 100.millis())).unwrap();
+                                    uprint!(uart, "-5");
+                                } else {
+                                    uprintln!(uart, "no logger?");
                                 }
-                                Err(e) => {
-                                    // uprintln!(uart, "error 0 = {:?}", e);
+
+                                // match bt.log_write(&cx.local.buf[..]) {
+                                //     Ok(true) => {
+                                //         // uprintln!(uart, "sent log write command");
+                                //     }
+                                //     Ok(false) => {
+                                //         uprintln!(uart, "failed to write");
+                                //     }
+                                //     Err(e) => {
+                                //         uprintln!(uart, "error 0 = {:?}", e);
+                                //     }
+                                // }
+                                uprint!(uart, "-6");
+                                bt.unpause_interrupt(exti);
+                                if bt.check_interrupt() {
+                                    uprintln!(uart, "interrupt?");
                                 }
-                            }
-                            bt.unpause_interrupt(exti);
-                            if bt.check_interrupt() {
-                                uprintln!(uart, "interrupt?");
-                            }
+                            });
                         }
                     }
+                    uprint!(uart, "5");
                 });
             });
             uprintln!(uart, " d = {:?}", t.as_micros());
@@ -496,6 +463,7 @@ mod app {
     // #[cfg(feature = "nope")]
     #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
+        cortex_m_semihosting::hprint!("b");
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "bt_irq");
 

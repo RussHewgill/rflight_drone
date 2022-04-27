@@ -3,7 +3,7 @@
 //! The BlueNRG implementation defines several additional events that are packaged as
 //! vendor-specific events by the Bluetooth HCI. This module defines those events and functions to
 //! deserialize buffers into them.
-extern crate bluetooth_hci as hci;
+use bluetooth_hci as hci;
 
 // pub mod command;
 
@@ -16,8 +16,8 @@ use core::time::Duration;
 
 use bitflags::bitflags;
 
-pub use hci::types::{ConnectionInterval, ConnectionIntervalError};
-pub use hci::{BdAddr, BdAddrType, ConnectionHandle};
+use hci::types::{ConnectionInterval, ConnectionIntervalError};
+use hci::{BdAddr, BdAddrType, ConnectionHandle};
 
 /// Vendor-specific events for the BlueNRG-MS controllers.
 #[allow(clippy::large_enum_variant)]
@@ -251,78 +251,78 @@ pub enum BlueNRGEvent {
 #[repr(u8)]
 pub enum Status {
     /// The command cannot be executed due to the current state of the device.
-    Failed = 0x41,
+    Failed                        = 0x41,
     /// Some parameters are invalid.
-    InvalidParameters = 0x42,
+    InvalidParameters             = 0x42,
     /// It is not allowed to start the procedure (e.g. another the procedure is ongoing or cannot be
     /// started on the given handle).
-    NotAllowed = 0x46,
+    NotAllowed                    = 0x46,
     /// Unexpected error.
-    Error = 0x47,
+    Error                         = 0x47,
     /// The address was not resolved.
-    AddressNotResolved = 0x48,
+    AddressNotResolved            = 0x48,
     /// Failed to read from flash.
-    FlashReadFailed = 0x49,
+    FlashReadFailed               = 0x49,
     /// Failed to write to flash.
-    FlashWriteFailed = 0x4A,
+    FlashWriteFailed              = 0x4A,
     /// Failed to erase flash.
-    FlashEraseFailed = 0x4B,
+    FlashEraseFailed              = 0x4B,
     /// Invalid CID
-    InvalidCid = 0x50,
+    InvalidCid                    = 0x50,
     /// Timer is not valid
-    TimerNotValidLayer = 0x54,
+    TimerNotValidLayer            = 0x54,
     /// Insufficient resources to create the timer
-    TimerInsufficientResources = 0x55,
+    TimerInsufficientResources    = 0x55,
     /// Connection signature resolving key (CSRK) is not found.
-    CsrkNotFound = 0x5A,
+    CsrkNotFound                  = 0x5A,
     /// Identity resolving key (IRK) is not found
-    IrkNotFound = 0x5B,
+    IrkNotFound                   = 0x5B,
     /// The device is not in the security database.
-    DeviceNotFoundInDatabase = 0x5C,
+    DeviceNotFoundInDatabase      = 0x5C,
     /// The security database is full.
-    SecurityDatabaseFull = 0x5D,
+    SecurityDatabaseFull          = 0x5D,
     /// The device is not bonded.
-    DeviceNotBonded = 0x5E,
+    DeviceNotBonded               = 0x5E,
     /// The device is blacklisted.
-    DeviceInBlacklist = 0x5F,
+    DeviceInBlacklist             = 0x5F,
     /// The handle (service, characteristic, or descriptor) is invalid.
-    InvalidHandle = 0x60,
+    InvalidHandle                 = 0x60,
     /// A parameter is invalid
-    InvalidParameter = 0x61,
+    InvalidParameter              = 0x61,
     /// The characteristic handle is not part of the service.
-    OutOfHandle = 0x62,
+    OutOfHandle                   = 0x62,
     /// The operation is invalid
-    InvalidOperation = 0x63,
+    InvalidOperation              = 0x63,
     /// Insufficient resources to complete the operation.
-    InsufficientResources = 0x64,
+    InsufficientResources         = 0x64,
     /// The encryption key size is too small
     InsufficientEncryptionKeySize = 0x65,
     /// The characteristic already exists.
-    CharacteristicAlreadyExists = 0x66,
+    CharacteristicAlreadyExists   = 0x66,
     /// Returned when no valid slots are available (e.g. when there are no available state
     /// machines).
-    NoValidSlot = 0x82,
+    NoValidSlot                   = 0x82,
     /// Returned when a scan window shorter than minimum allowed value has been requested
     /// (i.e. 2ms). The Rust API should prevent this error from occurring.
-    ScanWindowTooShort = 0x83,
+    ScanWindowTooShort            = 0x83,
     /// Returned when the maximum requested interval to be allocated is shorter then the current
     /// anchor period and a there is no submultiple for the current anchor period that is between
     /// the minimum and the maximum requested intervals.
-    NewIntervalFailed = 0x84,
+    NewIntervalFailed             = 0x84,
     /// Returned when the maximum requested interval to be allocated is greater than the current
     /// anchor period and there is no multiple of the anchor period that is between the minimum and
     /// the maximum requested intervals.
-    IntervalTooLarge = 0x85,
+    IntervalTooLarge              = 0x85,
     /// Returned when the current anchor period or a new one can be found that is compatible to the
     /// interval range requested by the new slot but the maximum available length that can be
     /// allocated is less than the minimum requested slot length.
-    LengthFailed = 0x86,
+    LengthFailed                  = 0x86,
     /// MCU Library timed out.
-    Timeout = 0xFF,
+    Timeout                       = 0xFF,
     /// MCU library: profile already initialized.
-    ProfileAlreadyInitialized = 0xF0,
+    ProfileAlreadyInitialized     = 0xF0,
     /// MCU library: A parameter was null.
-    NullParameter = 0xF1,
+    NullParameter                 = 0xF1,
 }
 
 impl TryFrom<u8> for Status {
@@ -683,9 +683,9 @@ impl hci::event::VendorEvent for BlueNRGEvent {
                 buffer,
             )?)),
             0x0C12 => Ok(
-                BlueNRGEvent::GattDiscoverOrReadCharacteristicByUuidResponse(to_attribute_value(
-                    buffer,
-                )?),
+                BlueNRGEvent::GattDiscoverOrReadCharacteristicByUuidResponse(
+                    to_attribute_value(buffer)?,
+                ),
             ),
             0x0C13 => Ok(BlueNRGEvent::AttWritePermitRequest(
                 to_write_permit_request(buffer)?,
@@ -798,7 +798,9 @@ impl TryFrom<u8> for ResetReason {
 /// - Returns a `BadLength` HCI error if the buffer is not exactly 3 bytes long
 ///
 /// - Returns a `UnknownResetReason` BlueNRG error if the reset reason is not recognized.
-fn to_hal_initialized(buffer: &[u8]) -> Result<ResetReason, hci::event::Error<BlueNRGError>> {
+fn to_hal_initialized(
+    buffer: &[u8],
+) -> Result<ResetReason, hci::event::Error<BlueNRGError>> {
     require_len!(buffer, 3);
 
     buffer[2].try_into().map_err(hci::event::Error::Vendor)
@@ -937,7 +939,8 @@ fn to_lost_event(buffer: &[u8]) -> Result<EventFlags, hci::event::Error<BlueNRGE
     require_len!(buffer, 10);
 
     let bits = LittleEndian::read_u64(&buffer[2..]);
-    EventFlags::from_bits(bits).ok_or(hci::event::Error::Vendor(BlueNRGError::BadEventFlags(bits)))
+    EventFlags::from_bits(bits)
+        .ok_or(hci::event::Error::Vendor(BlueNRGError::BadEventFlags(bits)))
 }
 
 // The maximum length of [`FaultData::debug_data`]. The maximum length of an event is 255 bytes,
@@ -985,21 +988,21 @@ pub struct FaultData {
     pub reason: CrashReason,
 
     /// MCP SP register
-    pub sp: u32,
+    pub sp:   u32,
     /// MCU R0 register
-    pub r0: u32,
+    pub r0:   u32,
     /// MCU R1 register
-    pub r1: u32,
+    pub r1:   u32,
     /// MCU R2 register
-    pub r2: u32,
+    pub r2:   u32,
     /// MCU R3 register
-    pub r3: u32,
+    pub r3:   u32,
     /// MCU R12 register
-    pub r12: u32,
+    pub r12:  u32,
     /// MCU LR register
-    pub lr: u32,
+    pub lr:   u32,
     /// MCU PC register
-    pub pc: u32,
+    pub pc:   u32,
     /// MCU xPSR register
     pub xpsr: u32,
 
@@ -1157,7 +1160,9 @@ fn extract_l2cap_connection_update_response_result(
         0x01 => Ok(L2CapConnectionUpdateResult::CommandRejected(
             LittleEndian::read_u16(&buffer[9..]).try_into()?,
         )),
-        0x13 => to_l2cap_connection_update_accepted_result(LittleEndian::read_u16(&buffer[9..])),
+        0x13 => to_l2cap_connection_update_accepted_result(LittleEndian::read_u16(
+            &buffer[9..],
+        )),
         _ => Err(BlueNRGError::BadL2CapConnectionResponseCode(buffer[5])),
     }
 }
@@ -1171,7 +1176,7 @@ fn to_l2cap_connection_update_response(
 
     Ok(L2CapConnectionUpdateResponse {
         conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
-        result: extract_l2cap_connection_update_response_result(buffer)
+        result:      extract_l2cap_connection_update_response_result(buffer)
             .map_err(hci::event::Error::Vendor)?,
     })
 }
@@ -1230,8 +1235,8 @@ fn to_l2cap_connection_update_request(
         .map_err(hci::event::Error::Vendor)?;
 
     Ok(L2CapConnectionUpdateRequest {
-        conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
-        identifier: buffer[5],
+        conn_handle:   ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
+        identifier:    buffer[5],
         conn_interval: interval,
     })
 }
@@ -1280,11 +1285,13 @@ fn to_gap_pairing_complete(
     require_len!(buffer, 5);
     Ok(GapPairingComplete {
         conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
-        status: buffer[4].try_into().map_err(hci::event::Error::Vendor)?,
+        status:      buffer[4].try_into().map_err(hci::event::Error::Vendor)?,
     })
 }
 
-fn to_conn_handle(buffer: &[u8]) -> Result<ConnectionHandle, hci::event::Error<BlueNRGError>> {
+fn to_conn_handle(
+    buffer: &[u8],
+) -> Result<ConnectionHandle, hci::event::Error<BlueNRGError>> {
     require_len_at_least!(buffer, 4);
     Ok(ConnectionHandle(LittleEndian::read_u16(&buffer[2..])))
 }
@@ -1318,7 +1325,9 @@ impl GapDeviceFound {
 
 pub use hci::event::AdvertisementEvent as GapDeviceFoundEvent;
 
-fn to_gap_device_found(buffer: &[u8]) -> Result<GapDeviceFound, hci::event::Error<BlueNRGError>> {
+fn to_gap_device_found(
+    buffer: &[u8],
+) -> Result<GapDeviceFound, hci::event::Error<BlueNRGError>> {
     const RSSI_UNAVAILABLE: i8 = 127;
 
     require_len_at_least!(buffer, 12);
@@ -1338,8 +1347,9 @@ fn to_gap_device_found(buffer: &[u8]) -> Result<GapDeviceFound, hci::event::Erro
                 unreachable!()
             }
         })?,
-        bdaddr: hci::to_bd_addr_type(buffer[3], addr)
-            .map_err(|e| hci::event::Error::Vendor(BlueNRGError::BadGapBdAddrType(e.0)))?,
+        bdaddr: hci::to_bd_addr_type(buffer[3], addr).map_err(|e| {
+            hci::event::Error::Vendor(BlueNRGError::BadGapBdAddrType(e.0))
+        })?,
         data_len,
         data_buf: [0; 31],
         rssi: if rssi == RSSI_UNAVAILABLE {
@@ -1360,7 +1370,7 @@ pub struct GapProcedureComplete {
     /// Type of procedure that completed
     pub procedure: GapProcedure,
     /// Status of the procedure
-    pub status: GapProcedureStatus,
+    pub status:    GapProcedureStatus,
 }
 
 /// Maximum length of the name returned in the [`NameDiscovery`](GapProcedure::NameDiscovery)
@@ -1479,7 +1489,9 @@ fn to_gap_procedure_complete(
 }
 
 #[cfg(not(feature = "ms"))]
-fn to_gap_reconnection_address(buffer: &[u8]) -> Result<BdAddr, hci::event::Error<BlueNRGError>> {
+fn to_gap_reconnection_address(
+    buffer: &[u8],
+) -> Result<BdAddr, hci::event::Error<BlueNRGError>> {
     require_len!(buffer, 8);
     let mut addr = BdAddr([0; 6]);
     addr.0.copy_from_slice(&buffer[2..]);
@@ -1618,7 +1630,7 @@ fn to_att_exchange_mtu_resp(
 ) -> Result<AttExchangeMtuResponse, hci::event::Error<BlueNRGError>> {
     require_len!(buffer, 7);
     Ok(AttExchangeMtuResponse {
-        conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
+        conn_handle:   ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
         server_rx_mtu: LittleEndian::read_u16(&buffer[5..]) as usize,
     })
 }
@@ -1628,7 +1640,7 @@ fn to_att_exchange_mtu_resp(
 #[derive(Copy, Clone, Debug)]
 pub struct AttFindInformationResponse {
     /// The connection handle related to the response
-    pub conn_handle: ConnectionHandle,
+    pub conn_handle:   ConnectionHandle,
     /// The Find Information Response shall have complete handle-UUID pairs. Such pairs shall not be
     /// split across response packets; this also implies that a handleUUID pair shall fit into a
     /// single response packet. The handle-UUID pairs shall be returned in ascending order of
@@ -1677,7 +1689,7 @@ pub struct HandleUuid16Pair {
     /// Attribute handle
     pub handle: AttributeHandle,
     /// Attribute UUID
-    pub uuid: Uuid16,
+    pub uuid:   Uuid16,
 }
 
 /// One format of the handle-UUID pairs in the [`AttFindInformationResponse`] event. The UUIDs are
@@ -1687,7 +1699,7 @@ pub struct HandleUuid128Pair {
     /// Attribute handle
     pub handle: AttributeHandle,
     /// Attribute UUID
-    pub uuid: Uuid128,
+    pub uuid:   Uuid128,
 }
 
 /// Newtype for the 16-bit UUID buffer.
@@ -1742,8 +1754,8 @@ pub enum HandleUuidPairIterator<'a> {
 
 /// Iterator over handle-UUID pairs for 16-bit UUIDs.
 pub struct HandleUuid16PairIterator<'a> {
-    data: &'a [HandleUuid16Pair; MAX_FORMAT16_PAIR_COUNT],
-    count: usize,
+    data:       &'a [HandleUuid16Pair; MAX_FORMAT16_PAIR_COUNT],
+    count:      usize,
     next_index: usize,
 }
 
@@ -1762,8 +1774,8 @@ impl<'a> Iterator for HandleUuid16PairIterator<'a> {
 
 /// Iterator over handle-UUID pairs for 128-bit UUIDs.
 pub struct HandleUuid128PairIterator<'a> {
-    data: &'a [HandleUuid128Pair; MAX_FORMAT128_PAIR_COUNT],
-    count: usize,
+    data:       &'a [HandleUuid128Pair; MAX_FORMAT128_PAIR_COUNT],
+    count:      usize,
     next_index: usize,
 }
 
@@ -1789,10 +1801,13 @@ fn to_att_find_information_response(
     require_len!(buffer, 5 + data_len);
 
     Ok(AttFindInformationResponse {
-        conn_handle: to_conn_handle(buffer)?,
+        conn_handle:       to_conn_handle(buffer)?,
         handle_uuid_pairs: match buffer[5] {
-            1 => to_handle_uuid16_pairs(&buffer[6..]).map_err(hci::event::Error::Vendor)?,
-            2 => to_handle_uuid128_pairs(&buffer[6..]).map_err(hci::event::Error::Vendor)?,
+            1 => {
+                to_handle_uuid16_pairs(&buffer[6..]).map_err(hci::event::Error::Vendor)?
+            }
+            2 => to_handle_uuid128_pairs(&buffer[6..])
+                .map_err(hci::event::Error::Vendor)?,
             _ => {
                 return Err(hci::event::Error::Vendor(
                     BlueNRGError::BadAttFindInformationResponseFormat(buffer[5]),
@@ -1811,7 +1826,7 @@ fn to_handle_uuid16_pairs(buffer: &[u8]) -> Result<HandleUuidPairs, BlueNRGError
     let count = buffer.len() / PAIR_LEN;
     let mut pairs = [HandleUuid16Pair {
         handle: AttributeHandle(0),
-        uuid: Uuid16(0),
+        uuid:   Uuid16(0),
     }; MAX_FORMAT16_PAIR_COUNT];
     for (i, pair) in pairs.iter_mut().enumerate().take(count) {
         let index = i * PAIR_LEN;
@@ -1831,7 +1846,7 @@ fn to_handle_uuid128_pairs(buffer: &[u8]) -> Result<HandleUuidPairs, BlueNRGErro
     let count = buffer.len() / PAIR_LEN;
     let mut pairs = [HandleUuid128Pair {
         handle: AttributeHandle(0),
-        uuid: Uuid128([0; 16]),
+        uuid:   Uuid128([0; 16]),
     }; MAX_FORMAT128_PAIR_COUNT];
     for (i, pair) in pairs.iter_mut().enumerate().take(count) {
         let index = i * PAIR_LEN;
@@ -1861,7 +1876,7 @@ impl AttFindByTypeValueResponse {
     /// spec.
     pub fn handle_pairs_iter(&self) -> HandleInfoPairIterator {
         HandleInfoPairIterator {
-            event: self,
+            event:      self,
             next_index: 0,
         }
     }
@@ -1901,7 +1916,7 @@ pub struct GroupEndHandle(pub u16);
 /// Iterator into valid [`HandleInfoPair`] structs returned in the [ATT Find By Type Value
 /// Response](AttFindByTypeValueResponse) event.
 pub struct HandleInfoPairIterator<'a> {
-    event: &'a AttFindByTypeValueResponse,
+    event:      &'a AttFindByTypeValueResponse,
     next_index: usize,
 }
 
@@ -1944,12 +1959,13 @@ fn to_att_find_by_value_type_response(
     for (i, pair) in pairs.iter_mut().enumerate().take(count) {
         let index = i * PAIR_LEN;
         pair.attribute = AttributeHandle(LittleEndian::read_u16(&pair_buffer[index..]));
-        pair.group_end = GroupEndHandle(LittleEndian::read_u16(&pair_buffer[2 + index..]));
+        pair.group_end =
+            GroupEndHandle(LittleEndian::read_u16(&pair_buffer[2 + index..]));
     }
     Ok(AttFindByTypeValueResponse {
-        conn_handle: to_conn_handle(buffer)?,
+        conn_handle:       to_conn_handle(buffer)?,
         handle_pair_count: count,
-        handles: pairs,
+        handles:           pairs,
     })
 }
 
@@ -1960,9 +1976,9 @@ pub struct AttReadByTypeResponse {
     pub conn_handle: ConnectionHandle,
 
     // Number of valid bytes in `handle_value_pair_buf`
-    data_len: usize,
+    data_len:              usize,
     // Length of each value in `handle_value_pair_buf`
-    value_len: usize,
+    value_len:             usize,
     // Raw data of the response. Contains 2 octets for the attribute handle followed by `value_len`
     // octets of value data. These pairs repeat for `data_len` bytes.
     handle_value_pair_buf: [u8; MAX_HANDLE_VALUE_PAIR_BUF_LEN],
@@ -2019,7 +2035,7 @@ impl<'a> Iterator for HandleValuePairIterator<'a> {
             handle: AttributeHandle(LittleEndian::read_u16(
                 &self.event.handle_value_pair_buf[handle_index..],
             )),
-            value: &self.event.handle_value_pair_buf[value_index..next_index],
+            value:  &self.event.handle_value_pair_buf[value_index..next_index],
         })
     }
 }
@@ -2030,7 +2046,7 @@ pub struct HandleValuePair<'a> {
     pub handle: AttributeHandle,
     /// Attribute value. The caller must interpret the value correctly, depending on the expected
     /// type of the attribute.
-    pub value: &'a [u8],
+    pub value:  &'a [u8],
 }
 
 fn to_att_read_by_type_response(
@@ -2054,9 +2070,9 @@ fn to_att_read_by_type_response(
         .copy_from_slice(handle_value_pair_buf);
 
     Ok(AttReadByTypeResponse {
-        conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
-        data_len: handle_value_pair_buf.len(),
-        value_len: handle_value_pair_len - 2,
+        conn_handle:           ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
+        data_len:              handle_value_pair_buf.len(),
+        value_len:             handle_value_pair_len - 2,
         handle_value_pair_buf: full_handle_value_pair_buf,
     })
 }
@@ -2096,7 +2112,9 @@ impl AttReadResponse {
     }
 }
 
-fn to_att_read_response(buffer: &[u8]) -> Result<AttReadResponse, hci::event::Error<BlueNRGError>> {
+fn to_att_read_response(
+    buffer: &[u8],
+) -> Result<AttReadResponse, hci::event::Error<BlueNRGError>> {
     require_len_at_least!(buffer, 5);
 
     let data_len = buffer[4] as usize;
@@ -2141,7 +2159,7 @@ impl AttReadByGroupTypeResponse {
     /// Create and return an iterator for the attribute data returned with the response.
     pub fn attribute_data_iter(&self) -> AttributeDataIterator {
         AttributeDataIterator {
-            event: self,
+            event:      self,
             next_index: 0,
         }
     }
@@ -2165,7 +2183,7 @@ impl Debug for AttReadByGroupTypeResponse {
 
 /// Iterator over the attribute data returned in the [`AttReadByGroupTypeResponse`].
 pub struct AttributeDataIterator<'a> {
-    event: &'a AttReadByGroupTypeResponse,
+    event:      &'a AttReadByGroupTypeResponse,
     next_index: usize,
 }
 
@@ -2187,7 +2205,8 @@ impl<'a> Iterator for AttributeDataIterator<'a> {
             group_end_handle: GroupEndHandle(LittleEndian::read_u16(
                 &self.event.attribute_data_buf[group_end_index..],
             )),
-            value: &self.event.attribute_data_buf[value_index..self.next_index],
+            value:            &self.event.attribute_data_buf
+                [value_index..self.next_index],
         })
     }
 }
@@ -2199,7 +2218,7 @@ pub struct AttributeData<'a> {
     /// Group end handle
     pub group_end_handle: GroupEndHandle,
     /// Attribute value
-    pub value: &'a [u8],
+    pub value:            &'a [u8],
 }
 
 fn to_att_read_by_group_type_response(
@@ -2233,11 +2252,11 @@ fn to_att_read_by_group_type_response(
 #[derive(Copy, Clone)]
 pub struct AttPrepareWriteResponse {
     /// The connection handle related to the response.
-    pub conn_handle: ConnectionHandle,
+    pub conn_handle:      ConnectionHandle,
     /// The handle of the attribute to be written.
     pub attribute_handle: AttributeHandle,
     /// The offset of the first octet to be written.
-    pub offset: usize,
+    pub offset:           usize,
 
     /// Number of valid bytes in |value_buf|
     value_len: usize,
@@ -2293,7 +2312,7 @@ fn to_att_prepare_write_response(
 #[derive(Copy, Clone)]
 pub struct AttributeValue {
     /// The connection handle related to the event.
-    pub conn_handle: ConnectionHandle,
+    pub conn_handle:      ConnectionHandle,
     /// The handle of the attribute.
     pub attribute_handle: AttributeHandle,
 
@@ -2326,7 +2345,9 @@ impl AttributeValue {
     }
 }
 
-fn to_attribute_value(buffer: &[u8]) -> Result<AttributeValue, hci::event::Error<BlueNRGError>> {
+fn to_attribute_value(
+    buffer: &[u8],
+) -> Result<AttributeValue, hci::event::Error<BlueNRGError>> {
     require_len_at_least!(buffer, 7);
 
     let data_len = buffer[4] as usize;
@@ -2403,7 +2424,7 @@ fn to_gatt_procedure_complete(
 
     Ok(GattProcedureComplete {
         conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
-        status: buffer[5].try_into().map_err(hci::event::Error::Vendor)?,
+        status:      buffer[5].try_into().map_err(hci::event::Error::Vendor)?,
     })
 }
 
@@ -2412,13 +2433,13 @@ fn to_gatt_procedure_complete(
 #[derive(Copy, Clone, Debug)]
 pub struct AttErrorResponse {
     /// The connection handle related to the event.
-    pub conn_handle: ConnectionHandle,
+    pub conn_handle:      ConnectionHandle,
     /// The request that generated this error response.
-    pub request: AttRequest,
+    pub request:          AttRequest,
     ///The attribute handle that generated this error response.
     pub attribute_handle: AttributeHandle,
     /// The reason why the request has generated an error response.
-    pub error: AttError,
+    pub error:            AttError,
 }
 
 /// Potential error codes for the [ATT Error Response](BlueNRGEvent::AttErrorResponse). See Table
@@ -2428,115 +2449,115 @@ pub struct AttErrorResponse {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AttError {
     /// The attribute handle given was not valid on this server.
-    InvalidHandle = 0x01,
+    InvalidHandle                 = 0x01,
     /// The attribute cannot be read.
-    ReadNotPermitted = 0x02,
+    ReadNotPermitted              = 0x02,
     /// The attribute cannot be written.
-    WriteNotPermitted = 0x03,
+    WriteNotPermitted             = 0x03,
     /// The attribute PDU was invalid.
-    InvalidPdu = 0x04,
+    InvalidPdu                    = 0x04,
     /// The attribute requires authentication before it can be read or written.
-    InsufficientAuthentication = 0x05,
+    InsufficientAuthentication    = 0x05,
     /// Attribute server does not support the request received from the client.
-    RequestNotSupported = 0x06,
+    RequestNotSupported           = 0x06,
     /// Offset specified was past the end of the attribute.
-    InvalidOffset = 0x07,
+    InvalidOffset                 = 0x07,
     /// The attribute requires authorization before it can be read or written.
-    InsufficientAuthorization = 0x08,
+    InsufficientAuthorization     = 0x08,
     /// Too many prepare writes have been queued.
-    PrepareQueueFull = 0x09,
+    PrepareQueueFull              = 0x09,
     /// No attribute found within the given attribute handle range.
-    AttributeNotFound = 0x0A,
+    AttributeNotFound             = 0x0A,
     /// The attribute cannot be read or written using the Read Blob Request.
-    AttributeNotLong = 0x0B,
+    AttributeNotLong              = 0x0B,
     /// The Encryption Key Size used for encrypting this link is insufficient.
     InsufficientEncryptionKeySize = 0x0C,
     /// The attribute value length is invalid for the operation.
-    InvalidAttributeValueLength = 0x0D,
+    InvalidAttributeValueLength   = 0x0D,
     /// The attribute request that was requested has encountered an error that was unlikely, and
     /// therefore could not be completed as requested.
-    UnlikelyError = 0x0E,
+    UnlikelyError                 = 0x0E,
     /// The attribute requires encryption before it can be read or written.
-    InsufficientEncryption = 0x0F,
+    InsufficientEncryption        = 0x0F,
     /// The attribute type is not a supported grouping attribute as defined by a higher layer
     /// specification.
-    UnsupportedGroupType = 0x10,
+    UnsupportedGroupType          = 0x10,
     /// Insufficient Resources to complete the request.
-    InsufficientResources = 0x11,
+    InsufficientResources         = 0x11,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x80 = 0x80,
+    ApplicationError0x80          = 0x80,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x81 = 0x81,
+    ApplicationError0x81          = 0x81,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x82 = 0x82,
+    ApplicationError0x82          = 0x82,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x83 = 0x83,
+    ApplicationError0x83          = 0x83,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x84 = 0x84,
+    ApplicationError0x84          = 0x84,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x85 = 0x85,
+    ApplicationError0x85          = 0x85,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x86 = 0x86,
+    ApplicationError0x86          = 0x86,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x87 = 0x87,
+    ApplicationError0x87          = 0x87,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x88 = 0x88,
+    ApplicationError0x88          = 0x88,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x89 = 0x89,
+    ApplicationError0x89          = 0x89,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x8A = 0x8A,
+    ApplicationError0x8A          = 0x8A,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x8B = 0x8B,
+    ApplicationError0x8B          = 0x8B,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x8C = 0x8C,
+    ApplicationError0x8C          = 0x8C,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x8D = 0x8D,
+    ApplicationError0x8D          = 0x8D,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x8E = 0x8E,
+    ApplicationError0x8E          = 0x8E,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x8F = 0x8F,
+    ApplicationError0x8F          = 0x8F,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x90 = 0x90,
+    ApplicationError0x90          = 0x90,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x91 = 0x91,
+    ApplicationError0x91          = 0x91,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x92 = 0x92,
+    ApplicationError0x92          = 0x92,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x93 = 0x93,
+    ApplicationError0x93          = 0x93,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x94 = 0x94,
+    ApplicationError0x94          = 0x94,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x95 = 0x95,
+    ApplicationError0x95          = 0x95,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x96 = 0x96,
+    ApplicationError0x96          = 0x96,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x97 = 0x97,
+    ApplicationError0x97          = 0x97,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x98 = 0x98,
+    ApplicationError0x98          = 0x98,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x99 = 0x99,
+    ApplicationError0x99          = 0x99,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x9A = 0x9A,
+    ApplicationError0x9A          = 0x9A,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x9B = 0x9B,
+    ApplicationError0x9B          = 0x9B,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x9C = 0x9C,
+    ApplicationError0x9C          = 0x9C,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x9D = 0x9D,
+    ApplicationError0x9D          = 0x9D,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x9E = 0x9E,
+    ApplicationError0x9E          = 0x9E,
     /// Application error code defined by a higher layer specification.
-    ApplicationError0x9F = 0x9F,
+    ApplicationError0x9F          = 0x9F,
     /// The requested write operation cannot be fulfilled for reasons other than permissions.
-    WriteRequestRejected = 0xFC,
+    WriteRequestRejected          = 0xFC,
     /// A Client Characteristic Configuration descriptor is not configured according to the
     /// requirements of the profile or service.
     ClientCharacteristicConfigurationDescriptorImproperlyConfigured = 0xFD,
     /// A profile or service request cannot be serviced because an operation that has been
     /// previously triggered is still in progress.
-    ProcedureAlreadyInProgress = 0xFE,
+    ProcedureAlreadyInProgress    = 0xFE,
     /// An attribute value is out of range as defined by a profile or service specification.
-    OutOfRange = 0xFF,
+    OutOfRange                    = 0xFF,
 }
 
 impl TryFrom<u8> for AttError {
@@ -2594,7 +2615,9 @@ impl TryFrom<u8> for AttError {
             0x9E => Ok(AttError::ApplicationError0x9E),
             0x9F => Ok(AttError::ApplicationError0x9F),
             0xFC => Ok(AttError::WriteRequestRejected),
-            0xFD => Ok(AttError::ClientCharacteristicConfigurationDescriptorImproperlyConfigured),
+            0xFD => Ok(
+                AttError::ClientCharacteristicConfigurationDescriptorImproperlyConfigured,
+            ),
             0xFE => Ok(AttError::ProcedureAlreadyInProgress),
             0xFF => Ok(AttError::OutOfRange),
             _ => Err(value),
@@ -2608,59 +2631,59 @@ impl TryFrom<u8> for AttError {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AttRequest {
     /// Section 3.4.1.1
-    ErrorResponse = 0x01,
+    ErrorResponse           = 0x01,
     /// Section 3.4.2.1
-    ExchangeMtuRequest = 0x02,
+    ExchangeMtuRequest      = 0x02,
     /// Section 3.4.2.2
-    ExchangeMtuResponse = 0x03,
+    ExchangeMtuResponse     = 0x03,
     /// Section 3.4.3.1
-    FindInformationRequest = 0x04,
+    FindInformationRequest  = 0x04,
     /// Section 3.4.3.2
     FindInformationResponse = 0x05,
     /// Section 3.4.3.3
-    FindByTypeValueRequest = 0x06,
+    FindByTypeValueRequest  = 0x06,
     /// Section 3.4.3.4
     FindByTypeValueResponse = 0x07,
     /// Section 3.4.4.1
-    ReadByTypeRequest = 0x08,
+    ReadByTypeRequest       = 0x08,
     /// Section 3.4.4.2
-    ReadByTypeResponse = 0x09,
+    ReadByTypeResponse      = 0x09,
     /// Section 3.4.4.3
-    ReadRequest = 0x0A,
+    ReadRequest             = 0x0A,
     /// Section 3.4.4.4
-    ReadResponse = 0x0B,
+    ReadResponse            = 0x0B,
     /// Section 3.4.4.5
-    ReadBlobRequest = 0x0C,
+    ReadBlobRequest         = 0x0C,
     /// Section 3.4.4.6
-    ReadBlobResponse = 0x0D,
+    ReadBlobResponse        = 0x0D,
     /// Section 3.4.4.7
-    ReadMultipleRequest = 0x0E,
+    ReadMultipleRequest     = 0x0E,
     /// Section 3.4.4.8
-    ReadMultipleResponse = 0x0F,
+    ReadMultipleResponse    = 0x0F,
     /// Section 3.4.4.9
-    ReadByGroupTypeRequest = 0x10,
+    ReadByGroupTypeRequest  = 0x10,
     /// Section 3.4.4.10
     ReadByGroupTypeResponse = 0x11,
     /// Section 3.4.5.1
-    WriteRequest = 0x12,
+    WriteRequest            = 0x12,
     /// Section 3.4.5.2
-    WriteResponse = 0x13,
+    WriteResponse           = 0x13,
     /// Section 3.4.5.3
-    WriteCommand = 0x52,
+    WriteCommand            = 0x52,
     /// Section 3.4.5.4
-    SignedWriteCommand = 0xD2,
+    SignedWriteCommand      = 0xD2,
     /// Section 3.4.6.1
-    PrepareWriteRequest = 0x16,
+    PrepareWriteRequest     = 0x16,
     /// Section 3.4.6.2
-    PrepareWriteResponse = 0x17,
+    PrepareWriteResponse    = 0x17,
     /// Section 3.4.6.3
-    ExecuteWriteRequest = 0x18,
+    ExecuteWriteRequest     = 0x18,
     /// Section 3.4.6.4
-    ExecuteWriteResponse = 0x19,
+    ExecuteWriteResponse    = 0x19,
     /// Section 3.4.7.1
     HandleValueNotification = 0x1B,
     /// Section 3.4.7.2
-    HandleValueIndication = 0x1D,
+    HandleValueIndication   = 0x1D,
     /// Section 3.4.7.3
     HandleValueConfirmation = 0x1E,
 }
@@ -2708,10 +2731,10 @@ fn to_att_error_response(
 ) -> Result<AttErrorResponse, hci::event::Error<BlueNRGError>> {
     require_len!(buffer, 9);
     Ok(AttErrorResponse {
-        conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
-        request: buffer[5].try_into().map_err(hci::event::Error::Vendor)?,
+        conn_handle:      ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
+        request:          buffer[5].try_into().map_err(hci::event::Error::Vendor)?,
         attribute_handle: AttributeHandle(LittleEndian::read_u16(&buffer[6..])),
-        error: buffer[8]
+        error:            buffer[8]
             .try_into()
             .map_err(BlueNRGError::BadAttError)
             .map_err(hci::event::Error::Vendor)?,
@@ -2743,9 +2766,9 @@ fn to_att_read_permit_request(
 ) -> Result<AttReadPermitRequest, hci::event::Error<BlueNRGError>> {
     require_len!(buffer, 9);
     Ok(AttReadPermitRequest {
-        conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
+        conn_handle:      ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
         attribute_handle: AttributeHandle(LittleEndian::read_u16(&buffer[4..])),
-        offset: LittleEndian::read_u16(&buffer[7..]) as usize,
+        offset:           LittleEndian::read_u16(&buffer[7..]) as usize,
     })
 }
 
@@ -2824,7 +2847,7 @@ fn to_att_read_multiple_permit_request(
 #[derive(Copy, Clone, Debug)]
 pub struct GattTxPoolAvailable {
     /// Connection handle on which the GATT procedure is running.
-    pub conn_handle: ConnectionHandle,
+    pub conn_handle:       ConnectionHandle,
     /// Indicates the number of elements available in the attrTxPool List.
     pub available_buffers: usize,
 }
@@ -2835,7 +2858,7 @@ fn to_gatt_tx_pool_available(
 ) -> Result<GattTxPoolAvailable, hci::event::Error<BlueNRGError>> {
     require_len!(buffer, 6);
     Ok(GattTxPoolAvailable {
-        conn_handle: ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
+        conn_handle:       ConnectionHandle(LittleEndian::read_u16(&buffer[2..])),
         available_buffers: LittleEndian::read_u16(&buffer[4..]) as usize,
     })
 }
@@ -2854,11 +2877,11 @@ fn to_gatt_tx_pool_available(
 #[derive(Copy, Clone)]
 pub struct AttPrepareWritePermitRequest {
     /// Connection handle on which the GATT procedure is running.
-    pub conn_handle: ConnectionHandle,
+    pub conn_handle:      ConnectionHandle,
     /// The handle of the attribute to be written.
     pub attribute_handle: AttributeHandle,
     /// The offset of the first octet to be written.
-    pub offset: usize,
+    pub offset:           usize,
 
     // Number of valid bytes in `value_buf`
     value_len: usize,

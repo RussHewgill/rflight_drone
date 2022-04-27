@@ -300,9 +300,9 @@ fn init_clocks(rcc: RCC) -> Clocks {
         .cfgr
         //
         .use_hse(16.MHz())
-        // .sysclk(32.MHz())
-        .sysclk(48.MHz())
-        .require_pll48clk()
+        .sysclk(32.MHz())
+        // .sysclk(48.MHz())
+        // .require_pll48clk()
         .freeze();
 
     clocks

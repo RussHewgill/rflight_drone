@@ -142,6 +142,7 @@ pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     // buffer: ArrayVec<u8, 256>,
     buffer: Buffer<'buf, u8>,
 
+    // pub buffer: Buffer<'buf, u8>,
     pub state:    BTState,
     // pub services: Option<SvLogger>,
     pub services: BTServices,

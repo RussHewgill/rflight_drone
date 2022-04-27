@@ -37,8 +37,11 @@ use crate::{
 
 #[derive(Debug, Clone, Copy)]
 pub struct SvLogger {
-    service_handle: ServiceHandle,
-    char_handle:    CharacteristicHandle,
+    // service_handle: ServiceHandle,
+    // char_handle:    CharacteristicHandle,
+    // XXX:
+    pub service_handle: ServiceHandle,
+    pub char_handle:    CharacteristicHandle,
 }
 
 impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
@@ -53,13 +56,13 @@ where
     pub fn log_write(
         &mut self,
         data: &[u8],
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+    ) -> nb::Result<bool, BTError<SpiError, GpioError>> {
         let logger = if let Some(logger) = self.services.logger {
             logger
         } else {
             // uprintln!(uart, "no logger?");
             // uprintln!(uart, "");
-            return Ok(());
+            return Ok(false);
         };
 
         let val = UpdateCharacteristicValueParameters {
@@ -72,7 +75,7 @@ where
 
         block!(self.ignore_event())?;
 
-        Ok(())
+        Ok(true)
     }
 
     pub fn log_write_uart(
