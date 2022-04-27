@@ -291,6 +291,25 @@ fn init_bt(
 }
 
 fn init_clocks(rcc: RCC) -> Clocks {
+    // /// Power interface clock enable
+    // rcc.apb1enr.modify(|r, w| w.pwren().set_bit());
+
+    let mut rcc = rcc.constrain();
+
+    let clocks = rcc
+        .cfgr
+        //
+        .use_hse(16.MHz())
+        // .sysclk(32.MHz())
+        .sysclk(48.MHz())
+        .require_pll48clk()
+        .freeze();
+
+    clocks
+}
+
+#[cfg(feature = "nope")]
+fn init_clocks(rcc: RCC) -> Clocks {
     let mut rcc = rcc.constrain();
     // let clocks = rcc.cfgr.use_hse(25.MHz()).sysclk(32.MHz()).freeze();
     // let clocks = rcc.cfgr.sysclk(32.MHz()).freeze();
@@ -298,11 +317,21 @@ fn init_clocks(rcc: RCC) -> Clocks {
     // /// Works, any change makes UART stop working
     // let clocks = rcc.cfgr.sysclk(16.MHz()).use_hse(16.MHz()).freeze();
 
+    // /// works
+    // let clocks = rcc.cfgr.use_hse(16.MHz()).sysclk(32.MHz()).freeze();
+
+    let speed: stm32f4xx_hal::time::Hertz = 32.MHz();
+    // let speed: stm32f4xx_hal::time::Hertz = 48.MHz();
+
     let clocks = rcc
         .cfgr
         //
         .use_hse(16.MHz())
-        .sysclk(32.MHz())
+        // .sysclk(32.MHz())
+        .sysclk(speed)
+        .hclk(speed)
+        // .pclk1(42.MHz())
+        // .pclk2(84.MHz())
         // .require_pll48clk()
         .freeze();
 

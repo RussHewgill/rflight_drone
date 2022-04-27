@@ -30,7 +30,9 @@ impl UART {
         let rx_pin = rx_pin.into_alternate();
 
         // let bps = 9600.bps();
-        let bps = 19200.bps();
+        // let bps = 19200.bps();
+        let bps = 38400.bps();
+        // let bps = 57600.bps();
 
         let mut serial = usart1
             // .serial((tx_pin, rx_pin), 115200.bps(), &clocks)

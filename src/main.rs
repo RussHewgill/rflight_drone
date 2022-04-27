@@ -128,7 +128,8 @@ mod app {
         let bt_buf = cx.local.bt_buf;
 
         // let main_period: stm32f4xx_hal::time::Hertz = 800.Hz();
-        let main_period: stm32f4xx_hal::time::Hertz = 20.Hz();
+        // let main_period: stm32f4xx_hal::time::Hertz = 20.Hz();
+        let main_period: stm32f4xx_hal::time::Hertz = 200.Hz();
 
         let mut init_struct = init_all(cp, dp, &mut bt_buf[..], main_period);
 
@@ -138,8 +139,12 @@ mod app {
         let mut exti = init_struct.exti;
 
         // hprintln!("hclk() = {:?}", clocks.hclk());
-        // uprintln!(uart, "hclk() = {:?}", clocks.hclk());
-        // uprintln!(uart, "sysclk() = {:?}", clocks.sysclk());
+        uprintln!(uart, "hclk()     = {:?}", clocks.hclk());
+        uprintln!(uart, "sysclk()   = {:?}", clocks.sysclk());
+        uprintln!(uart, "pclk1()    = {:?}", clocks.pclk1());
+        uprintln!(uart, "pclk2()    = {:?}", clocks.pclk2());
+        uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
+        uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
 
         let mut bt = init_struct.bt;
         let mut delay_bt = init_struct.delay_bt;
@@ -308,11 +313,20 @@ mod app {
     //         .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
     // }
 
+    // #[task(binds = TIM3, shared = [bt, exti, ahrs, uart, dwt], local = [tim3], priority = 3)]
+    // fn test_timer(mut cx: test_timer::Context) {
+    //     cx.local
+    //         .tim3
+    //         .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+    //     // *cx.local.counter += 1;
+    //     // cx.shared.uart.lock(|uart| {
+    //     //     uprintln!(uart, "counter = {:?}", cx.local.counter);
+    //     // });
+    // }
+
     // #[cfg(feature = "nope")]
-    // #[task(binds = TIM3, shared = [], local = [tim3, sensors], priority = 3)]
-    // #[task(binds = TIM3, shared = [], local = [tim3], priority = 3)]
-    #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [tim3, sensors], priority = 3)]
-    // #[task(binds = TIM3, shared = [bt, exti, ahrs], local = [sensors], priority = 3)]
+    #[task(binds = TIM3, shared = [bt, exti, ahrs, uart, dwt],
+           local = [tim3, sensors, counter: u32 = 0], priority = 3)]
     fn test_timer(mut cx: test_timer::Context) {
         cx.local
             .tim3
@@ -324,40 +338,56 @@ mod app {
         //     uprintln!(uart, "t");
         // });
 
-        cx.local.sensors.read_data_mag();
-        cx.local.sensors.read_data_imu(false);
+        (cx.shared.dwt, cx.shared.uart).lock(|dwt, uart| {
+            uprint!(uart, "s..");
+            let t = dwt.measure(|| {
+                cx.local.sensors.read_data_mag();
+                cx.local.sensors.read_data_imu(false);
 
-        // #[cfg(feature = "nope")]
-        (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
-            // let gyro = sensors.data.imu_gyro.read_and_reset();
-            // let acc = sensors.data.imu_acc.read_and_reset();
-            // let mag = sensors.data.magnetometer.read_and_reset();
-            let gyro = cx.local.sensors.data.imu_gyro.read_and_reset();
-            let acc = cx.local.sensors.data.imu_acc.read_and_reset();
-            let mag = cx.local.sensors.data.magnetometer.read_and_reset();
+                *cx.local.counter += 1;
 
-            if let Some(q) = ahrs.update(gyro, acc, mag) {
-                let qq = q.coords;
+                // #[cfg(feature = "nope")]
+                (cx.shared.ahrs, cx.shared.bt, cx.shared.exti).lock(|ahrs, bt, exti| {
+                    // (cx.shared.ahrs, cx.shared.bt, cx.shared.exti, cx.shared.uart).lock(
+                    //     |ahrs, bt, exti, uart| {
+                    let gyro = cx.local.sensors.data.imu_gyro.read_and_reset();
+                    let acc = cx.local.sensors.data.imu_acc.read_and_reset();
+                    let mag = cx.local.sensors.data.magnetometer.read_and_reset();
 
-                let mut buf = [0; 16];
+                    if let Some(q) = ahrs.update(gyro, acc, mag) {
+                        if *cx.local.counter >= 10 {
+                            *cx.local.counter = 0;
 
-                buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+                            // uprintln!(uart, "send");
 
-                bt.clear_interrupt();
-                bt.pause_interrupt(exti);
-                match bt.log_write(&buf) {
-                    Ok(_) => {
-                        // uprintln!(uart, "sent log write command");
+                            let qq = q.coords;
+
+                            let mut buf = [0; 16];
+
+                            buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                            buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                            buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                            buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+
+                            bt.clear_interrupt();
+                            bt.pause_interrupt(exti);
+                            match bt.log_write(&buf) {
+                                Ok(_) => {
+                                    // uprintln!(uart, "sent log write command");
+                                }
+                                Err(e) => {
+                                    // uprintln!(uart, "error 0 = {:?}", e);
+                                }
+                            }
+                            bt.unpause_interrupt(exti);
+                            if bt.check_interrupt() {
+                                uprintln!(uart, "interrupt?");
+                            }
+                        }
                     }
-                    Err(e) => {
-                        // uprintln!(uart, "error 0 = {:?}", e);
-                    }
-                }
-                bt.unpause_interrupt(exti);
-            }
+                });
+            });
+            uprintln!(uart, " d = {:?}", t.as_micros());
         });
 
         // unimplemented!()

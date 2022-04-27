@@ -514,6 +514,7 @@ dependencies = [
  "dwt-systick-monotonic",
  "embedded-hal 0.2.7",
  "fugit",
+ "heapless",
  "micromath",
  "nalgebra",
  "panic-semihosting",

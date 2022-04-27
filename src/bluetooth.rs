@@ -153,7 +153,7 @@ pub struct BTServices {
     pub sensors: Option<SvSensors>,
 }
 
-/// new
+/// new, pause/resume/check/clear interrupt
 impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     pub fn new(
         spi: SPI,
