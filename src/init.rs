@@ -11,7 +11,7 @@ use stm32f4xx_hal::gpio::{
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Mode, NoMiso};
 use stm32f4xx_hal::syscfg::SysCfg;
-use stm32f4xx_hal::timer::{CounterHz, CounterMs, DelayMs, SysDelay, Timer};
+use stm32f4xx_hal::timer::{CounterHz, CounterMs, DelayMs, FTimerMs, SysDelay, Timer};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
@@ -51,18 +51,18 @@ pub fn init_all_pre(rcc: &mut RCC) {
 }
 
 pub struct InitStruct {
-    pub dwt:      Dwt,
-    pub uart:     UART,
-    pub exti:     EXTI,
+    pub dwt:     Dwt,
+    pub uart:    UART,
+    pub exti:    EXTI,
     // pub tim3:     CounterHz<TIM3>,
-    pub tim3:     TIM3,
-    pub clocks:   Clocks,
+    pub tim3:    TIM3,
+    pub clocks:  Clocks,
     // pub mono:     Systick<1_000>,
-    pub mono:     MonoTimer<TIM5, 1_000_000>,
-    pub sensors:  Sensors,
+    pub mono:    MonoTimer<TIM5, 1_000_000>,
+    pub sensors: Sensors,
     // pub sensors:  (SensSpi, Pin<'B', 12, Output>),
-    pub bt:       BTController<'static>,
-    pub delay_bt: DelayMs<TIM2>,
+    pub bt:      BTController<'static>,
+    // pub delay_bt: DelayMs<TIM2>,
 }
 
 pub fn init_all(
@@ -84,9 +84,6 @@ pub fn init_all(
 
     // let mono = DwtSystick::<1_000>::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.sysclk().raw());
     // let mono = DwtSystick::<1_000>::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.hclk().raw());
-
-    // let mut bt_delay = cp.SYST.delay(&clocks);
-    let bt_delay = dp.TIM2.delay_ms(&clocks);
 
     // let mono = Systick::new(cp.SYST, clocks.sysclk().raw());
 
@@ -112,11 +109,17 @@ pub fn init_all(
     // (uart, clocks, mono)
     let mut syscfg = dp.SYSCFG.constrain();
 
+    // // let mut bt_delay = cp.SYST.delay(&clocks);
+    // // let bt_delay = dp.TIM2.delay_ms(&clocks);
+    // let bt_delay = dp.TIM2.counter_ms(&clocks);
+
+    let bt_delay = FTimerMs::new(dp.TIM2, &clocks);
+
     let bt_irq = init_bt_interrupt(&mut dp.EXTI, &mut syscfg, gpioa.pa4);
 
     let bt = init_bt(
         dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks,
-        bt_buf,
+        bt_buf, bt_delay,
     );
 
     let mut sensors = init_sensors_spi(
@@ -136,7 +139,7 @@ pub fn init_all(
         mono,
         sensors,
         bt,
-        delay_bt: bt_delay,
+        // delay_bt: bt_delay,
     }
 }
 
@@ -250,6 +253,8 @@ fn init_bt(
     mosi: PA7,
     clocks: &Clocks,
     buf: &'static mut [u8],
+    // delay: CounterMs<TIM2>,
+    delay: FTimerMs<TIM2>,
 ) -> BTController<'static> {
     let mut cs = cs
         .internal_resistor(Pull::Up)
@@ -280,12 +285,14 @@ fn init_bt(
         phase:    stm32f4xx_hal::spi::Phase::CaptureOnFirstTransition,
     };
 
-    let mut spi = spi1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);
+    // let mut spi = spi1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);
+    let mut spi = spi1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    // let mut spi = spi1.spi((sck, miso, mosi), mode, 100.kHz(), &clocks);
 
     // let mut buffer = [0u8; 512];
 
     // let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
-    let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, buf);
+    let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, buf, delay);
 
     bt
     // unimplemented!()
@@ -316,8 +323,10 @@ fn init_clocks(rcc: RCC) -> Clocks {
         .cfgr
         //
         .use_hse(16.MHz())
-        .sysclk(32.MHz())
+        // .sysclk(32.MHz())
         // .sysclk(48.MHz())
+        .sysclk(64.MHz())
+        // .sysclk(84.MHz())
         // .require_pll48clk()
         .freeze();
 

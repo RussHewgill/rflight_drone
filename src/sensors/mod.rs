@@ -30,8 +30,7 @@ pub struct Sensors {
     imu:          IMU<Pin<'A', 8, Output>>,
     magnetometer: Magnetometer<Pin<'B', 12, Output>>,
     barometer:    Barometer<Pin<'C', 13, Output>>,
-
-    pub data: SensorData,
+    // pub data: SensorData,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -58,6 +57,9 @@ impl DataVal {
         self.changed = false;
         self.data
     }
+    pub fn is_changed(&self) -> bool {
+        self.changed
+    }
 }
 
 /// new
@@ -74,7 +76,7 @@ impl Sensors {
             imu,
             magnetometer,
             barometer,
-            data: SensorData::default(),
+            // data: SensorData::default(),
         }
     }
 }
@@ -105,7 +107,7 @@ impl Sensors {
 
 /// read data
 impl Sensors {
-    pub fn read_data_imu(&mut self, discard: bool) {
+    pub fn read_data_imu(&mut self, data: &mut SensorData, discard: bool) {
         if let Ok((data_gyro, data_acc)) = self.with_spi_imu(|spi, imu| {
             while !(imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)) {
                 cortex_m::asm::nop();
@@ -113,23 +115,23 @@ impl Sensors {
             imu.read_data(spi)
         }) {
             if !discard {
-                self.data.imu_gyro.update(data_gyro);
-                self.data.imu_acc.update(data_acc);
+                data.imu_gyro.update(data_gyro);
+                data.imu_acc.update(data_acc);
             }
         } else {
             // unimplemented!()
         }
     }
 
-    pub fn read_data_mag(&mut self) {
-        if let Ok(data) = self.with_spi_mag(|spi, mag| {
+    pub fn read_data_mag(&mut self, data: &mut SensorData) {
+        if let Ok(mag_data) = self.with_spi_mag(|spi, mag| {
             if mag.read_new_data_available(spi).unwrap() {
                 mag.read_data(spi)
             } else {
                 Err(nb::Error::WouldBlock)
             }
         }) {
-            self.data.magnetometer.update(data);
+            data.magnetometer.update(mag_data);
         } else {
             // unimplemented!()
         }

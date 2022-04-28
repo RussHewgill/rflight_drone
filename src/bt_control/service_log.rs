@@ -8,7 +8,7 @@ use stm32f4xx_hal::{
     nb,
     prelude::*,
     spi::{Error as SpiError, NoMiso, Spi1},
-    timer::{DelayMs, SysDelay},
+    timer::{CounterMs, DelayMs, SysDelay},
 };
 
 use crate::bluetooth::{ev_command::GattService, gap::Commands as GapCommands};
@@ -55,6 +55,7 @@ where
 {
     pub fn log_write(
         &mut self,
+        delay: bool,
         data: &[u8],
     ) -> nb::Result<bool, BTError<SpiError, GpioError>> {
         let logger = if let Some(logger) = self.services.logger {
@@ -73,7 +74,11 @@ where
         };
         block!(self.update_characteristic_value(&val)).unwrap();
 
-        block!(self.ignore_event())?;
+        if delay {
+            block!(self.ignore_event_timeout(100.millis()))?;
+        } else {
+            block!(self.ignore_event())?;
+        }
 
         Ok(true)
     }
@@ -146,6 +151,11 @@ where
         };
         block!(self.add_characteristic(&params0))?;
 
+        uprintln!(uart, "wat 0");
+
+        block!(self.add_characteristic(&params0))?;
+
+        uprintln!(uart, "wat 1");
         // let params1 = AddCharacteristicParameters {
         //     service_handle: service.service_handle,
         //     characteristic_uuid: UUID_CONSOLE_LOG_CHAR_WRITE,
@@ -162,7 +172,7 @@ where
 
         // block!(self.read_event(uart))?;
 
-        let c = match self.read_event_params_vendor(uart)? {
+        let c = match block!(self.read_event_params_vendor(uart))? {
             VReturnParameters::GattAddCharacteristic(c) => c,
             _ => unimplemented!(),
         };
@@ -176,7 +186,7 @@ where
 
         self.services.logger = Some(logger);
 
-        self.log_write_uart(uart, "wat".as_bytes()).unwrap();
+        // self.log_write_uart(uart, "wat".as_bytes()).unwrap();
 
         Ok(())
     }

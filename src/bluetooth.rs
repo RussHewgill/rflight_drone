@@ -25,7 +25,7 @@ use hal::digital::v2::{InputPin, OutputPin};
 //     },
 // };
 
-use stm32f4::stm32f401::{Peripherals, EXTI, GPIOB, RCC, SPI1, SPI2};
+use stm32f4::stm32f401::{Peripherals, EXTI, GPIOB, RCC, SPI1, SPI2, TIM2};
 use stm32f4xx_hal::{
     block,
     gpio::{Alternate, Pin, PinExt, PA4, PA8, PB13, PB15},
@@ -34,6 +34,7 @@ use stm32f4xx_hal::{
     rcc::Clocks,
     spi::{Error as SpiError, NoMiso},
     time::*,
+    timer::{CounterMs, DelayMs, FTimerMs},
 };
 
 use bluetooth_hci::host::uart::{CommandHeader, Hci as HciUart};
@@ -142,6 +143,9 @@ pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     // buffer: ArrayVec<u8, 256>,
     buffer: Buffer<'buf, u8>,
 
+    // pub delay: CounterMs<TIM2>,
+    pub delay: Option<FTimerMs<TIM2>>,
+
     // pub buffer: Buffer<'buf, u8>,
     pub state:    BTState,
     // pub services: Option<SvLogger>,
@@ -162,6 +166,8 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
         reset: Reset,
         input: Input,
         buffer: &'buf mut [u8],
+        // delay: CounterMs<TIM2>,
+        delay: FTimerMs<TIM2>,
     ) -> Self {
         Self {
             spi,
@@ -169,6 +175,8 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
             reset,
             input,
             buffer: Buffer::new(buffer),
+
+            delay: Some(delay),
 
             state: BTState::Disconnected,
             services: BTServices::default(),
@@ -223,6 +231,22 @@ where
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
 {
+    pub fn reset(&mut self) -> nb::Result<(), GpioError> {
+        let mut ftimer = self.delay.take().unwrap();
+        let mut delay: DelayMs<TIM2> = ftimer.delay();
+
+        self.reset.set_low().map_err(nb::Error::Other)?;
+        delay.delay(10.millis());
+        self.reset.set_high().map_err(nb::Error::Other)?;
+        delay.delay(10.millis());
+
+        self.delay = Some(delay.release());
+
+        Ok(())
+        // unimplemented!()
+    }
+
+    #[cfg(feature = "nope")]
     pub fn reset_with_delay<D, UXX>(
         &mut self,
         delay: &mut D,

@@ -81,7 +81,7 @@ mod app {
     use crate::bluetooth::gatt::Commands as GattCommands;
     use crate::bluetooth::hal_bt::Commands as HalCommands;
     use crate::sensors::ahrs::AHRS;
-    use crate::sensors::{Sensors, UQuat};
+    use crate::sensors::{SensorData, Sensors, UQuat};
     use crate::time::MonoTimer;
     use crate::{bluetooth::gap::Commands as GapCommands, bt_control::BTState};
     use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
@@ -98,22 +98,24 @@ mod app {
 
     #[shared]
     struct Shared {
-        dwt:      Dwt,
-        uart:     UART,
-        exti:     EXTI,
-        ahrs:     AHRS,
+        dwt:       Dwt,
+        uart:      UART,
+        exti:      EXTI,
+        ahrs:      AHRS,
+        sens_data: SensorData,
         // bt_chan:  heapless::spsc::Queue<>
-        bt:       BTController<'static>,
+        bt:        BTController<'static>,
         // delay_bt: DelayMs<TIM2>,
         // delay_bt: TIM2,
-        delay_bt: CounterMs<TIM2>,
+        // delay_bt:  CounterMs<TIM2>,
+        tim9_flag: bool,
     }
 
     #[local]
     struct Local {
         //
         sensors:  Sensors,
-        // tim3:     CounterHz<TIM3>,
+        tim3:     CounterHz<TIM3>,
         interval: MillisDurationU32,
     }
 
@@ -146,7 +148,6 @@ mod app {
         let mono = init_struct.mono;
         let mut exti = init_struct.exti;
 
-        // hprintln!("hclk() = {:?}", clocks.hclk());
         uprintln!(uart, "hclk()     = {:?}", clocks.hclk());
         uprintln!(uart, "sysclk()   = {:?}", clocks.sysclk());
         uprintln!(uart, "pclk1()    = {:?}", clocks.pclk1());
@@ -154,14 +155,22 @@ mod app {
         uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
         uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
 
+        // hprintln!("hclk()     = {:?}", clocks.hclk());
+        // hprintln!("sysclk()   = {:?}", clocks.sysclk());
+        // hprintln!("pclk1()    = {:?}", clocks.pclk1());
+        // hprintln!("pclk2()    = {:?}", clocks.pclk2());
+        // hprintln!("pll48clk() = {:?}", clocks.pll48clk());
+        // hprintln!("i2s_clk()  = {:?}", clocks.i2s_clk());
+
         let mut bt = init_struct.bt;
-        let mut delay_bt = init_struct.delay_bt;
+        // let mut delay_bt = init_struct.delay_bt;
 
         // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
 
         uart.pause();
         bt.pause_interrupt(&mut exti);
-        match bt.init_bt(&mut uart, &mut delay_bt) {
+        // match bt.init_bt(&mut uart, &mut delay_bt) {
+        match bt.init_bt(&mut uart) {
             Ok(()) => {
                 // test_sens::spawn_after(2.secs()).unwrap();
                 // bt.unpause_interrupt(&mut exti);
@@ -191,10 +200,11 @@ mod app {
         // }
         // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
 
-        // let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
-        //     init_struct.tim3.counter_hz(&clocks);
+        let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
+            init_struct.tim3.counter_hz(&clocks);
         // tim3.start(main_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        tim3.start(50.Hz()).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         // /// No debug
         // uart.pause();
@@ -206,8 +216,8 @@ mod app {
             0.5,
         );
 
-        let tim2 = delay_bt.release().release();
-        let delay_bt = tim2.counter_ms(&clocks);
+        // let tim2 = delay_bt.release().release();
+        // let delay_bt = tim2.counter_ms(&clocks);
 
         let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
 
@@ -218,31 +228,110 @@ mod app {
             uart,
             exti,
             ahrs,
+            sens_data: SensorData::default(),
             bt,
-            delay_bt,
+            // delay_bt,
+            tim9_flag: false,
         };
 
         let local = Local {
             sensors: init_struct.sensors,
-            // tim3:    init_struct.tim3,
-            // tim3,
+            tim3,
             interval,
         };
 
-        timer_sensors::spawn_after(1.secs()).unwrap();
+        // // timer_sensors::spawn_after(1.secs()).unwrap();
+        // timer_sensors::spawn_after(100.millis()).unwrap();
+
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
-    // #[cfg(feature = "nope")]
-    // #[task(binds = TIM3, shared = [bt, delay_bt, exti, ahrs, uart, dwt],
-    // local = [tim3, sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16], interval], priority = 3)]
-    #[task(shared = [bt, delay_bt, exti, ahrs, uart, dwt],
-           local = [sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16], interval], priority = 3)]
+    #[task(binds = TIM3, shared = [uart, exti, bt],
+           local = [tim3, buf: [u8; 16] = [0; 16]], priority = 4)]
     fn timer_sensors(mut cx: timer_sensors::Context) {
-        // cx.local
-        //     .tim3
-        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        cx.local
+            .tim3
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        (cx.shared.uart, cx.shared.exti, cx.shared.bt).lock(|uart, exti, bt| {
+            // bt.clear_interrupt();
+            bt.pause_interrupt(exti);
+            uprint!(uart, "0..");
+            match bt.log_write(true, &cx.local.buf[..]) {
+                // match bt.log_write(None, &cx.local.buf[..]) {
+                Ok(true) => {
+                    // uprintln!(uart, "sent log write command");
+                }
+                Ok(false) => {
+                    uprintln!(uart, "failed to write");
+                }
+                Err(e) => {
+                    uprintln!(uart, "error 0 = {:?}", e);
+                }
+            }
+            uprintln!(uart, "1");
+            bt.unpause_interrupt(exti);
+        });
+    }
+
+    // #[task(binds = TIM3, shared = [sens_data, tim9_flag], local = [tim3, sensors], priority = 4)]
+    // fn timer_sensors(mut cx: timer_sensors::Context) {
+    //     cx.local
+    //         .tim3
+    //         .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+    //     (cx.shared.sens_data, cx.shared.tim9_flag).lock(|sd, tim9_flag| {
+    //         cx.local.sensors.read_data_mag(sd);
+    //         cx.local.sensors.read_data_imu(sd, false);
+    //         *tim9_flag = true;
+    //     });
+    // }
+
+    #[task(shared = [bt, exti, ahrs, sens_data, uart, dwt, tim9_flag],
+           local = [], priority = 3)]
+    fn main_loop(mut cx: main_loop::Context) {
+        cx.shared.tim9_flag.lock(|tim9_flag| {
+            if *tim9_flag {
+                /// read saved sensor data
+                let data = cx.shared.sens_data.lock(|sd| {
+                    if sd.imu_acc.is_changed() || sd.magnetometer.is_changed() {
+                        let gyro = sd.imu_gyro.read_and_reset();
+                        let acc = sd.imu_acc.read_and_reset();
+                        let mag = sd.magnetometer.read_and_reset();
+                        Some((gyro, acc, mag))
+                    } else {
+                        None
+                    }
+                });
+
+                /// update AHRS
+                if let Some((gyro, acc, mag)) = data {
+                    let quat = cx.shared.ahrs.lock(|ahrs| {
+                        ahrs.update(gyro, acc, mag);
+                        ahrs.get_quat()
+                    });
+                    let (roll, pitch, yaw) = quat.euler_angles();
+
+                    // TODO: PID Outer loop
+                };
+            }
+        });
+
+        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn().unwrap();
+    }
+
+    #[cfg(feature = "nope")]
+    // #[task(binds = TIM3, shared = [bt, delay_bt, exti, ahrs, uart, dwt],
+    //        local = [tim3, sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16], interval],
+    //        priority = 3
+    // )]
+    // #[task(shared = [bt, delay_bt, exti, ahrs, uart, dwt],
+    // local = [sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16], interval], priority = 3)]
+    fn timer_sensors(mut cx: timer_sensors::Context) {
+        cx.local
+            .tim3
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
 
         *cx.local.counter += 1;
 
@@ -267,10 +356,10 @@ mod app {
                         cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
                         cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
-                        uprint!(uart, "sending...");
                         // uprint!(uart, "sending ({:?})...", *cx.local.counter);
                         bt.clear_interrupt();
                         bt.pause_interrupt(exti);
+                        uprint!(uart, "0..");
                         match bt.log_write(&cx.local.buf[..]) {
                             Ok(true) => {
                                 // uprintln!(uart, "sent log write command");
@@ -283,7 +372,7 @@ mod app {
                             }
                         }
                         bt.unpause_interrupt(exti);
-                        uprintln!(uart, " sent");
+                        uprintln!(uart, "1");
                     });
                 }
 
@@ -292,15 +381,14 @@ mod app {
         });
 
         // timer_sensors::spawn_after(2.secs()).unwrap();
-        timer_sensors::spawn_after(cx.local.interval.convert()).unwrap();
+        // timer_sensors::spawn_after(cx.local.interval.convert()).unwrap();
         // unimplemented!()
     }
 
-    /// disabling this makes init_bt hang
     // #[cfg(feature = "nope")]
     #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
-        cortex_m_semihosting::hprint!("b");
+        // cortex_m_semihosting::hprint!("b");
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "bt_irq");
 
@@ -374,6 +462,7 @@ mod app {
     }
 }
 
+#[cfg(feature = "nope")]
 // #[entry]
 fn main_bluetooth() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();

@@ -114,9 +114,10 @@ where
     pub fn init_bt(
         &mut self,
         uart: &mut UART,
-        delay: &mut DelayMs<TIM2>,
+        // delay: &mut DelayMs<TIM2>,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        self.reset_with_delay(delay, 5u32).unwrap();
+        self.reset().unwrap();
+        // self.reset_with_delay(delay, 5u32).unwrap();
         block!(self.read_event_uart(uart))?;
 
         let addr = gen_bd_addr();
@@ -472,52 +473,13 @@ where
     pub fn ignore_event_timeout(
         &mut self,
         // uart: &mut UART,
-        delay: &mut CounterMs<TIM2>,
+        // delay: &mut CounterMs<TIM2>,
         timeout: fugit::MillisDurationU32,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         use bluetooth_hci::Controller;
 
-        // let p = loop {
-        //     const PACKET_TYPE_HCI_EVENT: u8 = 0x04;
-
-        //     // match self.peek(0) {
-        //     //     Ok(PACKET_TYPE_HCI_EVENT) => {
-        //     //         const MAX_EVENT_LENGTH: usize = 255;
-        //     //         const PACKET_HEADER_LENGTH: usize = 1;
-        //     //         const EVENT_PACKET_HEADER_LENGTH: usize = 3;
-        //     //         const PARAM_LEN_BYTE: usize = 2;
-        //     //         let param_len = self.peek(PARAM_LEN_BYTE).unwrap() as usize;
-        //     //         let mut buf = [0; MAX_EVENT_LENGTH + EVENT_PACKET_HEADER_LENGTH];
-        //     //         self.read_into(&mut buf[..EVENT_PACKET_HEADER_LENGTH + param_len])
-        //     //             .unwrap();
-        //     //         // crate::events::Event::new(crate::events::Packet(
-        //     //         //     &buf[PACKET_HEADER_LENGTH
-        //     //         //         ..EVENT_PACKET_HEADER_LENGTH + param_len],
-        //     //         // ))
-        //     //         // .map_err(|e| nb::Error::Other(Error::BLE(e)))
-        //     //     }
-        //     //     Ok(other) => {
-        //     //         uprintln!(uart, "other = {:?}", other);
-        //     //         return Ok(());
-        //     //     }
-        //     //     Err(e) => {
-        //     //         panic!("error 0 = {:?}", e);
-        //     //     }
-        //     // };
-
-        //     // // match self.read() {
-        //     // match x {
-        //     //     Ok(p) => break p,
-        //     //     Err(nb::Error::WouldBlock) => {}
-        //     //     Err(e) => {
-        //     //         panic!("error 1 = {:?}", e);
-        //     //     }
-        //     // }
-        // };
-
-        // let p = self.read2(uart)?;
-
-        // let counter =
+        let mut ftimer = self.delay.take().unwrap();
+        let mut delay = ftimer.counter();
 
         delay.start(1000.millis()).unwrap();
         let start = delay.now();
@@ -540,6 +502,7 @@ where
         };
 
         delay.cancel().unwrap();
+        self.delay = Some(delay.release());
 
         let bluetooth_hci::host::uart::Packet::Event(e) = p;
         // uprintln!(uart, "event = {:?}", &e);

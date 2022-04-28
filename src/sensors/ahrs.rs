@@ -232,8 +232,12 @@ impl AHRS {
     }
 }
 
-/// get accel
+/// get quat, accel
 impl AHRS {
+    pub fn get_quat(&self) -> UQuat {
+        self.quat
+    }
+
     /// Returns the linear acceleration measurement equal to the accelerometer
     /// measurement with the 1 g of gravity removed.
     pub fn get_linear_accel(&self, acc: V3) -> V3 {
