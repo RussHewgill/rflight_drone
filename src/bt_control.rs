@@ -492,6 +492,7 @@ where
                     let now = delay.now();
                     if now >= end {
                         delay.cancel().unwrap();
+                        self.delay = Some(delay.release());
                         return Ok(());
                     }
                 }
