@@ -336,7 +336,9 @@ where
                 ReturnParameters::Vendor(vs) => Ok(vs),
                 _ => unimplemented!(),
             },
-            _ => unimplemented!(),
+            other => {
+                panic!("event_params_vendor other = {:?}", other);
+            } // _ => unimplemented!(),
         }
     }
 

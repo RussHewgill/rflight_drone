@@ -6,7 +6,7 @@ use stm32f401::{CorePeripherals, Peripherals};
 use stm32f4xx_hal::dwt::{Dwt, DwtExt};
 use stm32f4xx_hal::gpio::{
     Alternate, Input, Output, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PA8, PB12, PB13,
-    PB15, PB2, PC13,
+    PB15, PB2, PB4, PB5, PC13,
 };
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Mode, NoMiso};
@@ -15,6 +15,7 @@ use stm32f4xx_hal::timer::{CounterHz, CounterMs, DelayMs, SysDelay, Timer};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
+use crate::leds::LEDs;
 use crate::sensors::barometer::Barometer;
 use crate::sensors::imu::config::ImuConfig;
 use crate::sensors::imu::IMU;
@@ -288,6 +289,21 @@ fn init_bt(
 
     bt
     // unimplemented!()
+}
+
+fn init_led(pb4: PB4, pb5: PB5) -> LEDs {
+    let mut led1_pin = pb5
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .internal_resistor(stm32f4xx_hal::gpio::Pull::None);
+    let mut led2_pin = pb4
+        .into_push_pull_output()
+        .speed(Speed::High)
+        .internal_resistor(stm32f4xx_hal::gpio::Pull::None);
+    led1_pin.set_high();
+    led2_pin.set_high();
+
+    LEDs::new(led1_pin, led2_pin)
 }
 
 fn init_clocks(rcc: RCC) -> Clocks {

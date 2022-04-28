@@ -232,6 +232,49 @@ impl AHRS {
     }
 }
 
+/// get accel
+impl AHRS {
+    /// Returns the linear acceleration measurement equal to the accelerometer
+    /// measurement with the 1 g of gravity removed.
+    pub fn get_linear_accel(&self, acc: V3) -> V3 {
+        let q = self.quat.coords;
+        let gravity = V3::new(
+            2.0 * (q.x * q.z - q.w * q.y),
+            2.0 * (q.w * q.x + q.y * q.z),
+            2.0 * (q.w * q.w - 0.5 + q.z * q.z),
+        );
+        acc - gravity
+    }
+
+    /// Returns the Earth acceleration measurement equal to accelerometer
+    /// measurement in the Earth coordinate frame with the 1 g of gravity removed.
+    pub fn get_earth_accel(&self, acc: V3) -> V3 {
+        let q = self.quat.coords;
+        let qwqw = q.w * q.w; // calculate common terms to avoid repeated operations
+        let qwqx = q.w * q.x;
+        let qwqy = q.w * q.y;
+        let qwqz = q.w * q.z;
+        let qxqy = q.x * q.y;
+        let qxqz = q.x * q.z;
+        let qyqz = q.y * q.z;
+
+        /// transpose of a rotation matrix representation
+        /// multiplied with the accelerometer, with 1 g subtracted
+        V3::new(
+            2.0 * ((qwqw - 0.5 + q.x * q.x) * acc.x
+                + (qxqy - qwqz) * acc.y
+                + (qxqz + qwqy) * acc.z),
+            2.0 * ((qxqy + qwqz) * acc.x
+                + (qwqw - 0.5 + q.y * q.y) * acc.y
+                + (qyqz - qwqx) * acc.z),
+            (2.0 * ((qxqz - qwqy) * acc.x
+                + (qyqz + qwqx) * acc.y
+                + (qwqw - 0.5 + q.z * q.z) * acc.z))
+                - 1.0,
+        )
+    }
+}
+
 impl Default for AHRS {
     fn default() -> Self {
         let sample_period = 1.0 / 256.0;
