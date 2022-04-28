@@ -62,6 +62,7 @@ use stm32f4xx_hal::{
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
+    use fugit::MillisDurationU32;
     use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM5, TIM9};
     // use stm32f4xx_hal::prelude::*;
 
@@ -108,8 +109,9 @@ mod app {
     #[local]
     struct Local {
         //
-        sensors: Sensors,
-        tim3:    CounterHz<TIM3>,
+        sensors:  Sensors,
+        tim3:     CounterHz<TIM3>,
+        interval: MillisDurationU32,
     }
 
     // #[monotonic(binds = SysTick, default = true)]
@@ -204,6 +206,10 @@ mod app {
         let tim2 = delay_bt.release().release();
         let delay_bt = tim2.counter_ms(&clocks);
 
+        let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
+
+        uprintln!(uart, "interval = {:?}", interval);
+
         let shared = Shared {
             dwt: init_struct.dwt,
             uart,
@@ -217,6 +223,7 @@ mod app {
             sensors: init_struct.sensors,
             // tim3:    init_struct.tim3,
             tim3,
+            interval,
         };
 
         // setup_bt::spawn().unwrap();
@@ -224,7 +231,9 @@ mod app {
         // test_uart::spawn().unwrap();
         // test_uart::spawn_after(2.secs()).unwrap();
 
-        // test_sens::spawn_after(2.secs()).unwrap();
+        timer_sensors::spawn_after(1.secs()).unwrap();
+
+        // let x: MillisDurationU32 = 1.secs();
 
         // tim9_sensors::spawn().unwrap();
 
@@ -254,8 +263,10 @@ mod app {
     // }
 
     // #[cfg(feature = "nope")]
-    #[task(binds = TIM3, shared = [bt, delay_bt, exti, ahrs, uart, dwt],
-           local = [tim3, sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
+    // #[task(binds = TIM3, shared = [bt, delay_bt, exti, ahrs, uart, dwt],
+    //        local = [tim3, sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
+    #[task(shared = [bt, delay_bt, exti, ahrs, uart, dwt],
+           local = [tim3, sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16], interval], priority = 3)]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -357,6 +368,8 @@ mod app {
             uprintln!(uart, " d = {:?}", t.as_micros());
         });
 
+        // timer_sensors::spawn_after(2.secs()).unwrap();
+        timer_sensors::spawn_after(cx.local.interval.convert()).unwrap();
         // unimplemented!()
     }
 
