@@ -143,18 +143,20 @@ where
 
         let service: GattService = loop {
             block!(self.add_service(&params))?;
-            // match block!(self._read_event_timeout(5.millis(), uart)) {
-            let k = self.data_ready().unwrap();
-            uprintln!(uart, "data_ready 0 = {:?}", k);
-            let k = self.data_ready().unwrap();
-            uprintln!(uart, "data_ready 1 = {:?}", k);
-            let k = self.data_ready().unwrap();
-            uprintln!(uart, "data_ready 2 = {:?}", k);
-            let k = self.data_ready().unwrap();
-            uprintln!(uart, "data_ready 3 = {:?}", k);
-            match self._read_event(uart) {
-                // Ok(Some(e)) => match e {
-                Ok(e) => match e {
+
+            // let k = self.data_ready().unwrap();
+            // uprintln!(uart, "0 = {:?}", k);
+            // let k = self.data_ready().unwrap();
+            // uprintln!(uart, "1 = {:?}", k);
+            // let k = self.data_ready().unwrap();
+            // uprintln!(uart, "2 = {:?}", k);
+            // let k = self.data_ready().unwrap();
+            // uprintln!(uart, "3 = {:?}", k);
+
+            match self._read_event_timeout(25.millis(), uart) {
+                // match self._read_event(uart) {
+                Ok(Some(e)) => match e {
+                    // Ok(e) => match e {
                     Event::CommandComplete(params) => match params.return_params {
                         ReturnParameters::Vendor(vs) => match vs {
                             VReturnParameters::GattAddService(service) => break service,
@@ -170,15 +172,15 @@ where
                         uprintln!(uart, "other 2 = {:?}", other);
                     }
                 },
-                // Ok(None) => {
-                //     block!(self.add_service(&params))?;
-                // }
+                Ok(None) => {
+                    block!(self.add_service(&params))?;
+                }
                 Err(e) => panic!("init_log_service error = {:?}", e),
             }
         };
         uprintln!(uart, "service = {:?}", service);
 
-        self.wait_ms(2.millis());
+        self.wait_ms(10.millis());
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
@@ -192,36 +194,44 @@ where
             // gatt_event_mask: CharacteristicEvent::CONFIRM_READ,
             encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
             is_variable:               true,
-            fw_version_before_v72:     true,
-            // fw_version_before_v72:     false,
+            // fw_version_before_v72:     true,
+            fw_version_before_v72:     false,
         };
-        block!(self.add_characteristic(&params0))?;
-
-        // uprintln!(uart, "wat 0");
         // block!(self.add_characteristic(&params0))?;
 
-        // uprintln!(uart, "wat 1");
-        // let params1 = AddCharacteristicParameters {
-        //     service_handle: service.service_handle,
-        //     characteristic_uuid: UUID_CONSOLE_LOG_CHAR_WRITE,
-        //     characteristic_value_len: 18,
-        //     characteristic_properties: CharacteristicProperty::WRITE
-        //         | CharacteristicProperty::WRITE_WITHOUT_RESPONSE,
-        //     security_permissions: CharacteristicPermission::NONE,
-        //     gatt_event_mask: CharacteristicEvent::NONE,
-        //     encryption_key_size: EncryptionKeySize::with_value(7).unwrap(),
-        //     is_variable: true,
-        //     fw_version_before_v72: true,
+        // let c = match self.read_event_params_vendor(uart)? {
+        //     VReturnParameters::GattAddCharacteristic(c) => c,
+        //     other => unimplemented!("other = {:?}", other),
         // };
-        // block!(self.add_characteristic(&params1))?;
+        // uprintln!(uart, "c = {:?}", c);
 
-        // block!(self.read_event(uart))?;
-
-        let c = match self.read_event_params_vendor(uart)? {
-            VReturnParameters::GattAddCharacteristic(c) => c,
-            other => unimplemented!("other = {:?}", other),
+        let c = loop {
+            block!(self.add_characteristic(&params0))?;
+            match self._read_event_timeout(25.millis(), uart) {
+                Ok(Some(e)) => match e {
+                    Event::CommandComplete(params) => match params.return_params {
+                        ReturnParameters::Vendor(vs) => match vs {
+                            VReturnParameters::GattAddCharacteristic(service) => {
+                                break service
+                            }
+                            other => {
+                                uprintln!(uart, "other 0 = {:?}", other);
+                            }
+                        },
+                        other => {
+                            uprintln!(uart, "other 1 = {:?}", other);
+                        }
+                    },
+                    other => {
+                        uprintln!(uart, "other 2 = {:?}", other);
+                    }
+                },
+                Ok(None) => {
+                    block!(self.add_service(&params))?;
+                }
+                Err(e) => panic!("init_log_service error = {:?}", e),
+            }
         };
-
         uprintln!(uart, "c = {:?}", c);
 
         let logger = SvLogger {

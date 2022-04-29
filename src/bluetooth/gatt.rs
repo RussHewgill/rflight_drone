@@ -64,7 +64,10 @@ pub trait Commands {
     ///
     /// A [Command complete](crate::event::command::ReturnParameters::GattAddService) event is
     /// generated.
-    fn add_service(&mut self, params: &AddServiceParameters) -> nb::Result<(), Self::Error>;
+    fn add_service(
+        &mut self,
+        params: &AddServiceParameters,
+    ) -> nb::Result<(), Self::Error>;
 
     /// Include a service to another service.
     ///
@@ -78,8 +81,10 @@ pub trait Commands {
     ///
     /// A [Command complete](crate::event::command::ReturnParameters::GattIncludeService) event is
     /// generated.
-    fn include_service(&mut self, params: &IncludeServiceParameters)
-        -> nb::Result<(), Self::Error>;
+    fn include_service(
+        &mut self,
+        params: &IncludeServiceParameters,
+    ) -> nb::Result<(), Self::Error>;
 
     /// Add a characteristic to a service.
     ///
@@ -791,7 +796,10 @@ pub trait Commands {
     ///
     /// A [command complete](crate::event::command::ReturnParameters::GattAllowRead) event is
     /// generated when this command is processed.
-    fn allow_read(&mut self, conn_handle: hci::ConnectionHandle) -> nb::Result<(), Self::Error>;
+    fn allow_read(
+        &mut self,
+        conn_handle: hci::ConnectionHandle,
+    ) -> nb::Result<(), Self::Error>;
 
     /// This command sets the security permission for the attribute handle specified. Currently the
     /// setting of security permission is allowed only for client configuration descriptor.
@@ -837,7 +845,10 @@ pub trait Commands {
     ///
     /// A [command complete](crate::event::command::ReturnParameters::GattReadHandleValue) event is
     /// generated when this command is processed.
-    fn read_handle_value(&mut self, handle: CharacteristicHandle) -> nb::Result<(), Self::Error>;
+    fn read_handle_value(
+        &mut self,
+        handle: CharacteristicHandle,
+    ) -> nb::Result<(), Self::Error>;
 
     /// The command returns the value of the attribute handle from the specified offset.
     ///
@@ -905,18 +916,17 @@ where
         self.write_command(crate::opcode::GATT_INIT, &[])
     }
 
-    // impl_variable_length_params!(
-    //     add_service,
-    //     AddServiceParameters,
-    //     crate::opcode::GATT_ADD_SERVICE
-    // );
+    impl_variable_length_params!(
+        add_service,
+        AddServiceParameters,
+        crate::opcode::GATT_ADD_SERVICE
+    );
 
-    fn add_service(&mut self, params: &AddServiceParameters) -> nb::Result<(), Self::Error> {
-        let mut bytes = [0; AddServiceParameters::MAX_LENGTH];
-        let len = params.copy_into_slice(&mut bytes);
-
-        self.write_command(crate::opcode::GATT_ADD_SERVICE, &bytes[..len])
-    }
+    // fn add_service(&mut self, params: &AddServiceParameters) -> nb::Result<(), Self::Error> {
+    //     let mut bytes = [0; AddServiceParameters::MAX_LENGTH];
+    //     let len = params.copy_into_slice(&mut bytes);
+    //     self.write_command(crate::opcode::GATT_ADD_SERVICE, &bytes[..len])
+    // }
 
     impl_variable_length_params!(
         include_service,
@@ -1244,7 +1254,10 @@ where
         crate::opcode::GATT_WRITE_RESPONSE
     );
 
-    fn allow_read(&mut self, conn_handle: hci::ConnectionHandle) -> nb::Result<(), Self::Error> {
+    fn allow_read(
+        &mut self,
+        conn_handle: hci::ConnectionHandle,
+    ) -> nb::Result<(), Self::Error> {
         let mut bytes = [0; 2];
         LittleEndian::write_u16(&mut bytes, conn_handle.0);
 
@@ -1263,7 +1276,10 @@ where
         crate::opcode::GATT_SET_DESCRIPTOR_VALUE
     );
 
-    fn read_handle_value(&mut self, handle: CharacteristicHandle) -> nb::Result<(), Self::Error> {
+    fn read_handle_value(
+        &mut self,
+        handle: CharacteristicHandle,
+    ) -> nb::Result<(), Self::Error> {
         let mut bytes = [0; 2];
         LittleEndian::write_u16(&mut bytes, handle.0);
 
@@ -1396,7 +1412,7 @@ impl Uuid {
 #[repr(u8)]
 pub enum ServiceType {
     /// Primary service
-    Primary = 0x01,
+    Primary   = 0x01,
     /// Secondary service
     Secondary = 0x02,
 }
@@ -1436,7 +1452,7 @@ pub struct ServiceHandle(pub u16);
 /// only one value.
 pub struct Range<T> {
     from: T,
-    to: T,
+    to:   T,
 }
 
 impl<T: PartialOrd> Range<T> {
@@ -1744,11 +1760,11 @@ pub enum KnownDescriptor {
     /// Characteristic Extended Properties Descriptor
     CharacteristicExtendedProperties = 0x2900,
     /// Characteristic User Descriptor
-    CharacteristicUser = 0x2901,
+    CharacteristicUser             = 0x2901,
     /// Client configuration descriptor
-    ClientConfiguration = 0x2902,
+    ClientConfiguration            = 0x2902,
     /// Server configuration descriptor
-    ServerConfiguration = 0x2903,
+    ServerConfiguration            = 0x2903,
     /// Characteristic presentation format
     CharacteristicPresentationFormat = 0x2904,
     /// Characteristic aggregated format

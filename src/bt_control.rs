@@ -120,6 +120,11 @@ where
         self.reset().unwrap();
         self.read_event_uart(uart)?;
 
+        // uart.unpause();
+        // block!(self.get_firmware_revision())?;
+        // self.read_event_uart(uart)?;
+        // uart.pause();
+
         self.reset().unwrap();
         self.read_event_uart(uart)?;
 
@@ -394,6 +399,7 @@ where
         }
     }
 
+    /// blocks, but doesn't use nb::block!
     pub fn _read_event_timeout(
         &mut self,
         timeout: fugit::MillisDurationU32,
@@ -407,6 +413,8 @@ where
         loop {
             match self.read() {
                 Ok(p) => {
+                    self.delay.cancel().unwrap();
+                    self.delay.clear_interrupt(TimerEvent::Update);
                     let bluetooth_hci::host::uart::Packet::Event(e) = p;
                     break Ok(Some(e));
                 }
@@ -462,7 +470,7 @@ where
                 Err(nb::Error::WouldBlock) => {
                     //
                     let k = self.data_ready().unwrap();
-                    uprintln!(uart, "data_ready = {:?}", k);
+                    uprintln!(uart, "rdy = {:?}", k);
                     // unimplemented!()
                 }
                 Err(other) => {
@@ -470,7 +478,6 @@ where
                 }
             }
         };
-        // block!(self.read());
 
         match x {
             Ok(p) => {
