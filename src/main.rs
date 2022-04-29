@@ -178,7 +178,8 @@ mod app {
         bt.unpause_interrupt(&mut exti);
         bt.clear_interrupt();
         // uart.unpause();
-        bt.unpend();
+
+        // bt.unpend();
 
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);

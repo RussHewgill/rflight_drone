@@ -278,12 +278,12 @@ where
         Ok(())
     }
 
-    pub fn _data_ready(&self) -> nb::Result<bool, BTError<SpiError, GpioError>> {
-        self.input
-            .is_high()
-            .map_err(BTError::Gpio)
-            .map_err(nb::Error::Other)
-    }
+    // pub fn _data_ready(&self) -> nb::Result<bool, BTError<SpiError, GpioError>> {
+    //     self.input
+    //         .is_high()
+    //         .map_err(BTError::Gpio)
+    //         .map_err(nb::Error::Other)
+    // }
 
     pub fn data_ready(&self) -> Result<bool, Input::Error> {
         self.input.is_high()

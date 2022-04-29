@@ -241,6 +241,7 @@ fn init_bt_interrupt(
     pa4.trigger_on_edge(exti, stm32f4xx_hal::gpio::Edge::Rising);
     pa4.clear_interrupt_pending_bit();
     pa4.into_input()
+    // pa4.into_input().internal_resistor(Pull::None)
 }
 
 fn init_bt(
@@ -286,7 +287,8 @@ fn init_bt(
     };
 
     // let mut spi = spi1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);
-    let mut spi = spi1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    let mut spi = spi1.spi((sck, miso, mosi), mode, 4.MHz(), &clocks);
+    // let mut spi = spi1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
     // let mut spi = spi1.spi((sck, miso, mosi), mode, 100.kHz(), &clocks);
 
     // let mut buffer = [0u8; 512];
