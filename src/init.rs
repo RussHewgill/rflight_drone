@@ -326,6 +326,7 @@ fn init_clocks(rcc: RCC) -> Clocks {
         // .sysclk(32.MHz())
         // .sysclk(48.MHz())
         .sysclk(64.MHz())
+        // .sysclk(80.MHz())
         // .sysclk(84.MHz())
         // .require_pll48clk()
         .freeze();
