@@ -7,11 +7,13 @@ use super::{UQuat, V3};
 
 // pub use self::madgwick_prev::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct AHRS {
     quat:          UQuat,
     sample_period: f32,
     beta:          f32,
+
+    prev_acc: V3,
 
     cfg_gain:              f32,
     cfg_acc_rejection:     f32,
@@ -33,6 +35,29 @@ pub struct AHRS {
     mag_rejection_timeout: bool,
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct FlightData {
+    /// Rotation using North-West-Up convention
+    pub quat:        UQuat,
+    /// accelerometer measurement with the 1 g of gravity removed
+    pub lin_accel:   V3,
+    /// accelerometer measurement in the Earth coordinate frame with the 1 g of gravity removed
+    pub earth_accel: V3,
+}
+
+impl FlightData {
+    pub fn update(&mut self, ahrs: &AHRS) {
+        self.quat = ahrs.get_quat();
+        self.lin_accel = ahrs.get_linear_accel();
+        self.earth_accel = ahrs.get_earth_accel();
+    }
+
+    /// roll, pitch, yaw
+    pub fn get_euler_angles(&self) -> (f32, f32, f32) {
+        self.quat.euler_angles()
+    }
+}
+
 /// new
 impl AHRS {
     pub const INIT_TIME: f32 = 3.0;
@@ -43,6 +68,8 @@ impl AHRS {
             quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
             sample_period,
             beta,
+
+            prev_acc: V3::zeros(),
 
             cfg_gain: 0.5,
             cfg_acc_rejection: 90.0,
@@ -240,19 +267,19 @@ impl AHRS {
 
     /// Returns the linear acceleration measurement equal to the accelerometer
     /// measurement with the 1 g of gravity removed.
-    pub fn get_linear_accel(&self, acc: V3) -> V3 {
+    pub fn get_linear_accel(&self) -> V3 {
         let q = self.quat.coords;
         let gravity = V3::new(
             2.0 * (q.x * q.z - q.w * q.y),
             2.0 * (q.w * q.x + q.y * q.z),
             2.0 * (q.w * q.w - 0.5 + q.z * q.z),
         );
-        acc - gravity
+        self.prev_acc - gravity
     }
 
     /// Returns the Earth acceleration measurement equal to accelerometer
     /// measurement in the Earth coordinate frame with the 1 g of gravity removed.
-    pub fn get_earth_accel(&self, acc: V3) -> V3 {
+    pub fn get_earth_accel(&self) -> V3 {
         let q = self.quat.coords;
         let qwqw = q.w * q.w; // calculate common terms to avoid repeated operations
         let qwqx = q.w * q.x;
@@ -261,6 +288,8 @@ impl AHRS {
         let qxqy = q.x * q.y;
         let qxqz = q.x * q.z;
         let qyqz = q.y * q.z;
+
+        let acc = &self.prev_acc;
 
         /// transpose of a rotation matrix representation
         /// multiplied with the accelerometer, with 1 g subtracted

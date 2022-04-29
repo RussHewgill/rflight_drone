@@ -143,8 +143,10 @@ pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     // buffer: ArrayVec<u8, 256>,
     buffer: Buffer<'buf, u8>,
 
-    // pub delay: CounterMs<TIM2>,
-    pub delay: Option<FTimerMs<TIM2>>,
+    // pub delay: DelayMs<TIM2>,
+    pub delay: CounterMs<TIM2>,
+
+    // pub delay: Option<FTimerMs<TIM2>>,
 
     // pub buffer: Buffer<'buf, u8>,
     pub state:    BTState,
@@ -166,8 +168,8 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
         reset: Reset,
         input: Input,
         buffer: &'buf mut [u8],
-        // delay: CounterMs<TIM2>,
-        delay: FTimerMs<TIM2>,
+        delay: CounterMs<TIM2>,
+        // delay: FTimerMs<TIM2>,
     ) -> Self {
         Self {
             spi,
@@ -176,7 +178,8 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
             input,
             buffer: Buffer::new(buffer),
 
-            delay: Some(delay),
+            // delay: Some(delay),
+            delay,
 
             state: BTState::Disconnected,
             services: BTServices::default(),
@@ -231,19 +234,27 @@ where
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
 {
+    /// ms must be greater than 1
+    pub fn wait_ms(&mut self, ms: fugit::MillisDurationU32) {
+        // if ms == 1.millis() {
+        //     return;
+        // }
+        use stm32f4xx_hal::timer::Event;
+        self.delay.clear_interrupt(Event::Update);
+        self.delay.start(ms).unwrap();
+        while !self.delay.get_interrupt().contains(Event::Update) {
+            cortex_m::asm::nop();
+        }
+        self.delay.cancel().unwrap();
+        self.delay.clear_interrupt(Event::Update);
+    }
+
     pub fn reset(&mut self) -> nb::Result<(), GpioError> {
-        let mut ftimer = self.delay.take().unwrap();
-        let mut delay: DelayMs<TIM2> = ftimer.delay();
-
         self.reset.set_low().map_err(nb::Error::Other)?;
-        delay.delay(10.millis());
+        self.wait_ms(10.millis());
         self.reset.set_high().map_err(nb::Error::Other)?;
-        delay.delay(10.millis());
-
-        self.delay = Some(delay.release());
-
+        self.wait_ms(10.millis());
         Ok(())
-        // unimplemented!()
     }
 
     #[cfg(feature = "nope")]

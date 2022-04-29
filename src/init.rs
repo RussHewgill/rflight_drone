@@ -111,9 +111,9 @@ pub fn init_all(
 
     // // let mut bt_delay = cp.SYST.delay(&clocks);
     // // let bt_delay = dp.TIM2.delay_ms(&clocks);
-    // let bt_delay = dp.TIM2.counter_ms(&clocks);
 
-    let bt_delay = FTimerMs::new(dp.TIM2, &clocks);
+    let bt_delay = dp.TIM2.counter_ms(&clocks);
+    // let bt_delay = FTimerMs::new(dp.TIM2, &clocks);
 
     let bt_irq = init_bt_interrupt(&mut dp.EXTI, &mut syscfg, gpioa.pa4);
 
@@ -253,8 +253,8 @@ fn init_bt(
     mosi: PA7,
     clocks: &Clocks,
     buf: &'static mut [u8],
-    // delay: CounterMs<TIM2>,
-    delay: FTimerMs<TIM2>,
+    delay: CounterMs<TIM2>,
+    // delay: FTimerMs<TIM2>,
 ) -> BTController<'static> {
     let mut cs = cs
         .internal_resistor(Pull::Up)

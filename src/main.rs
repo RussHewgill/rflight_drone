@@ -80,7 +80,7 @@ mod app {
 
     use crate::bluetooth::gatt::Commands as GattCommands;
     use crate::bluetooth::hal_bt::Commands as HalCommands;
-    use crate::sensors::ahrs::AHRS;
+    use crate::sensors::ahrs::{FlightData, AHRS};
     use crate::sensors::{SensorData, Sensors, UQuat};
     use crate::time::MonoTimer;
     use crate::{bluetooth::gap::Commands as GapCommands, bt_control::BTState};
@@ -98,17 +98,18 @@ mod app {
 
     #[shared]
     struct Shared {
-        dwt:       Dwt,
-        uart:      UART,
-        exti:      EXTI,
-        ahrs:      AHRS,
-        sens_data: SensorData,
+        dwt:         Dwt,
+        uart:        UART,
+        exti:        EXTI,
+        ahrs:        AHRS,
+        sens_data:   SensorData,
+        flight_data: FlightData,
         // bt_chan:  heapless::spsc::Queue<>
-        bt:        BTController<'static>,
+        bt:          BTController<'static>,
         // delay_bt: DelayMs<TIM2>,
         // delay_bt: TIM2,
         // delay_bt:  CounterMs<TIM2>,
-        tim9_flag: bool,
+        tim9_flag:   bool,
     }
 
     #[local]
@@ -165,21 +166,11 @@ mod app {
         let mut bt = init_struct.bt;
         // let mut delay_bt = init_struct.delay_bt;
 
-        // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
-
         uart.pause();
         bt.pause_interrupt(&mut exti);
         // match bt.init_bt(&mut uart, &mut delay_bt) {
         match bt.init_bt(&mut uart) {
-            Ok(()) => {
-                // test_sens::spawn_after(2.secs()).unwrap();
-                // bt.unpause_interrupt(&mut exti);
-                // bt.clear_interrupt();
-                // bt.unpend();
-
-                // init_struct.tim9.start(main_period).unwrap();
-                // init_struct.tim9.listen(stm32f4xx_hal::timer::Event::Update);
-            }
+            Ok(()) => {}
             e => {
                 uprintln!(uart, "init_bt error = {:?}", e);
             }
@@ -187,21 +178,11 @@ mod app {
         bt.unpause_interrupt(&mut exti);
         bt.clear_interrupt();
         // uart.unpause();
-
         bt.unpend();
-
-        // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
-        // const TRANSFER_SIZE: usize = 4;
-        // {
-        //     let writable = bt.buffer.next_mut_slice(TRANSFER_SIZE);
-        //     for i in 0..TRANSFER_SIZE {
-        //         writable[i] = 1 + i as u8;
-        //     }
-        // }
-        // uprintln!(uart, "available_len() = {:?}", bt.buffer.available_len());
 
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
+
         // tim3.start(main_period).unwrap();
         tim3.start(50.Hz()).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
@@ -216,9 +197,6 @@ mod app {
             0.5,
         );
 
-        // let tim2 = delay_bt.release().release();
-        // let delay_bt = tim2.counter_ms(&clocks);
-
         let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
 
         uprintln!(uart, "interval = {:?}", interval);
@@ -229,6 +207,7 @@ mod app {
             exti,
             ahrs,
             sens_data: SensorData::default(),
+            flight_data: FlightData::default(),
             bt,
             // delay_bt,
             tim9_flag: false,
@@ -275,45 +254,47 @@ mod app {
         });
     }
 
-    // #[task(binds = TIM3, shared = [sens_data, tim9_flag], local = [tim3, sensors], priority = 4)]
-    // fn timer_sensors(mut cx: timer_sensors::Context) {
-    //     cx.local
-    //         .tim3
-    //         .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-    //     (cx.shared.sens_data, cx.shared.tim9_flag).lock(|sd, tim9_flag| {
-    //         cx.local.sensors.read_data_mag(sd);
-    //         cx.local.sensors.read_data_imu(sd, false);
-    //         *tim9_flag = true;
-    //     });
-    // }
+    #[cfg(feature = "nope")]
+    // #[task(
+    //     binds = TIM3,
+    //     shared = [ahrs, sens_data, flight_data, tim9_flag],
+    //     local = [tim3, sensors],
+    //     priority = 4
+    // )]
+    fn timer_sensors(mut cx: timer_sensors::Context) {
+        cx.local
+            .tim3
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        (
+            cx.shared.ahrs,
+            cx.shared.sens_data,
+            cx.shared.flight_data,
+            cx.shared.tim9_flag,
+        )
+            .lock(|ahrs, sd, fd, tim9_flag| {
+                /// Read sensor data
+                cx.local.sensors.read_data_mag(sd);
+                cx.local.sensors.read_data_imu(sd, false);
 
-    #[task(shared = [bt, exti, ahrs, sens_data, uart, dwt, tim9_flag],
+                /// update AHRS
+                let gyro = sd.imu_gyro.read_and_reset();
+                let acc = sd.imu_acc.read_and_reset();
+                let mag = sd.magnetometer.read_and_reset();
+                ahrs.update(gyro, acc, mag);
+
+                /// update FlightData
+                fd.update(&ahrs);
+
+                *tim9_flag = true;
+            });
+    }
+
+    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
            local = [], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
-                /// read saved sensor data
-                let data = cx.shared.sens_data.lock(|sd| {
-                    if sd.imu_acc.is_changed() || sd.magnetometer.is_changed() {
-                        let gyro = sd.imu_gyro.read_and_reset();
-                        let acc = sd.imu_acc.read_and_reset();
-                        let mag = sd.magnetometer.read_and_reset();
-                        Some((gyro, acc, mag))
-                    } else {
-                        None
-                    }
-                });
-
-                /// update AHRS
-                if let Some((gyro, acc, mag)) = data {
-                    let quat = cx.shared.ahrs.lock(|ahrs| {
-                        ahrs.update(gyro, acc, mag);
-                        ahrs.get_quat()
-                    });
-                    let (roll, pitch, yaw) = quat.euler_angles();
-
-                    // TODO: PID Outer loop
-                };
+                *tim9_flag = false;
             }
         });
 

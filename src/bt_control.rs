@@ -288,10 +288,6 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
-    // fn handle_event_new_conn(uart: &mut UART) -> ConnectionHandle {
-    //     unimplemented!()
-    // }
-
     fn handle_event_command_complete(
         uart: &mut UART,
         return_params: ReturnParameters<BlueNRGEvent>,
@@ -345,6 +341,7 @@ where
 
     pub fn _read_event(
         &mut self,
+        // timeout: Option<fugit::MillisDurationU32>,
         uart: &mut UART,
     ) -> nb::Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>>
     {
@@ -382,117 +379,23 @@ where
         }
     }
 
-    // fn rewrap_error<E, VE>(e: nb::Error<E>) -> nb::Error<Error<E, VE>> {
-    //     match e {
-    //         nb::Error::WouldBlock => nb::Error::WouldBlock,
-    //         nb::Error::Other(err) => nb::Error::Other(Error::Comm(err)),
-    //     }
-    // }
-
-    #[cfg(feature = "nope")]
-    fn read_event2<Vendor, VE>(
-        &mut self,
-        uart: &mut UART,
-    ) -> nb::Result<bluetooth_hci::Event<Vendor>, BTError<SpiError, GpioError>>
-    where
-        Vendor: bluetooth_hci::event::VendorEvent<Error = VE>,
-        VE: core::fmt::Debug,
-    {
-        use bluetooth_hci::Controller;
-        const MAX_EVENT_LENGTH: usize = 255;
-        const PACKET_HEADER_LENGTH: usize = 1;
-        const EVENT_PACKET_HEADER_LENGTH: usize = 3;
-        const PARAM_LEN_BYTE: usize = 2;
-
-        let param_len = self
-            .peek(PARAM_LEN_BYTE)
-            // .map_err(Self::rewrap_error)
-            ? as usize;
-
-        let mut buf = [0; MAX_EVENT_LENGTH + EVENT_PACKET_HEADER_LENGTH];
-        self.read_into(&mut buf[..EVENT_PACKET_HEADER_LENGTH + param_len])?;
-
-        // crate::event::Event::new(crate::event::Packet(
-        //     &buf[PACKET_HEADER_LENGTH..EVENT_PACKET_HEADER_LENGTH + param_len],
-        // ))
-        // .map_err(|e| nb::Error::Other(Error::BLE(e)))
-
-        // bluetooth_hci::event::Event::new(crate::events::Packet(
-        //     &buf[PACKET_HEADER_LENGTH..EVENT_PACKET_HEADER_LENGTH + param_len],
-        // ))
-
-        Ok(
-            bluetooth_hci::event::Event::new(bluetooth_hci::event::Packet(
-                &buf[PACKET_HEADER_LENGTH..EVENT_PACKET_HEADER_LENGTH + param_len],
-            ))
-            .unwrap(),
-        )
-
-        // unimplemented!()
-
-        // bluetooth_hci::event::Event::new()
-        // Ok(crate::bluetooth::events::BlueNRGEvent::new(
-        //     &buf[PACKET_HEADER_LENGTH..EVENT_PACKET_HEADER_LENGTH + param_len],
-        // )
-        // .unwrap())
-    }
-
-    #[cfg(feature = "nope")]
-    fn read2(
-        &mut self,
-        uart: &mut UART,
-    ) -> nb::Result<
-        bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-        BTError<SpiError, GpioError>,
-    > {
-        use bluetooth_hci::Controller;
-
-        const PACKET_TYPE_HCI_EVENT: u8 = 0x04;
-
-        loop {
-            match self.peek(0) {
-                Ok(PACKET_TYPE_HCI_EVENT) => {
-                    // return Ok(bluetooth_hci::host::uart::Packet::Event(
-                    //     bluetooth_hci::Event::Vendor(self.read_event2(uart).unwrap()),
-                    // ))
-                    return Ok(bluetooth_hci::host::uart::Packet::Event(
-                        self.read_event2(uart).unwrap(),
-                    ));
-                }
-                Ok(x) => {
-                    panic!("read2, other = {:?}", x);
-                }
-                Err(nb::Error::WouldBlock) => {}
-                Err(e) => {
-                    panic!("read2, error = {:?}", e);
-                }
-            }
-        }
-    }
-
     pub fn ignore_event_timeout(
         &mut self,
-        // uart: &mut UART,
-        // delay: &mut CounterMs<TIM2>,
         timeout: fugit::MillisDurationU32,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         use bluetooth_hci::Controller;
+        use stm32f4xx_hal::timer::Event as TimerEvent;
 
-        let mut ftimer = self.delay.take().unwrap();
-        let mut delay = ftimer.counter();
-
-        delay.start(1000.millis()).unwrap();
-        let start = delay.now();
-        let end = start + timeout;
+        self.delay.clear_interrupt(TimerEvent::Update);
+        self.delay.start(timeout).unwrap();
 
         let p = loop {
             match self.read() {
                 Ok(p) => break p,
                 Err(nb::Error::WouldBlock) => {
-                    let now = delay.now();
-                    if now >= end {
-                        delay.cancel().unwrap();
-                        self.delay = Some(delay.release());
+                    if self.delay.get_interrupt().contains(TimerEvent::Update) {
+                        self.delay.cancel().unwrap();
+                        self.delay.clear_interrupt(TimerEvent::Update);
                         return Ok(());
                     }
                 }
@@ -501,9 +404,6 @@ where
                 }
             }
         };
-
-        delay.cancel().unwrap();
-        self.delay = Some(delay.release());
 
         let bluetooth_hci::host::uart::Packet::Event(e) = p;
         // uprintln!(uart, "event = {:?}", &e);

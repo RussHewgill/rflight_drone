@@ -121,6 +121,7 @@ where
         &mut self,
         uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        self.wait_ms(2.millis());
         let params = AddServiceParameters {
             uuid:                  UUID_CONSOLE_LOG_SERVICE,
             service_type:          crate::bluetooth::gatt::ServiceType::Primary,
@@ -133,6 +134,8 @@ where
             _ => unimplemented!(),
         };
         uprintln!(uart, "service = {:?}", service);
+
+        self.wait_ms(2.millis());
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
@@ -151,11 +154,10 @@ where
         };
         block!(self.add_characteristic(&params0))?;
 
-        uprintln!(uart, "wat 0");
+        // uprintln!(uart, "wat 0");
+        // block!(self.add_characteristic(&params0))?;
 
-        block!(self.add_characteristic(&params0))?;
-
-        uprintln!(uart, "wat 1");
+        // uprintln!(uart, "wat 1");
         // let params1 = AddCharacteristicParameters {
         //     service_handle: service.service_handle,
         //     characteristic_uuid: UUID_CONSOLE_LOG_CHAR_WRITE,
