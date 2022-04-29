@@ -106,7 +106,7 @@ where
         &mut self,
         uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        self.init_console_log_service(uart)?;
+        self.init_log_service(uart)?;
         // self.init_sensor_service(uart)?;
         Ok(())
     }
@@ -278,6 +278,54 @@ where
     //
 }
 
+/// send commands
+#[cfg(feature = "nope")]
+impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+where
+    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+        + hal::blocking::spi::Write<u8, Error = SpiError>,
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+    Input: InputPin<Error = GpioError>,
+    GpioError: core::fmt::Debug,
+{
+    pub fn send_command_timeout_retry<C>(
+        &mut self,
+        timeout: fugit::MillisDurationU32,
+        command: C,
+    ) -> nb::Result<
+        crate::bluetooth::ev_command::ReturnParameters,
+        BTError<SpiError, GpioError>,
+    >
+    where
+        C: FnOnce(
+            &mut BluetoothSpi<'buf, SPI, CS, Reset, Input>,
+        ) -> nb::Result<(), BTError<SpiError, GpioError>>,
+    {
+        // block!(command(self))?;
+
+        // self.delay.clear_interrupt(TimerEvent::Update);
+        // self.delay.start(timeout).unwrap();
+        // let p = loop {
+        //     match self.read() {
+        //         Ok(p) => break p,
+        //         Err(nb::Error::WouldBlock) => {
+        //             if self.delay.get_interrupt().contains(TimerEvent::Update) {
+        //                 self.delay.cancel().unwrap();
+        //                 self.delay.clear_interrupt(TimerEvent::Update);
+        //                 return Ok(());
+        //             }
+        //         }
+        //         Err(e) => {
+        //             panic!("error 1 = {:?}", e);
+        //         }
+        //     }
+        // };
+
+        unimplemented!()
+    }
+}
+
 /// read and handle events
 impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
 where
@@ -310,8 +358,9 @@ where
 
     pub fn read_event_params(
         &mut self,
+        // timeout: Option<fugit::MillisDurationU32>,
         uart: &mut UART,
-    ) -> nb::Result<
+    ) -> Result<
         bluetooth_hci::event::command::ReturnParameters<BlueNRGEvent>,
         BTError<SpiError, GpioError>,
     > {
@@ -323,8 +372,9 @@ where
 
     pub fn read_event_params_vendor(
         &mut self,
+        // timeout: Option<fugit::MillisDurationU32>,
         uart: &mut UART,
-    ) -> nb::Result<
+    ) -> Result<
         crate::bluetooth::ev_command::ReturnParameters,
         BTError<SpiError, GpioError>,
     > {
@@ -339,12 +389,54 @@ where
         }
     }
 
+    pub fn _read_event_timeout(
+        &mut self,
+        timeout: fugit::MillisDurationU32,
+        uart: &mut UART,
+    ) -> Result<Option<bluetooth_hci::Event<BlueNRGEvent>>, BTError<SpiError, GpioError>>
+    {
+        use stm32f4xx_hal::timer::Event as TimerEvent;
+
+        self.delay.clear_interrupt(TimerEvent::Update);
+        self.delay.start(timeout).unwrap();
+        loop {
+            match self.read() {
+                Ok(p) => {
+                    let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                    break Ok(Some(e));
+                }
+                Err(nb::Error::WouldBlock) => {
+                    if self.delay.get_interrupt().contains(TimerEvent::Update) {
+                        self.delay.cancel().unwrap();
+                        self.delay.clear_interrupt(TimerEvent::Update);
+                        return Ok(None);
+                    }
+                }
+                Err(nb::Error::Other(e)) => {
+                    match e {
+                        bluetooth_hci::host::uart::Error::Comm(e) => {
+                            uprintln!(uart, "error 0 = {:?}", e);
+                        }
+                        bluetooth_hci::host::uart::Error::BadPacketType(e) => {
+                            uprintln!(uart, "error 1 = {:?}", e);
+                        }
+                        bluetooth_hci::host::uart::Error::BLE(e) => {
+                            uprintln!(uart, "error 2 = {:?}", e);
+                        }
+                    }
+                    unimplemented!("_read_event_timeout");
+                    // panic!("error 1 = {:?}", e);
+                }
+            }
+        }
+    }
+
     pub fn _read_event(
         &mut self,
         // timeout: Option<fugit::MillisDurationU32>,
         uart: &mut UART,
-    ) -> nb::Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>>
-    {
+        // ) -> nb::Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>>
+    ) -> Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>> {
         let x: Result<
             bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
             bluetooth_hci::host::uart::Error<

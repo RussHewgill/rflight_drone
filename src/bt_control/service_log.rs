@@ -1,3 +1,4 @@
+use bluetooth_hci::{event::command::ReturnParameters, Event};
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
@@ -117,23 +118,54 @@ where
         Ok(())
     }
 
-    pub fn init_console_log_service(
+    pub fn init_log_service(
         &mut self,
         uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        self.wait_ms(2.millis());
+        self.wait_ms(25.millis());
+
         let params = AddServiceParameters {
             uuid:                  UUID_CONSOLE_LOG_SERVICE,
             service_type:          crate::bluetooth::gatt::ServiceType::Primary,
             max_attribute_records: 8,
         };
-        block!(self.add_service(&params))?;
 
+        block!(self.add_service(&params))?;
+        self.wait_ms(25.millis());
+        // uprintln!(uart, "wat 0");
         let service: GattService = match self.read_event_params_vendor(uart)? {
             VReturnParameters::GattAddService(service) => service,
-            _ => unimplemented!(),
+            other => {
+                panic!("other 0 = {:?}", other);
+            }
         };
         uprintln!(uart, "service = {:?}", service);
+
+        // let service: GattService = loop {
+        //     block!(self.add_service(&params))?;
+        //     match block!(self._read_event_timeout(5.millis(), uart)) {
+        //         Ok(Some(e)) => match e {
+        //             Event::CommandComplete(params) => match params.return_params {
+        //                 ReturnParameters::Vendor(vs) => match vs {
+        //                     VReturnParameters::GattAddService(service) => break service,
+        //                     other => {
+        //                         uprintln!(uart, "other 0 = {:?}", other);
+        //                     }
+        //                 },
+        //                 other => {
+        //                     uprintln!(uart, "other 1 = {:?}", other);
+        //                 }
+        //             },
+        //             other => {
+        //                 uprintln!(uart, "other 2 = {:?}", other);
+        //             }
+        //         },
+        //         Ok(None) => {
+        //             block!(self.add_service(&params))?;
+        //         }
+        //         Err(e) => panic!("init_log_service error = {:?}", e),
+        //     }
+        // };
 
         self.wait_ms(2.millis());
 
@@ -174,9 +206,9 @@ where
 
         // block!(self.read_event(uart))?;
 
-        let c = match block!(self.read_event_params_vendor(uart))? {
+        let c = match self.read_event_params_vendor(uart)? {
             VReturnParameters::GattAddCharacteristic(c) => c,
-            _ => unimplemented!(),
+            other => unimplemented!("other = {:?}", other),
         };
 
         uprintln!(uart, "c = {:?}", c);

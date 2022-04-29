@@ -377,7 +377,7 @@ mod app {
             bt.clear_interrupt();
             bt.pause_interrupt(exti);
 
-            let event: BTEvent = match block!(bt._read_event(uart)) {
+            let event: BTEvent = match bt._read_event(uart) {
                 Ok(ev) => ev,
                 Err(e) => {
                     uprintln!(uart, "read event error = {:?}", e);
