@@ -586,9 +586,9 @@ mod spi3 {
 
     /// read, send
     impl Spi3 {
-        pub fn send_mult(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
-            unimplemented!()
-        }
+        // pub fn send_mult(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
+        //     unimplemented!()
+        // }
 
         pub fn send_blocking(&mut self, byte: u8) -> nb::Result<(), SpiError> {
             while self.spi_is_busy() {

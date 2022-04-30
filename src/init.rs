@@ -63,6 +63,7 @@ pub struct InitStruct {
     // pub sensors:  (SensSpi, Pin<'B', 12, Output>),
     pub bt:      BTController<'static>,
     // pub delay_bt: DelayMs<TIM2>,
+    pub tim9:    TIM9,
 }
 
 pub fn init_all(
@@ -139,7 +140,7 @@ pub fn init_all(
         mono,
         sensors,
         bt,
-        // delay_bt: bt_delay,
+        tim9: dp.TIM9,
     }
 }
 

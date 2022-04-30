@@ -79,15 +79,13 @@ where
         Ok((status & 0b0000_1000) == 0b1000)
     }
 
-    pub fn read_temp(&mut self, spi: &mut Spi3) -> nb::Result<i16, SpiError> {
-        let temp_l = self.read_reg(spi, MagRegister::TEMP_OUT_L_REG)?;
-        let temp_h = self.read_reg(spi, MagRegister::TEMP_OUT_H_REG)?;
-
-        // hprintln!("temp_l: {:#010b}", temp_l);
-        // hprintln!("temp_h: {:#010b}", temp_h);
-
-        Ok(0)
-    }
+    // pub fn read_temp(&mut self, spi: &mut Spi3) -> nb::Result<i16, SpiError> {
+    //     let temp_l = self.read_reg(spi, MagRegister::TEMP_OUT_L_REG)?;
+    //     let temp_h = self.read_reg(spi, MagRegister::TEMP_OUT_H_REG)?;
+    //     // hprintln!("temp_l: {:#010b}", temp_l);
+    //     // hprintln!("temp_h: {:#010b}", temp_h);
+    //     Ok(0)
+    // }
 
     pub fn read_data(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
         // pub fn read_data(&mut self, spi: &mut Spi3) -> nb::Result<[i16; 3], SpiError> {

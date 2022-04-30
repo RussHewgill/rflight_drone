@@ -56,6 +56,8 @@ where
         ))
     }
 
+    /// needs short wait before data is ready, even if status register is high
+    /// about 50 nops
     pub fn one_shot(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
         let current = self.read_reg(spi, BaroRegister::CTRL_REG2)?;
         self.write_reg(spi, BaroRegister::CTRL_REG2, current | 0b1)?;
@@ -80,16 +82,15 @@ where
     }
 
     pub fn read_temperature_data(&mut self, spi: &mut Spi3) -> nb::Result<f32, SpiError> {
-        // let mut data = [0u8; 2];
-        let h = self.read_reg(spi, BaroRegister::TEMP_OUT_H)?;
-        let l = self.read_reg(spi, BaroRegister::TEMP_OUT_L)?;
+        let mut data = [0u8; 2];
+        self.read_reg_mult(spi, BaroRegister::TEMP_OUT_L, &mut data)?;
 
         unimplemented!()
     }
 
-    fn convert_raw_data(h: u8, m: u8, xl: u8) -> f32 {
+    fn convert_raw_data(xl: u8, l: u8, h: u8) -> f32 {
         const SCALE: f32 = 4096.0;
-        let xs: [u8; 4] = [0, h, m, xl];
+        let xs: [u8; 4] = [0, h, l, xl];
         u32::from_be_bytes(xs) as f32 / SCALE
     }
 }

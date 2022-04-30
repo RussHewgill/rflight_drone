@@ -39,6 +39,7 @@ impl<CS> IMU<CS> {
 const SPI_READ: u8 = 0x80; // 0x01 << 7
 const SPI_WRITE: u8 = 0x00;
 
+/// Init
 impl<CS, PinError> IMU<CS>
 where
     // CS: hal::digital::blocking::OutputPin<Error = PinError>,
@@ -157,6 +158,21 @@ where
         ];
 
         Ok((gyro, acc))
+    }
+
+    pub fn read_temperature_data(&mut self, spi: &mut Spi3) -> nb::Result<f32, SpiError> {
+        let mut data = [0u8; 2];
+        self.read_reg_mult(spi, IMURegister::OUT_TEMP_L, &mut data)?;
+
+        let l = data[0];
+        let h = data[1];
+
+        let t = l as i16 | ((h as i16) << 8);
+
+        let t = t as f32 / 256.0;
+        let t = t + 25.0;
+
+        Ok(t)
     }
 
     fn convert_raw_data(l: u8, h: u8, scale: f32) -> f32 {

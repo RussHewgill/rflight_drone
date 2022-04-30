@@ -206,6 +206,9 @@ mod app {
                 ;
             baro.write_reg(spi, BaroRegister::CTRL_REG2, val2).unwrap();
 
+            // let val4 = 0b1; // enable low-current mode
+            // baro.write_reg(spi, BaroRegister::RES_CONF, val4).unwrap();
+
             // baro.init(spi).unwrap();
 
             // let b = baro
@@ -216,43 +219,83 @@ mod app {
             // baro.one_shot(spi).unwrap();
             // baro.set_data_rate(spi, BaroDataRate::R10).unwrap();
 
-            while !baro.read_new_data_available(spi).unwrap().0 {
+            while !baro.read_new_data_available(spi).unwrap().1 {
                 uprintln!(uart, "no data");
             }
 
-            // let h = baro.read_reg(spi, BaroRegister::TEMP_OUT_H).unwrap();
-            // let l = baro.read_reg(spi, BaroRegister::TEMP_OUT_L).unwrap();
+            // bt.wait_ms(2.millis());
 
-            let xl = baro.read_reg(spi, BaroRegister::PRESS_OUT_XL).unwrap();
-            // uprintln!(uart, "xl = {:#08b}", xl);
-            bt.wait_ms(2.millis());
-            // cortex_m::asm::dsb();
-            let m = baro.read_reg(spi, BaroRegister::PRESS_OUT_L).unwrap();
-            // uprintln!(uart, "m  = {:#08b}", m);
-            bt.wait_ms(2.millis());
-            // cortex_m::asm::dsb();
-            let h = baro.read_reg(spi, BaroRegister::PRESS_OUT_H).unwrap();
-            // uprintln!(uart, "h  = {:#08b}", h);
+            // let mut tt = init_struct.tim9.delay_us(&clocks);
+            // tt.delay(100_000.micros());
 
-            const SCALE: f32 = 4096.0;
-            let xs: [u8; 4] = [0, h, m, xl];
-            let x = u32::from_be_bytes(xs) as f32 / SCALE;
-            uprintln!(uart, "x = {:?}", x);
+            // bt.wait_ms(100.millis());
+
+            for _ in 0..50 {
+                cortex_m::asm::nop();
+            }
 
             // let mut data = [0u8; 3];
-            // baro.read_reg_mult(
-            //     spi,
-            //     crate::sensors::barometer::BaroRegister::PRESS_OUT_XL,
-            //     &mut data,
-            // )
-            // .unwrap();
-
-            // for d in data.iter() {
-            //     uprintln!(uart, "d = {:#08b}", d);
-            // }
-
-            // let x = baro.read_data(spi).unwrap();
+            // baro.read_reg_mult(spi, BaroRegister::PRESS_OUT_XL, &mut data)
+            //     .unwrap();
+            // let xl = data[0];
+            // let l = data[1];
+            // let h = data[2];
+            // uprintln!(uart, "xl = {:#08b}", xl);
+            // uprintln!(uart, "l  = {:#08b}", l);
+            // uprintln!(uart, "h  = {:#08b}", h);
+            // const SCALE: f32 = 4096.0;
+            // let xs: [u8; 4] = [0, h, l, xl];
+            // let x = u32::from_be_bytes(xs) as f32 / SCALE;
             // uprintln!(uart, "x = {:?}", x);
+
+            let x = baro.read_data(spi).unwrap();
+            uprintln!(uart, "pressure = {:?}", x);
+
+            let mut data = [0u8; 2];
+            baro.read_reg_mult(spi, BaroRegister::TEMP_OUT_L, &mut data)
+                .unwrap();
+            let l = data[0];
+            let h = data[1];
+
+            // let l = baro.read_reg(spi, BaroRegister::TEMP_OUT_L).unwrap();
+            // let h = baro.read_reg(spi, BaroRegister::TEMP_OUT_H).unwrap();
+
+            uprintln!(uart, "l = {:#010b}", l);
+            uprintln!(uart, "h = {:#010b}", h);
+
+            let x = l as i16 | ((h as i16) << 8);
+            // let x = l as u16 + ((h as u16) << 8);
+            // let x = x as i16;
+
+            // let x = i16::from_be_bytes([h, l]);
+
+            // let x = (x as f32 * 10.0) / 100.0;
+
+            uprintln!(uart, "x = {:?}", x);
+
+            //
+        });
+
+        sensors.with_spi_imu(|spi, imu| {
+            use crate::sensors::imu::*;
+            // let t = imu.read_temperature_data(spi).unwrap();
+
+            let mut data = [0u8; 2];
+            imu.read_reg_mult(spi, IMURegister::OUT_TEMP_L, &mut data)
+                .unwrap();
+
+            let l = data[0];
+            let h = data[1];
+
+            uprintln!(uart, "l = {:#10b}", l);
+            uprintln!(uart, "h = {:#10b}", h);
+
+            let t = l as i16 | ((h as i16) << 8);
+
+            let t = t as f32 / 256.0;
+            let t = t + 25.0;
+
+            uprintln!(uart, "t = {:?}", t);
         });
 
         // let p_xl = 0b1000_1101;
