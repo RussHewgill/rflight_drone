@@ -146,7 +146,6 @@ where
 
 impl<CS, PinError> Magnetometer<CS>
 where
-    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
     CS: OutputPin<Error = PinError>,
 {
     pub fn read_reg_mult(

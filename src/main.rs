@@ -115,16 +115,10 @@ mod app {
     #[local]
     struct Local {
         //
-        sensors:  Sensors,
-        tim3:     CounterHz<TIM3>,
-        interval: MillisDurationU32,
+        sensors: Sensors,
+        tim3:    CounterHz<TIM3>,
+        // interval: MillisDurationU32,
     }
-
-    // #[monotonic(binds = SysTick, default = true)]
-    // type MonoTick = DwtSystick<1_000>; // 1000 Hz
-
-    // #[monotonic(binds = SysTick, default = true)]
-    // type MonoTick = Systick<1_000>; // 1000 Hz
 
     #[monotonic(binds = TIM5, default = true)]
     type MonoTick = MonoTimer<TIM5, 1_000_000>; // 1 MHz
@@ -148,13 +142,15 @@ mod app {
         let clocks = init_struct.clocks;
         let mono = init_struct.mono;
         let mut exti = init_struct.exti;
+        let mut sensors = init_struct.sensors;
+        let mut bt = init_struct.bt;
 
-        uprintln!(uart, "hclk()     = {:?}", clocks.hclk());
-        uprintln!(uart, "sysclk()   = {:?}", clocks.sysclk());
-        uprintln!(uart, "pclk1()    = {:?}", clocks.pclk1());
-        uprintln!(uart, "pclk2()    = {:?}", clocks.pclk2());
-        uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
-        uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
+        // uprintln!(uart, "hclk()     = {:?}", clocks.hclk());
+        // uprintln!(uart, "sysclk()   = {:?}", clocks.sysclk());
+        // uprintln!(uart, "pclk1()    = {:?}", clocks.pclk1());
+        // uprintln!(uart, "pclk2()    = {:?}", clocks.pclk2());
+        // uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
+        // uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
 
         // hprintln!("hclk()     = {:?}", clocks.hclk());
         // hprintln!("sysclk()   = {:?}", clocks.sysclk());
@@ -163,33 +159,110 @@ mod app {
         // hprintln!("pll48clk() = {:?}", clocks.pll48clk());
         // hprintln!("i2s_clk()  = {:?}", clocks.i2s_clk());
 
-        let mut bt = init_struct.bt;
-        // let mut delay_bt = init_struct.delay_bt;
-
-        uart.pause();
-        bt.pause_interrupt(&mut exti);
-        // match bt.init_bt(&mut uart, &mut delay_bt) {
-        match bt.init_bt(&mut uart) {
-            Ok(()) => {}
-            e => {
-                uprintln!(uart, "init_bt error = {:?}", e);
-            }
-        }
-        bt.unpause_interrupt(&mut exti);
-        bt.clear_interrupt();
-        // uart.unpause();
+        // uart.pause();
+        // bt.pause_interrupt(&mut exti);
+        // // match bt.init_bt(&mut uart, &mut delay_bt) {
+        // match bt.init_bt(&mut uart) {
+        //     Ok(()) => {}
+        //     e => {
+        //         uprintln!(uart, "init_bt error = {:?}", e);
+        //     }
+        // }
+        // bt.unpause_interrupt(&mut exti);
+        // bt.clear_interrupt();
+        // // uart.unpause();
 
         // bt.unpend();
 
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        // tim3.start(main_period).unwrap();
-        tim3.start(50.Hz()).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // // tim3.start(main_period).unwrap();
+        // tim3.start(50.Hz()).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         // /// No debug
         // uart.pause();
+
+        use crate::sensors::barometer::*;
+
+        sensors.with_spi_baro(|spi, baro| {
+            // let val2 = 0b0100; // SW reset
+            // baro.write_reg(spi, BaroRegister::CTRL_REG2, val2).unwrap();
+            // bt.wait_ms(10.millis());
+
+            let val1 = 0b0000_0000
+                // | 0b0010_0000 // 10 Hz
+                | 0b0000_0000 // PowerDown
+                | 0b1 // 3-wire
+                | 0b10 // BDU
+                ;
+            baro.write_reg(spi, BaroRegister::CTRL_REG1, val1).unwrap();
+
+            let val2 = 0b0
+                | 0b0001_0000 // address increment
+                | 0b1000 // disable i2c
+                | 0b0001 // one shot mode
+                ;
+            baro.write_reg(spi, BaroRegister::CTRL_REG2, val2).unwrap();
+
+            // baro.init(spi).unwrap();
+
+            // let b = baro
+            //     .read_reg(spi, crate::sensors::barometer::BaroRegister::WHO_AM_I)
+            //     .unwrap();
+            // uprintln!(uart, "b = {:#08b}", b);
+
+            // baro.one_shot(spi).unwrap();
+            // baro.set_data_rate(spi, BaroDataRate::R10).unwrap();
+
+            while !baro.read_new_data_available(spi).unwrap().0 {
+                uprintln!(uart, "no data");
+            }
+
+            // let h = baro.read_reg(spi, BaroRegister::TEMP_OUT_H).unwrap();
+            // let l = baro.read_reg(spi, BaroRegister::TEMP_OUT_L).unwrap();
+
+            let xl = baro.read_reg(spi, BaroRegister::PRESS_OUT_XL).unwrap();
+            // uprintln!(uart, "xl = {:#08b}", xl);
+            bt.wait_ms(2.millis());
+            // cortex_m::asm::dsb();
+            let m = baro.read_reg(spi, BaroRegister::PRESS_OUT_L).unwrap();
+            // uprintln!(uart, "m  = {:#08b}", m);
+            bt.wait_ms(2.millis());
+            // cortex_m::asm::dsb();
+            let h = baro.read_reg(spi, BaroRegister::PRESS_OUT_H).unwrap();
+            // uprintln!(uart, "h  = {:#08b}", h);
+
+            const SCALE: f32 = 4096.0;
+            let xs: [u8; 4] = [0, h, m, xl];
+            let x = u32::from_be_bytes(xs) as f32 / SCALE;
+            uprintln!(uart, "x = {:?}", x);
+
+            // let mut data = [0u8; 3];
+            // baro.read_reg_mult(
+            //     spi,
+            //     crate::sensors::barometer::BaroRegister::PRESS_OUT_XL,
+            //     &mut data,
+            // )
+            // .unwrap();
+
+            // for d in data.iter() {
+            //     uprintln!(uart, "d = {:#08b}", d);
+            // }
+
+            // let x = baro.read_data(spi).unwrap();
+            // uprintln!(uart, "x = {:?}", x);
+        });
+
+        // let p_xl = 0b1000_1101;
+        // let p_l = 0b1111_0101;
+        // let p_h = 0b0011_1111;
+        // let xs: [u8; 4] = [0, p_h, p_l, p_xl];
+        // let k = u32::from_be_bytes(xs);
+        // uprintln!(uart, "k = {:?}", k);
+        // let k0 = k as f32 / 4096.0;
+        // uprintln!(uart, "k0 = {:?}", k0);
 
         let ahrs = AHRS::new(
             // 1.0 / 800.0, // 1.25 ms
@@ -198,9 +271,8 @@ mod app {
             0.5,
         );
 
-        let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
-
-        uprintln!(uart, "interval = {:?}", interval);
+        // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
+        // uprintln!(uart, "interval = {:?}", interval);
 
         let shared = Shared {
             dwt: init_struct.dwt,
@@ -215,9 +287,9 @@ mod app {
         };
 
         let local = Local {
-            sensors: init_struct.sensors,
+            sensors,
             tim3,
-            interval,
+            // interval,
         };
 
         // // timer_sensors::spawn_after(1.secs()).unwrap();
