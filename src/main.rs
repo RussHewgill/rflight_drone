@@ -251,27 +251,30 @@ mod app {
             let x = baro.read_data(spi).unwrap();
             uprintln!(uart, "pressure = {:?}", x);
 
-            let mut data = [0u8; 2];
-            baro.read_reg_mult(spi, BaroRegister::TEMP_OUT_L, &mut data)
-                .unwrap();
-            let l = data[0];
-            let h = data[1];
+            let t = baro.read_temperature_data(spi).unwrap();
+            uprintln!(uart, "t = {:?}", t);
+
+            // let mut data = [0u8; 2];
+            // baro.read_reg_mult(spi, BaroRegister::TEMP_OUT_L, &mut data)
+            //     .unwrap();
+            // let l = data[0];
+            // let h = data[1];
 
             // let l = baro.read_reg(spi, BaroRegister::TEMP_OUT_L).unwrap();
             // let h = baro.read_reg(spi, BaroRegister::TEMP_OUT_H).unwrap();
 
-            uprintln!(uart, "l = {:#010b}", l);
-            uprintln!(uart, "h = {:#010b}", h);
+            // uprintln!(uart, "l = {:#010b}", l);
+            // uprintln!(uart, "h = {:#010b}", h);
 
-            let x = l as i16 | ((h as i16) << 8);
-            // let x = l as u16 + ((h as u16) << 8);
-            // let x = x as i16;
+            // let x = l as i16 | ((h as i16) << 8);
+            // // let x = l as u16 + ((h as u16) << 8);
+            // // let x = x as i16;
 
             // let x = i16::from_be_bytes([h, l]);
 
             // let x = (x as f32 * 10.0) / 100.0;
 
-            uprintln!(uart, "x = {:?}", x);
+            // uprintln!(uart, "x = {:?}", x);
 
             //
         });

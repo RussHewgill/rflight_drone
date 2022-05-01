@@ -85,7 +85,11 @@ where
         let mut data = [0u8; 2];
         self.read_reg_mult(spi, BaroRegister::TEMP_OUT_L, &mut data)?;
 
-        unimplemented!()
+        let l = data[0];
+        let h = data[1];
+        let t = l as i16 | ((h as i16) << 8);
+
+        Ok(t as f32 / 100.0)
     }
 
     fn convert_raw_data(xl: u8, l: u8, h: u8) -> f32 {
