@@ -178,11 +178,94 @@ mod app {
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        tim3.start(sensor_period).unwrap();
-        // tim3.start(50.Hz()).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // tim3.start(sensor_period).unwrap();
+        // // tim3.start(50.Hz()).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        init_sensors(&mut sensors);
+        // init_sensors(&mut sensors);
+
+        sensors.with_spi_imu(|spi, imu| {
+            use crate::sensors::imu::*;
+
+            // imu.reset(spi).unwrap();
+            // bt.wait_ms(10.millis());
+
+            // imu.init(spi, cfg)
+
+            /// Accelerometer
+            imu.write_reg(spi, IMURegister::CTRL1_XL, 0b0100_0000) // 104 Hz
+                // imu.write_reg(spi, IMURegister::CTRL1_XL, 0b0110_0000) // 416 Hz
+                // imu.write_reg(spi, IMURegister::CTRL1_XL, 0b0111_0000) // 833 Hz
+                .unwrap();
+
+            /// Gyro
+            /// ODR_GL = 0100 = 104 Hz Normal mode
+            imu.write_reg(spi, IMURegister::CTRL2_G, 0b0100_0000)
+                .unwrap();
+
+            let val = 0b0000_0000
+                        | 0b0100_0000 // Block Data Update
+                        | 0b1000 // SIM
+                        | 0b0100; // IF_INC
+
+            /// BDU = 1, Block Data Update
+            /// SIM = 1, 3 wire SPI mode
+            /// IF_INC = 1, increment on multiple byte access
+            imu.write_reg(spi, IMURegister::CTRL3_C, val).unwrap();
+
+            // while !imu.read_new_data_available(spi).unwrap()[2] {
+            //     uprintln!(uart, "no data");
+            //     // cortex_m::asm::nop();
+            // }
+
+            loop {
+                let [r0, r1, r2] = imu.read_new_data_available(spi).unwrap();
+                if r1 && r2 {
+                    break;
+                }
+                uprintln!(uart, "no data");
+            }
+
+            let (data_gyro, data_acc) = imu.read_data(spi).unwrap();
+
+            uprintln!(uart, "data_gyro = {:?}", data_gyro);
+            uprintln!(uart, "data_acc = {:?}", data_acc);
+
+            // let outx_l = imu.read_reg(spi, IMURegister::OUTX_L_XL).unwrap();
+            // let outx_h = imu.read_reg(spi, IMURegister::OUTX_H_XL).unwrap();
+            // let outy_l = imu.read_reg(spi, IMURegister::OUTY_L_XL).unwrap();
+            // let outy_h = imu.read_reg(spi, IMURegister::OUTY_H_XL).unwrap();
+            // let outz_l = imu.read_reg(spi, IMURegister::OUTZ_L_XL).unwrap();
+            // let outz_h = imu.read_reg(spi, IMURegister::OUTZ_H_XL).unwrap();
+
+            // uprintln!(uart, "outx_l = {:?}", outx_l);
+            // uprintln!(uart, "outx_h = {:?}", outx_h);
+            // uprintln!(uart, "outy_l = {:?}", outy_l);
+            // uprintln!(uart, "outy_h = {:?}", outy_h);
+            // uprintln!(uart, "outz_l = {:?}", outz_l);
+            // uprintln!(uart, "outz_h = {:?}", outz_h);
+
+            // let mut data = [0u8; 6];
+            // imu.read_reg_mult(spi, IMURegister::OUTX_L_XL, &mut data)
+            //     .unwrap();
+
+            // let d = imu.read_reg(spi, IMURegister::WHO_AM_I).unwrap();
+            // uprintln!(uart, "d = {:#010b}", d);
+
+            // let mut data = [0u8; 4];
+            // imu.read_reg_mult(spi, IMURegister::WHO_AM_I, &mut data)
+            //     .unwrap();
+
+            // for d in data.iter() {
+            //     uprintln!(uart, "d = {:#010b}", d);
+            // }
+
+            // let (l, h) = (data[0], data[1]);
+            // let v0 = l as i16 | ((h as i16) << 8);
+            // uprintln!(uart, "v0 = {:?}", v0);
+
+            //
+        });
 
         // /// No debug
         // uart.pause();
@@ -223,7 +306,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -256,13 +339,13 @@ mod app {
         });
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(
-        binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag],
-        local = [tim3, sensors],
-        priority = 4
-    )]
+    #[cfg(feature = "nope")]
+    // #[task(
+    //     binds = TIM3,
+    //     shared = [ahrs, sens_data, flight_data, tim9_flag, uart],
+    //     local = [tim3, sensors],
+    //     priority = 4
+    // )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -272,8 +355,9 @@ mod app {
             cx.shared.sens_data,
             cx.shared.flight_data,
             cx.shared.tim9_flag,
+            cx.shared.uart,
         )
-            .lock(|ahrs, sd, fd, tim9_flag| {
+            .lock(|ahrs, sd, fd, tim9_flag, uart| {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
@@ -287,38 +371,66 @@ mod app {
                 /// update FlightData
                 fd.update(&ahrs);
 
+                print_v3(uart, acc);
+
                 *tim9_flag = true;
             });
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-           local = [], priority = 3)]
+    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag, ahrs, sens_data],
+           local = [sensors], priority = 3)]
+    fn main_loop(mut cx: main_loop::Context) {
+        (
+            cx.shared.ahrs,
+            cx.shared.sens_data,
+            cx.shared.flight_data,
+            cx.shared.tim9_flag,
+            cx.shared.uart,
+        )
+            .lock(|ahrs, sd, fd, tim9_flag, uart| {
+                // /// Read sensor data
+                // cx.local.sensors.read_data_mag(sd);
+                // cx.local.sensors.read_data_imu(sd, false);
+                // let gyro = sd.imu_gyro.read_and_reset();
+                // let acc = sd.imu_acc.read_and_reset();
+                // let mag = sd.magnetometer.read_and_reset();
+                // uprintln!(uart, "acc = {:?}", acc);
+
+                //
+            });
+
+        // main_loop::spawn_after(100.millis()).unwrap();
+        // // main_loop::spawn().unwrap();
+
+        //
+    }
+
+    #[cfg(feature = "nope")]
+    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+    // local = [], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
                 *tim9_flag = false;
 
-                (cx.shared.uart, cx.shared.flight_data).lock(|uart, fd| {
-                    // uprintln!(uart, "fd.lin_accel = {:?}", fd.lin_accel);
-                    // uprintln!(uart, "fd.earth_accel = {:?}", fd.earth_accel);
-                    // uprintln!(uart, "fd.est_velocity = {:?}", fd.est_velocity);
-                    // uprint!(uart, "fd.lin_accel = ");
-                    // print_v3(uart, fd.lin_accel);
+                // (cx.shared.uart, cx.shared.flight_data).lock(|uart, fd| {
+                //     // uprintln!(uart, "fd.lin_accel = {:?}", fd.lin_accel);
+                //     // uprintln!(uart, "fd.earth_accel = {:?}", fd.earth_accel);
+                //     // uprintln!(uart, "fd.est_velocity = {:?}", fd.est_velocity);
+                //     // uprint!(uart, "fd.lin_accel = ");
+                //     // print_v3(uart, fd.lin_accel);
 
-                    uart_clear_screen(uart);
+                //     // uart_clear_screen(uart);
 
-                    // uprint!(uart, "fd.earth_accel = ");
-                    uprint!(uart, "ea = ");
-                    print_v3(uart, fd.earth_accel);
+                //     uprint!(uart, "fd.earth_accel = ");
+                //     print_v3(uart, fd.earth_accel);
 
-                    // uprint!(uart, "fd.prev_acc = ");
-                    // print_v3(uart, fd.prev_acc);
+                //     uprint!(uart, "fd.prev_acc = ");
+                //     print_v3(uart, fd.prev_acc);
 
-                    // uprint!(uart, "fd.est_velocity = ");
-                    uprint!(uart, "v = ");
-                    print_v3(uart, fd.est_velocity);
-                });
+                //     uprint!(uart, "fd.est_velocity = ");
+                //     print_v3(uart, fd.est_velocity);
+                // });
             }
         });
 

@@ -215,7 +215,8 @@ mod spi3 {
                     .bidioe() // bidi output mode
                     .set_bit()
                     .br() // baud rate = 1/16 f_PCLK
-                    .div16()
+                    // .div16()
+                    .div8()
                     .mstr() // master mode enabled
                     .set_bit()
                     .ssm() // software slave management
@@ -449,6 +450,7 @@ mod spi3 {
 
         /// The sequence begins when data are written into the SPI_DR register (Tx buffer)
         /// While (BIDIMODE=1 and BIDIOE=1)
+        #[cfg(feature = "nope")]
         pub fn send2(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
             // if !self.output_mode {
             //     // self.set_bidi_output();
@@ -463,6 +465,7 @@ mod spi3 {
             Ok(())
         }
 
+        #[cfg(feature = "nope")]
         pub fn read2(&mut self, byte: &mut u8) -> nb::Result<(), SpiError> {
             self.enable(false);
             self.set_bidi_input();

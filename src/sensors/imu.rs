@@ -45,9 +45,11 @@ where
     // CS: hal::digital::blocking::OutputPin<Error = PinError>,
     CS: OutputPin<Error = PinError>,
 {
-    // pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
-    //     unimplemented!()
-    // }
+    pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+        let val = 0b1; // reset
+        self.write_reg(spi, IMURegister::CTRL3_C, val)?;
+        Ok(())
+    }
 
     #[cfg(feature = "nope")]
     pub fn init(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
@@ -95,6 +97,7 @@ where
     // CS: hal::digital::blocking::OutputPin<Error = PinError>,
     CS: OutputPin<Error = PinError>,
 {
+    /// temperature, gyro, accel
     pub fn read_new_data_available(
         &mut self,
         spi: &mut Spi3,
