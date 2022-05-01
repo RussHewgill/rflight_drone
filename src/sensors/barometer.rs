@@ -33,12 +33,17 @@ where
     }
 
     pub fn init(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
-        let mut val = 0b0000_0000;
+        let mut val1 = 0b0000_0000;
 
-        val |= 0b1; // 3-wire mode
-        val |= 0b10; // Block Data Update
+        val1 |= 0b1; // 3-wire mode
+        val1 |= 0b10; // Block Data Update
 
-        self.write_reg(spi, BaroRegister::CTRL_REG1, val)?;
+        self.write_reg(spi, BaroRegister::CTRL_REG1, val1)?;
+        let mut val2 = 0b0000_0000;
+
+        val2 |= 0b0001_0000; // address increment
+        val2 |= 0b1000; // disable i2c
+        self.write_reg(spi, BaroRegister::CTRL_REG2, val2)?;
 
         Ok(())
     }

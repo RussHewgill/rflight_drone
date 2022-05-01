@@ -43,6 +43,9 @@ pub struct FlightData {
     pub lin_accel:   V3,
     /// accelerometer measurement in the Earth coordinate frame with the 1 g of gravity removed
     pub earth_accel: V3,
+
+    /// integrated accel to estimate velocity
+    est_velocity: V3,
 }
 
 impl FlightData {
@@ -50,6 +53,8 @@ impl FlightData {
         self.quat = ahrs.get_quat();
         self.lin_accel = ahrs.get_linear_accel();
         self.earth_accel = ahrs.get_earth_accel();
+
+        // self.est_velocity += self.
     }
 
     /// roll, pitch, yaw
@@ -72,9 +77,9 @@ impl AHRS {
             prev_acc: V3::zeros(),
 
             cfg_gain: 0.5,
-            cfg_acc_rejection: 90.0,
-            cfg_mag_rejection: 90.0,
-            cfg_rejection_timeout: 0,
+            cfg_acc_rejection: 10.0,
+            cfg_mag_rejection: 20.0,
+            cfg_rejection_timeout: (5.0 / sample_period) as u32,
 
             initializing: true,
             ramped_gain: Self::INITIAL_GAIN,

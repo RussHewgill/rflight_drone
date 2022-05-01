@@ -127,8 +127,6 @@ pub fn init_all(
         dp.SPI2, gpiob.pb13, gpiob.pb15, gpioa.pa8, gpiob.pb12, gpioc.pc13, &clocks,
     );
 
-    init_sensors(&mut sensors);
-
     let dwt = cp.DWT.constrain(cp.DCB, &clocks);
 
     InitStruct {
@@ -203,7 +201,7 @@ fn init_sensors_spi(
     out
 }
 
-fn init_sensors(sensors: &mut Sensors) {
+pub fn init_sensors(sensors: &mut Sensors) {
     use crate::sensors::imu::config::*;
 
     let mut imu_cfg = ImuConfig::default();

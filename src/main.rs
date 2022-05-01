@@ -9,8 +9,8 @@
 pub mod adc;
 pub mod bluetooth;
 pub mod bt_control;
+pub mod flight_control;
 pub mod init;
-pub mod inputs;
 pub mod leds;
 pub mod math;
 pub mod pid;
@@ -22,8 +22,8 @@ pub mod uart;
 use adc::*;
 use bluetooth::*;
 use bt_control::*;
+use flight_control::*;
 use init::init_all_pre;
-use inputs::*;
 use math::*;
 use sensors::barometer::*;
 use sensors::imu::*;
@@ -132,9 +132,10 @@ mod app {
 
         let bt_buf = cx.local.bt_buf;
 
-        // let main_period: stm32f4xx_hal::time::Hertz = 800.Hz();
-        // let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
-        let main_period: stm32f4xx_hal::time::Hertz = 200.Hz();
+        // let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
+        let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
+
+        let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
 
         let mut init_struct = init_all(cp, dp, &mut bt_buf[..], main_period);
 
@@ -152,12 +153,7 @@ mod app {
         // uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
         // uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
 
-        // hprintln!("hclk()     = {:?}", clocks.hclk());
-        // hprintln!("sysclk()   = {:?}", clocks.sysclk());
-        // hprintln!("pclk1()    = {:?}", clocks.pclk1());
-        // hprintln!("pclk2()    = {:?}", clocks.pclk2());
-        // hprintln!("pll48clk() = {:?}", clocks.pll48clk());
-        // hprintln!("i2s_clk()  = {:?}", clocks.i2s_clk());
+        uprintln!(uart, "main_period = {:?}", main_period.to_Hz());
 
         // uart.pause();
         // bt.pause_interrupt(&mut exti);
@@ -177,138 +173,17 @@ mod app {
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        // // tim3.start(main_period).unwrap();
-        // tim3.start(50.Hz()).unwrap();
+        // tim3.start(sensor_period).unwrap();
+        // // tim3.start(50.Hz()).unwrap();
         // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+
+        init_sensors(&mut sensors);
 
         // /// No debug
         // uart.pause();
 
-        use crate::sensors::barometer::*;
-
-        sensors.with_spi_baro(|spi, baro| {
-            // let val2 = 0b0100; // SW reset
-            // baro.write_reg(spi, BaroRegister::CTRL_REG2, val2).unwrap();
-            // bt.wait_ms(10.millis());
-
-            let val1 = 0b0000_0000
-                // | 0b0010_0000 // 10 Hz
-                | 0b0000_0000 // PowerDown
-                | 0b1 // 3-wire
-                | 0b10 // BDU
-                ;
-            baro.write_reg(spi, BaroRegister::CTRL_REG1, val1).unwrap();
-
-            let val2 = 0b0
-                | 0b0001_0000 // address increment
-                | 0b1000 // disable i2c
-                | 0b0001 // one shot mode
-                ;
-            baro.write_reg(spi, BaroRegister::CTRL_REG2, val2).unwrap();
-
-            // let val4 = 0b1; // enable low-current mode
-            // baro.write_reg(spi, BaroRegister::RES_CONF, val4).unwrap();
-
-            // baro.init(spi).unwrap();
-
-            // let b = baro
-            //     .read_reg(spi, crate::sensors::barometer::BaroRegister::WHO_AM_I)
-            //     .unwrap();
-            // uprintln!(uart, "b = {:#08b}", b);
-
-            // baro.one_shot(spi).unwrap();
-            // baro.set_data_rate(spi, BaroDataRate::R10).unwrap();
-
-            while !baro.read_new_data_available(spi).unwrap().1 {
-                uprintln!(uart, "no data");
-            }
-
-            // bt.wait_ms(2.millis());
-
-            // let mut tt = init_struct.tim9.delay_us(&clocks);
-            // tt.delay(100_000.micros());
-
-            // bt.wait_ms(100.millis());
-
-            for _ in 0..50 {
-                cortex_m::asm::nop();
-            }
-
-            // let mut data = [0u8; 3];
-            // baro.read_reg_mult(spi, BaroRegister::PRESS_OUT_XL, &mut data)
-            //     .unwrap();
-            // let xl = data[0];
-            // let l = data[1];
-            // let h = data[2];
-            // uprintln!(uart, "xl = {:#08b}", xl);
-            // uprintln!(uart, "l  = {:#08b}", l);
-            // uprintln!(uart, "h  = {:#08b}", h);
-            // const SCALE: f32 = 4096.0;
-            // let xs: [u8; 4] = [0, h, l, xl];
-            // let x = u32::from_be_bytes(xs) as f32 / SCALE;
-            // uprintln!(uart, "x = {:?}", x);
-
-            let x = baro.read_data(spi).unwrap();
-            uprintln!(uart, "pressure = {:?}", x);
-
-            let t = baro.read_temperature_data(spi).unwrap();
-            uprintln!(uart, "t = {:?}", t);
-
-            // let mut data = [0u8; 2];
-            // baro.read_reg_mult(spi, BaroRegister::TEMP_OUT_L, &mut data)
-            //     .unwrap();
-            // let l = data[0];
-            // let h = data[1];
-
-            // let l = baro.read_reg(spi, BaroRegister::TEMP_OUT_L).unwrap();
-            // let h = baro.read_reg(spi, BaroRegister::TEMP_OUT_H).unwrap();
-
-            // uprintln!(uart, "l = {:#010b}", l);
-            // uprintln!(uart, "h = {:#010b}", h);
-
-            // let x = l as i16 | ((h as i16) << 8);
-            // // let x = l as u16 + ((h as u16) << 8);
-            // // let x = x as i16;
-
-            // let x = i16::from_be_bytes([h, l]);
-
-            // let x = (x as f32 * 10.0) / 100.0;
-
-            // uprintln!(uart, "x = {:?}", x);
-
-            //
-        });
-
-        sensors.with_spi_imu(|spi, imu| {
-            use crate::sensors::imu::*;
-            // let t = imu.read_temperature_data(spi).unwrap();
-
-            let mut data = [0u8; 2];
-            imu.read_reg_mult(spi, IMURegister::OUT_TEMP_L, &mut data)
-                .unwrap();
-
-            let l = data[0];
-            let h = data[1];
-
-            uprintln!(uart, "l = {:#10b}", l);
-            uprintln!(uart, "h = {:#10b}", h);
-
-            let t = l as i16 | ((h as i16) << 8);
-
-            let t = t as f32 / 256.0;
-            let t = t + 25.0;
-
-            uprintln!(uart, "t = {:?}", t);
-        });
-
-        // let p_xl = 0b1000_1101;
-        // let p_l = 0b1111_0101;
-        // let p_h = 0b0011_1111;
-        // let xs: [u8; 4] = [0, p_h, p_l, p_xl];
-        // let k = u32::from_be_bytes(xs);
-        // uprintln!(uart, "k = {:?}", k);
-        // let k0 = k as f32 / 4096.0;
-        // uprintln!(uart, "k0 = {:?}", k0);
+        let t = 1.0 / (sensor_period.raw() as f32);
+        uprintln!(uart, "t = {:?}", t);
 
         let ahrs = AHRS::new(
             // 1.0 / 800.0, // 1.25 ms
@@ -341,13 +216,16 @@ mod app {
         // // timer_sensors::spawn_after(1.secs()).unwrap();
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
+        timer_sensors::spawn_after(100.millis()).unwrap();
+
         // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
-    #[task(binds = TIM3, shared = [uart, exti, bt],
-           local = [tim3, buf: [u8; 16] = [0; 16]], priority = 4)]
+    #[cfg(feature = "nope")]
+    // #[task(binds = TIM3, shared = [uart, exti, bt],
+    //        local = [tim3, buf: [u8; 16] = [0; 16]], priority = 4)]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -373,43 +251,53 @@ mod app {
         });
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    //     binds = TIM3,
-    //     shared = [ahrs, sens_data, flight_data, tim9_flag],
-    //     local = [tim3, sensors],
-    //     priority = 4
-    // )]
+    // #[cfg(feature = "nope")]
+    #[task(
+        // binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag, dwt, uart],
+        local = [tim3, sensors],
+        priority = 4
+    )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        (
-            cx.shared.ahrs,
-            cx.shared.sens_data,
-            cx.shared.flight_data,
-            cx.shared.tim9_flag,
-        )
-            .lock(|ahrs, sd, fd, tim9_flag| {
-                /// Read sensor data
-                cx.local.sensors.read_data_mag(sd);
-                cx.local.sensors.read_data_imu(sd, false);
 
-                /// update AHRS
-                let gyro = sd.imu_gyro.read_and_reset();
-                let acc = sd.imu_acc.read_and_reset();
-                let mag = sd.magnetometer.read_and_reset();
-                ahrs.update(gyro, acc, mag);
+        let t = cx.shared.dwt.lock(|dwt| {
+            dwt.measure(|| {
+                (
+                    cx.shared.ahrs,
+                    cx.shared.sens_data,
+                    cx.shared.flight_data,
+                    cx.shared.tim9_flag,
+                )
+                    .lock(|ahrs, sd, fd, tim9_flag| {
+                        /// Read sensor data
+                        cx.local.sensors.read_data_mag(sd);
+                        cx.local.sensors.read_data_imu(sd, false);
 
-                /// update FlightData
-                fd.update(&ahrs);
+                        /// update AHRS
+                        let gyro = sd.imu_gyro.read_and_reset();
+                        let acc = sd.imu_acc.read_and_reset();
+                        let mag = sd.magnetometer.read_and_reset();
+                        ahrs.update(gyro, acc, mag);
 
-                *tim9_flag = true;
-            });
+                        /// update FlightData
+                        fd.update(&ahrs);
+
+                        *tim9_flag = true;
+                    });
+            })
+        });
+
+        cx.shared.uart.lock(|uart| {
+            uprintln!(uart, "t = {:?} us", t.as_micros());
+        });
     }
 
-    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-           local = [], priority = 3)]
+    #[cfg(feature = "nope")]
+    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+    //        local = [], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
