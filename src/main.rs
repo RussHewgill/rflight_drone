@@ -18,6 +18,7 @@ pub mod sensors;
 pub mod spi;
 pub mod time;
 pub mod uart;
+pub mod utils;
 
 use adc::*;
 use bluetooth::*;
@@ -33,6 +34,7 @@ use spi::*;
 use stm32f4xx_hal::dwt::DwtExt;
 use time::*;
 use uart::*;
+use utils::*;
 
 use byteorder::ByteOrder;
 
@@ -67,23 +69,26 @@ mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
     use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM5, TIM9};
-    // use stm32f4xx_hal::prelude::*;
 
-    use stm32f4xx_hal::dma::StreamsTuple;
-    use stm32f4xx_hal::dwt::Dwt;
-    use stm32f4xx_hal::gpio::{Output, Pin};
-    use stm32f4xx_hal::timer::{CounterHz, CounterMs};
-    use stm32f4xx_hal::{block, prelude::*, timer::DelayMs};
+    use stm32f4xx_hal::{
+        block,
+        dwt::Dwt,
+        gpio::{Output, Pin},
+        prelude::*,
+        timer::{CounterHz, CounterMs, DelayMs},
+    };
 
-    // // use dwt_systick_monotonic::{DwtSystick, ExtU32};
-    // use systick_monotonic::{ExtU64, Systick};
+    use crate::{
+        bluetooth::gap::Commands as GapCommands,
+        bluetooth::gatt::Commands as GattCommands,
+        bluetooth::hal_bt::Commands as HalCommands,
+        bt_control::BTState,
+        sensors::ahrs::{FlightData, AHRS},
+        sensors::{SensorData, Sensors, UQuat},
+        time::MonoTimer,
+        utils::*,
+    };
 
-    use crate::bluetooth::gatt::Commands as GattCommands;
-    use crate::bluetooth::hal_bt::Commands as HalCommands;
-    use crate::sensors::ahrs::{FlightData, AHRS};
-    use crate::sensors::{SensorData, Sensors, UQuat};
-    use crate::time::MonoTimer;
-    use crate::{bluetooth::gap::Commands as GapCommands, bt_control::BTState};
     use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
 
     use nalgebra as na;
@@ -173,22 +178,22 @@ mod app {
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        // tim3.start(sensor_period).unwrap();
-        // // tim3.start(50.Hz()).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        tim3.start(sensor_period).unwrap();
+        // tim3.start(50.Hz()).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         init_sensors(&mut sensors);
 
         // /// No debug
         // uart.pause();
 
-        let t = 1.0 / (sensor_period.raw() as f32);
-        uprintln!(uart, "t = {:?}", t);
+        // let t = 1.0 / (sensor_period.raw() as f32);
+        // uprintln!(uart, "t = {:?}", t);
 
         let ahrs = AHRS::new(
             // 1.0 / 800.0, // 1.25 ms
             // 1.0 / 200.0, // 5 ms
-            1.0 / (main_period.raw() as f32),
+            1.0 / (sensor_period.raw() as f32),
             0.5,
         );
 
@@ -216,9 +221,9 @@ mod app {
         // // timer_sensors::spawn_after(1.secs()).unwrap();
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        timer_sensors::spawn_after(100.millis()).unwrap();
+        // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -253,8 +258,8 @@ mod app {
 
     // #[cfg(feature = "nope")]
     #[task(
-        // binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag, dwt, uart],
+        binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag],
         local = [tim3, sensors],
         priority = 4
     )]
@@ -262,46 +267,58 @@ mod app {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        (
+            cx.shared.ahrs,
+            cx.shared.sens_data,
+            cx.shared.flight_data,
+            cx.shared.tim9_flag,
+        )
+            .lock(|ahrs, sd, fd, tim9_flag| {
+                /// Read sensor data
+                cx.local.sensors.read_data_mag(sd);
+                cx.local.sensors.read_data_imu(sd, false);
 
-        let t = cx.shared.dwt.lock(|dwt| {
-            dwt.measure(|| {
-                (
-                    cx.shared.ahrs,
-                    cx.shared.sens_data,
-                    cx.shared.flight_data,
-                    cx.shared.tim9_flag,
-                )
-                    .lock(|ahrs, sd, fd, tim9_flag| {
-                        /// Read sensor data
-                        cx.local.sensors.read_data_mag(sd);
-                        cx.local.sensors.read_data_imu(sd, false);
+                /// update AHRS
+                let gyro = sd.imu_gyro.read_and_reset();
+                let acc = sd.imu_acc.read_and_reset();
+                let mag = sd.magnetometer.read_and_reset();
+                ahrs.update(gyro, acc, mag);
 
-                        /// update AHRS
-                        let gyro = sd.imu_gyro.read_and_reset();
-                        let acc = sd.imu_acc.read_and_reset();
-                        let mag = sd.magnetometer.read_and_reset();
-                        ahrs.update(gyro, acc, mag);
+                /// update FlightData
+                fd.update(&ahrs);
 
-                        /// update FlightData
-                        fd.update(&ahrs);
-
-                        *tim9_flag = true;
-                    });
-            })
-        });
-
-        cx.shared.uart.lock(|uart| {
-            uprintln!(uart, "t = {:?} us", t.as_micros());
-        });
+                *tim9_flag = true;
+            });
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-    //        local = [], priority = 3)]
+    // #[cfg(feature = "nope")]
+    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+           local = [], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
                 *tim9_flag = false;
+
+                (cx.shared.uart, cx.shared.flight_data).lock(|uart, fd| {
+                    // uprintln!(uart, "fd.lin_accel = {:?}", fd.lin_accel);
+                    // uprintln!(uart, "fd.earth_accel = {:?}", fd.earth_accel);
+                    // uprintln!(uart, "fd.est_velocity = {:?}", fd.est_velocity);
+                    // uprint!(uart, "fd.lin_accel = ");
+                    // print_v3(uart, fd.lin_accel);
+
+                    uart_clear_screen(uart);
+
+                    // uprint!(uart, "fd.earth_accel = ");
+                    uprint!(uart, "ea = ");
+                    print_v3(uart, fd.earth_accel);
+
+                    // uprint!(uart, "fd.prev_acc = ");
+                    // print_v3(uart, fd.prev_acc);
+
+                    // uprint!(uart, "fd.est_velocity = ");
+                    uprint!(uart, "v = ");
+                    print_v3(uart, fd.est_velocity);
+                });
             }
         });
 
