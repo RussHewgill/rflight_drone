@@ -158,32 +158,34 @@ mod app {
         // uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
         // uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
 
-        uprintln!(uart, "main_period = {:?}", main_period.to_Hz());
+        // uprintln!(uart, "main_period = {:?}", main_period.to_Hz());
+        uprintln!(uart, "sensor_period = {:?}", sensor_period.to_Hz());
 
-        // uart.pause();
-        // bt.pause_interrupt(&mut exti);
-        // // match bt.init_bt(&mut uart, &mut delay_bt) {
-        // match bt.init_bt(&mut uart) {
-        //     Ok(()) => {}
-        //     e => {
-        //         uprintln!(uart, "init_bt error = {:?}", e);
-        //     }
-        // }
-        // bt.unpause_interrupt(&mut exti);
-        // bt.clear_interrupt();
-        // // uart.unpause();
+        uart.pause();
+        bt.pause_interrupt(&mut exti);
+        // match bt.init_bt(&mut uart, &mut delay_bt) {
+        match bt.init_bt(&mut uart) {
+            Ok(()) => {}
+            e => {
+                uprintln!(uart, "init_bt error = {:?}", e);
+            }
+        }
+        bt.unpause_interrupt(&mut exti);
+        bt.clear_interrupt();
+        // uart.unpause();
 
         // bt.unpend();
 
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        // tim3.start(sensor_period).unwrap();
-        // // tim3.start(50.Hz()).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        tim3.start(sensor_period).unwrap();
+        // tim3.start(50.Hz()).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // init_sensors(&mut sensors);
+        init_sensors(&mut sensors);
 
+        #[cfg(feature = "nope")]
         sensors.with_spi_imu(|spi, imu| {
             use crate::sensors::imu::*;
 
@@ -306,7 +308,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -339,13 +341,13 @@ mod app {
         });
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    //     binds = TIM3,
-    //     shared = [ahrs, sens_data, flight_data, tim9_flag, uart],
-    //     local = [tim3, sensors],
-    //     priority = 4
-    // )]
+    // #[cfg(feature = "nope")]
+    #[task(
+        binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag, uart],
+        local = [tim3, sensors],
+        priority = 4
+    )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -355,9 +357,8 @@ mod app {
             cx.shared.sens_data,
             cx.shared.flight_data,
             cx.shared.tim9_flag,
-            cx.shared.uart,
         )
-            .lock(|ahrs, sd, fd, tim9_flag, uart| {
+            .lock(|ahrs, sd, fd, tim9_flag| {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
@@ -371,14 +372,13 @@ mod app {
                 /// update FlightData
                 fd.update(&ahrs);
 
-                print_v3(uart, acc);
-
                 *tim9_flag = true;
             });
     }
 
-    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag, ahrs, sens_data],
-           local = [sensors], priority = 3)]
+    #[cfg(feature = "nope")]
+    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag, ahrs, sens_data],
+    //        local = [sensors], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         (
             cx.shared.ahrs,
@@ -405,32 +405,53 @@ mod app {
         //
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-    // local = [], priority = 3)]
+    // #[cfg(feature = "nope")]
+    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+           local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
                 *tim9_flag = false;
 
-                // (cx.shared.uart, cx.shared.flight_data).lock(|uart, fd| {
-                //     // uprintln!(uart, "fd.lin_accel = {:?}", fd.lin_accel);
-                //     // uprintln!(uart, "fd.earth_accel = {:?}", fd.earth_accel);
-                //     // uprintln!(uart, "fd.est_velocity = {:?}", fd.est_velocity);
-                //     // uprint!(uart, "fd.lin_accel = ");
-                //     // print_v3(uart, fd.lin_accel);
+                *cx.local.counter += 1;
+                if *cx.local.counter >= 10 {
+                    *cx.local.counter = 0;
+                    (
+                        cx.shared.uart,
+                        cx.shared.flight_data,
+                        cx.shared.bt,
+                        cx.shared.exti,
+                    )
+                        .lock(|uart, fd, bt, exti| {
+                            let qq = fd.quat.coords;
 
-                //     // uart_clear_screen(uart);
+                            cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                            cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                            cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                            cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
-                //     uprint!(uart, "fd.earth_accel = ");
-                //     print_v3(uart, fd.earth_accel);
+                            // uprint!(uart, "sending ({:?})...", *cx.local.counter);
+                            bt.clear_interrupt();
+                            bt.pause_interrupt(exti);
+                            uprint!(uart, "0..");
+                            match bt.log_write(true, &cx.local.buf[..]) {
+                                Ok(true) => {
+                                    // uprintln!(uart, "sent log write command");
+                                }
+                                Ok(false) => {
+                                    // uprintln!(uart, "failed to write");
+                                }
+                                Err(e) => {
+                                    // uprintln!(uart, "error 0 = {:?}", e);
+                                }
+                            }
+                            bt.unpause_interrupt(exti);
+                            uprintln!(uart, "1");
 
-                //     uprint!(uart, "fd.prev_acc = ");
-                //     print_v3(uart, fd.prev_acc);
-
-                //     uprint!(uart, "fd.est_velocity = ");
-                //     print_v3(uart, fd.est_velocity);
-                // });
+                            // //
+                            // unimplemented!()
+                        });
+                }
             }
         });
 

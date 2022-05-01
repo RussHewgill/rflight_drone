@@ -216,7 +216,7 @@ mod spi3 {
                     .set_bit()
                     .br() // baud rate = 1/16 f_PCLK
                     // .div16()
-                    .div8()
+                    .div8() // XXX: needed for higher core clock rate
                     .mstr() // master mode enabled
                     .set_bit()
                     .ssm() // software slave management

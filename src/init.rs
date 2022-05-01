@@ -201,6 +201,9 @@ fn init_sensors_spi(
     out
 }
 
+/// Gyroscope is configured a narrow bandwidth low-pass filter
+/// Accelerometer is configured to use an anti-aliasing analog low-pass filter,
+///     a digital low-pass filter, and a composite filter
 pub fn init_sensors(sensors: &mut Sensors) {
     use crate::sensors::imu::config::*;
 
@@ -211,13 +214,18 @@ pub fn init_sensors(sensors: &mut Sensors) {
     // imu_cfg.acc_power = AccelPowerModes::High6660;
     imu_cfg.acc_scale = AccelScaleFactor::S4;
 
-    // imu_cfg.acc_filter_input_composite = true;
-    // imu_cfg.acc_bandwidth = AccelBandwidth::OdrLowPass400;
+    imu_cfg.acc_analog_lp_bandwidth = AccelAnalogBandwidth::BW1500;
+
+    imu_cfg.acc_filter_input_composite = AccelInputComposite::LowLatency;
+    imu_cfg.acc_digital_filter_config = AccelDigFilterConfig::OdrLowPass400;
 
     imu_cfg.gyro_power = GyroPowerModes::Normal104;
     // imu_cfg.gyro_power = GyroPowerModes::High416;
     imu_cfg.gyro_scale = GyroScaleFactor::S2000;
-    // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
+
+    // gyro low-pass filter
+    imu_cfg.gyro_lp_filter_enable = true;
+    imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
 
     // sensors.read_data_imu(true);
 

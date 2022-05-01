@@ -43,10 +43,9 @@ pub struct FlightData {
     pub lin_accel:   V3,
     /// accelerometer measurement in the Earth coordinate frame with the 1 g of gravity removed
     pub earth_accel: V3,
-
-    pub prev_acc:     V3,
-    /// integrated accel to estimate velocity
-    pub est_velocity: V3,
+    // pub prev_acc:     V3,
+    // /// integrated accel to estimate velocity
+    // pub est_velocity: V3,
 }
 
 impl FlightData {
@@ -55,9 +54,9 @@ impl FlightData {
         self.lin_accel = ahrs.get_linear_accel();
         self.earth_accel = ahrs.get_earth_accel();
 
-        self.prev_acc = ahrs.prev_acc;
+        // self.prev_acc = ahrs.prev_acc;
         // self.est_velocity += self.lin_accel * ahrs.sample_period;
-        self.est_velocity += self.earth_accel * ahrs.sample_period;
+        // // self.est_velocity += self.earth_accel * ahrs.sample_period;
     }
 
     /// roll, pitch, yaw

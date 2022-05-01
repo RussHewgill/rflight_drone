@@ -42,7 +42,6 @@ const SPI_WRITE: u8 = 0x00;
 /// Init
 impl<CS, PinError> IMU<CS>
 where
-    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
     CS: OutputPin<Error = PinError>,
 {
     pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
@@ -78,9 +77,11 @@ where
         self.write_reg(spi, IMURegister::CTRL1_XL, cfg.reg_ctrl1_xl())?;
         self.write_reg(spi, IMURegister::CTRL2_G, cfg.reg_ctrl2_g())?;
         self.write_reg(spi, IMURegister::CTRL3_C, cfg.reg_ctrl3_c())?;
-        // self.write_reg(spi, IMURegister::CTRL6_C, cfg.reg_ctrl6_c())?;
-        // self.write_reg(spi, IMURegister::CTRL7_G, cfg.reg_ctrl7_g())?;
-        // self.write_reg(spi, IMURegister::CTRL8_XL, cfg.reg_ctrl8_xl())?;
+
+        self.write_reg(spi, IMURegister::CTRL4_C, cfg.reg_ctrl4_c())?;
+        self.write_reg(spi, IMURegister::CTRL6_C, cfg.reg_ctrl6_c())?;
+        self.write_reg(spi, IMURegister::CTRL7_G, cfg.reg_ctrl7_g())?;
+        self.write_reg(spi, IMURegister::CTRL8_XL, cfg.reg_ctrl8_xl())?;
 
         Ok(())
     }
@@ -92,9 +93,9 @@ where
     }
 }
 
+/// read data
 impl<CS, PinError> IMU<CS>
 where
-    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
     CS: OutputPin<Error = PinError>,
 {
     /// temperature, gyro, accel
@@ -184,9 +185,9 @@ where
     }
 }
 
+/// read, write reg
 impl<CS, PinError> IMU<CS>
 where
-    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
     CS: OutputPin<Error = PinError>,
 {
     pub fn read_reg_mult(
@@ -259,14 +260,17 @@ pub mod config {
         pub acc_power:                   AccelPowerModes,
         pub acc_scale:                   AccelScaleFactor,
         pub acc_high_perf_mode_disable:  bool,
-        pub acc_bandwidth:               AccelBandwidth,
-        pub acc_filter_input_composite:  bool,
+        /// Only used when data rate > 1.67 kHz
+        pub acc_analog_lp_bandwidth:     AccelAnalogBandwidth,
+        pub acc_digital_filter_config:   AccelDigFilterConfig,
+        pub acc_filter_input_composite:  AccelInputComposite,
         /// Gyro
         pub gyro_power:                  GyroPowerModes,
         pub gyro_scale:                  GyroScaleFactor,
         pub gyro_high_perf_mode_disable: bool,
         pub gyro_hp_filter_enable:       bool,
         pub gyro_hp_filter_cutoff:       GyroHpFilterCutoff,
+        pub gyro_lp_filter_enable:       bool,
         pub gyro_lp_bandwidth:           GyroLpBandwidth,
     }
 
@@ -279,14 +283,16 @@ pub mod config {
                 acc_power:                   AccelPowerModes::PowerDown,
                 acc_scale:                   AccelScaleFactor::S2,
                 acc_high_perf_mode_disable:  false,
-                acc_bandwidth:               AccelBandwidth::Odr2,
-                acc_filter_input_composite:  false,
+                acc_analog_lp_bandwidth:     AccelAnalogBandwidth::BW1500,
+                acc_digital_filter_config:   AccelDigFilterConfig::Odr2,
+                acc_filter_input_composite:  AccelInputComposite::LowLatency,
                 /// Gyro
                 gyro_power:                  GyroPowerModes::PowerDown,
                 gyro_scale:                  GyroScaleFactor::S250,
                 gyro_high_perf_mode_disable: false,
                 gyro_hp_filter_enable:       false,
                 gyro_hp_filter_cutoff:       GyroHpFilterCutoff::C16,
+                gyro_lp_filter_enable:       false,
                 gyro_lp_bandwidth:           GyroLpBandwidth::Normal,
             }
         }
@@ -297,7 +303,7 @@ pub mod config {
             let mut out = 0b0000_0000;
             out |= self.acc_power.to_val();
 
-            let out = self.acc_bandwidth.reg_ctrl1_xl(out);
+            let out = self.acc_digital_filter_config.reg_ctrl1_xl(out);
 
             out
         }
@@ -322,10 +328,16 @@ pub mod config {
             out
         }
 
-        // pub fn reg_ctrl4_c(&self) -> u8 {
-        //     let mut out = 0b0000_0000;
-        //     out
-        // }
+        pub fn reg_ctrl4_c(&self) -> u8 {
+            let mut out = 0b0000_0000;
+
+            out |= 0b0100; // disable i2c interface
+
+            if self.gyro_lp_filter_enable {
+                out |= 0b0010;
+            }
+            out
+        }
 
         // pub fn reg_ctrl5_c(&self) -> u8 {
         //     let mut out = 0b0000_0000;
@@ -361,11 +373,11 @@ pub mod config {
         pub fn reg_ctrl8_xl(&self) -> u8 {
             let mut out = 0b0000_0000;
 
-            if self.acc_filter_input_composite {
+            if self.acc_filter_input_composite == AccelInputComposite::LowNoise {
                 out |= 0b0000_1000;
             }
 
-            let out = self.acc_bandwidth.reg_ctrl8_xl(out);
+            let out = self.acc_digital_filter_config.reg_ctrl8_xl(out);
 
             out
         }
@@ -388,7 +400,7 @@ pub mod config {
         ///   HPCF_XL[1:0]
         ///   LPF2_XL_EN
         ///   INPUT_COMPOSITE
-        pub enum AccelBandwidth {
+        pub enum AccelDigFilterConfig {
             Odr2,
             Odr4,
 
@@ -403,9 +415,9 @@ pub mod config {
             OdrHighPass400,
         }
 
-        impl AccelBandwidth {
+        impl AccelDigFilterConfig {
             pub fn reg_ctrl1_xl(self, mut b: u8) -> u8 {
-                use self::AccelBandwidth::*;
+                use self::AccelDigFilterConfig::*;
                 match self {
                     Odr2 => b |= 0b00,
                     Odr4 => b |= 0b10,
@@ -415,7 +427,7 @@ pub mod config {
             }
 
             pub fn reg_ctrl8_xl(self, mut b: u8) -> u8 {
-                use self::AccelBandwidth::*;
+                use self::AccelDigFilterConfig::*;
                 match self {
                     Odr2 | Odr4 => b &= !(0b1000_0000),
 
@@ -457,12 +469,25 @@ pub mod config {
 
         #[derive(Debug, Clone, Copy)]
         #[repr(u8)]
-        pub enum AccelCompFilterInput {
-            ODR2 = 0b0,
-            ODR4 = 0b1,
+        pub enum AccelAnalogBandwidth {
+            BW1500 = 0,
+            BW400  = 1,
         }
 
-        impl ImuSetting for AccelCompFilterInput {
+        impl ImuSetting for AccelAnalogBandwidth {
+            fn to_val(self) -> u8 {
+                self as u8
+            }
+        }
+
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        #[repr(u8)]
+        pub enum AccelInputComposite {
+            LowLatency = 0,
+            LowNoise   = 1,
+        }
+
+        impl ImuSetting for AccelInputComposite {
             fn to_val(self) -> u8 {
                 (self as u8) << 3
             }
