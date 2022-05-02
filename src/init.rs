@@ -23,8 +23,9 @@ use crate::sensors::magneto::Magnetometer;
 use crate::sensors::Sensors;
 use crate::spi::Spi3;
 use crate::time::MonoTimer;
+use crate::uprintln;
 // use crate::time::MonoTimer;
-use crate::{bt_control::BTController, uart::UART};
+use crate::{bt_control::BTController, uart::*};
 
 // use systick_monotonic::{ExtU64, Systick};
 
@@ -116,11 +117,30 @@ pub fn init_all(
     let bt_delay = dp.TIM2.counter_ms(&clocks);
     // let bt_delay = FTimerMs::new(dp.TIM2, &clocks);
 
+    // {
+    //     use stm32f4xx_hal::rcc::BusClock;
+    //     let freq: fugit::HertzU32 = 8.MHz();
+    //     let clock: fugit::HertzU32 = SPI1::clock(&clocks);
+    //     /// 64 MHz, 4 MHz = 0b011
+    //     let br = match clock.raw() / freq.raw() {
+    //         0 => unreachable!(),
+    //         1..=2 => 0b000,
+    //         3..=5 => 0b001,
+    //         6..=11 => 0b010,
+    //         12..=23 => 0b011,
+    //         24..=47 => 0b100,
+    //         48..=95 => 0b101,
+    //         96..=191 => 0b110,
+    //         _ => 0b111,
+    //     };
+    //     uprintln!(uart, "br = {:#05b}", br);
+    // }
+
     let bt_irq = init_bt_interrupt(&mut dp.EXTI, &mut syscfg, gpioa.pa4);
 
     let bt = init_bt(
         dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks,
-        bt_buf, bt_delay,
+        bt_buf, bt_delay, &mut uart,
     );
 
     let mut sensors = init_sensors_spi(
@@ -226,8 +246,6 @@ pub fn init_sensors(sensors: &mut Sensors) {
     // imu_cfg.gyro_lp_filter_enable = true;
     // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
 
-    // sensors.read_data_imu(true);
-
     sensors.with_spi_imu(|spi, imu| {
         imu.init(spi, imu_cfg).unwrap();
     });
@@ -262,6 +280,7 @@ fn init_bt(
     buf: &'static mut [u8],
     delay: CounterMs<TIM2>,
     // delay: FTimerMs<TIM2>,
+    uart: &mut UART,
 ) -> BTController<'static> {
     let mut cs = cs
         .internal_resistor(Pull::Up)
@@ -270,19 +289,25 @@ fn init_bt(
     cs.set_high();
 
     let reset = reset
-        .internal_resistor(stm32f4xx_hal::gpio::Pull::Up)
+        .internal_resistor(Pull::Up)
         .into_push_pull_output()
         .speed(Speed::Low);
 
     // let input = input.into_pull_down_input();
 
     let sck = sck
-        .internal_resistor(stm32f4xx_hal::gpio::Pull::Down)
+        .internal_resistor(Pull::Down)
         .into_push_pull_output()
         .speed(Speed::High)
         .into_alternate::<5>();
-    let miso = miso.into_alternate::<5>();
+    // let miso = miso.into_alternate::<5>();
+    let miso = miso
+        .internal_resistor(Pull::None)
+        .into_push_pull_output()
+        .into_alternate::<5>()
+        .speed(Speed::High);
     let mosi = mosi
+        .internal_resistor(Pull::None)
         .into_push_pull_output()
         .speed(Speed::High)
         .into_alternate::<5>();
@@ -293,6 +318,7 @@ fn init_bt(
     };
 
     // let mut spi = spi1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);
+    // let mut spi = spi1.spi((sck, miso, mosi), mode, 2.MHz(), &clocks);
     let mut spi = spi1.spi((sck, miso, mosi), mode, 4.MHz(), &clocks);
     // let mut spi = spi1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
     // let mut spi = spi1.spi((sck, miso, mosi), mode, 100.kHz(), &clocks);
@@ -301,6 +327,13 @@ fn init_bt(
 
     // let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
     let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, buf, delay);
+
+    // let x = {
+    //     use core::ops::Deref;
+    //     let spi1 = unsafe { &(*SPI1::ptr()) };
+    //     spi1.deref().cr1.read().br().bits()
+    // };
+    // uprintln!(uart, "x = {:#05b}", x);
 
     bt
     // unimplemented!()
@@ -332,10 +365,7 @@ fn init_clocks(rcc: RCC) -> Clocks {
         //
         .use_hse(16.MHz())
         // .sysclk(32.MHz())
-        // .sysclk(48.MHz())
         .sysclk(64.MHz())
-        // .sysclk(80.MHz())
-        // .sysclk(84.MHz())
         // .require_pll48clk()
         .freeze();
 

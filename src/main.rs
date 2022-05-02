@@ -324,9 +324,10 @@ mod app {
         (cx.shared.uart, cx.shared.exti, cx.shared.bt).lock(|uart, exti, bt| {
             bt.pause_interrupt(exti);
             uprint!(uart, "0..");
-            match bt.log_write(true, &cx.local.buf[..]) {
+            match bt.log_write(uart, true, &cx.local.buf[..]) {
                 Ok(true) => {
                     // uprintln!(uart, "sent log write command");
+                    uprintln!(uart, "1");
                 }
                 Ok(false) => {
                     uprintln!(uart, "failed to write");
@@ -356,49 +357,51 @@ mod app {
             cx.shared.flight_data,
         )
             .lock(|uart, exti, bt, ahrs, sd, fd| {
-                // cx.local.sensors.read_data_mag(sd);
-                // cx.local.sensors.read_data_imu(sd, false);
+                cx.local.sensors.read_data_mag(sd);
+                cx.local.sensors.read_data_imu(sd, false);
 
-                // let gyro = sd.imu_gyro.read_and_reset();
-                // let acc = sd.imu_acc.read_and_reset();
-                // let mag = sd.magnetometer.read_and_reset();
-                // ahrs.update(gyro, acc, mag);
+                let gyro = sd.imu_gyro.read_and_reset();
+                let acc = sd.imu_acc.read_and_reset();
+                let mag = sd.magnetometer.read_and_reset();
+                ahrs.update(gyro, acc, mag);
 
-                // let qq = ahrs.get_quat().coords;
+                let qq = ahrs.get_quat().coords;
 
-                // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+                cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
-                bt.pause_interrupt(exti);
-                // uprint!(uart, "0..");
-                match bt.log_write(uart, true, &cx.local.buf[..]) {
-                    Ok(true) => {
-                        // uprintln!(uart, "sent log write command");
-                        cx.local.cnt.0 += 1;
+                if bt.state.is_connected() {
+                    bt.pause_interrupt(exti);
+                    // uprint!(uart, "0..");
+                    match bt.log_write(uart, true, &cx.local.buf[..]) {
+                        Ok(true) => {
+                            // uprintln!(uart, "sent log write command");
+                            cx.local.cnt.0 += 1;
+                        }
+                        Ok(false) => {
+                            // uprintln!(uart, "failed to write");
+                            cx.local.cnt.1 += 1;
+                        }
+                        Err(e) => {
+                            uprintln!(uart, "error 0 = {:?}", e);
+                        }
                     }
-                    Ok(false) => {
-                        // uprintln!(uart, "failed to write");
-                        cx.local.cnt.1 += 1;
-                    }
-                    Err(e) => {
-                        uprintln!(uart, "error 0 = {:?}", e);
-                    }
+
+                    // uprintln!(uart, "{:?}/{:?}", cx.local.cnt.0, cx.local.cnt.1,);
+
+                    // uprintln!(uart, "1");
+                    bt.unpause_interrupt(exti);
                 }
 
-                uprintln!(uart, "{:?}/{:?}", cx.local.cnt.0, cx.local.cnt.1,);
-
-                // uprintln!(uart, "1");
-                bt.unpause_interrupt(exti);
-
-                // uprintln!(
-                //     uart,
-                //     "{:?}/{:?} = {:.3}",
-                //     cx.local.cnt.0,
-                //     cx.local.cnt.0 + cx.local.cnt.1,
-                //     cx.local.cnt.0 as f32 / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
-                // );
+                uprintln!(
+                    uart,
+                    "{:?}/{:?} = {:.3}",
+                    cx.local.cnt.0,
+                    cx.local.cnt.0 + cx.local.cnt.1,
+                    cx.local.cnt.0 as f32 / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
+                );
 
                 // uprintln!(uart, "{:?}/{:?}", cx.local.cnt.0, cx.local.cnt.1,);
             });

@@ -62,10 +62,15 @@ where
         timeout: bool,
         data: &[u8],
     ) -> nb::Result<bool, BTError<SpiError, GpioError>> {
+        // if !self.state.is_connected() {
+        //     uprintln!(uart, "not connected");
+        //     return Ok(true);
+        // }
+
         let logger = if let Some(logger) = self.services.logger {
             logger
         } else {
-            // uprintln!(uart, "no logger?");
+            uprintln!(uart, "no logger?");
             // uprintln!(uart, "");
             return Ok(false);
         };
@@ -132,7 +137,7 @@ where
     pub fn init_log_service(
         &mut self,
         uart: &mut UART,
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+    ) -> Result<(), BTError<SpiError, GpioError>> {
         let params = AddServiceParameters {
             uuid:                  UUID_CONSOLE_LOG_SERVICE,
             service_type:          crate::bluetooth::gatt::ServiceType::Primary,
@@ -160,6 +165,7 @@ where
             fw_version_before_v72:     false,
         };
         block!(self.add_characteristic(&params0))?;
+        uprintln!(uart, "sent c");
 
         let c = match self.read_event_params_vendor(uart)? {
             VReturnParameters::GattAddCharacteristic(c) => c,
@@ -168,6 +174,13 @@ where
 
         uprintln!(uart, "c = {:?}", c);
 
+        let logger = SvLogger {
+            service_handle: service.service_handle,
+            char_handle:    c.characteristic_handle,
+        };
+
+        self.services.logger = Some(logger);
+
         Ok(())
     }
 
@@ -175,7 +188,7 @@ where
     pub fn init_log_service(
         &mut self,
         uart: &mut UART,
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+    ) -> Result<(), BTError<SpiError, GpioError>> {
         self.wait_ms(25.millis());
 
         let params = AddServiceParameters {

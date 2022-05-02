@@ -167,8 +167,8 @@ where
         block!(self.update_characteristic_value(&ps)).unwrap();
         self.read_event_uart(uart)?;
 
-        block!(self.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1))?;
-        self.read_event_uart(uart)?;
+        // block!(self.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1))?;
+        // self.read_event_uart(uart)?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
