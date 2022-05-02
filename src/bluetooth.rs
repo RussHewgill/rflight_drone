@@ -49,7 +49,7 @@ use crate::{
     uprint, uprintln,
 };
 
-use self::rx_buffer::Buffer;
+use self::{events::BlueNRGEvent, rx_buffer::Buffer};
 
 /// // SPI Configuration
 /// #define BNRG_SPI_MODE               SPI_MODE_MASTER
@@ -594,6 +594,101 @@ fn parse_spi_header<E>(header: &[u8; 5]) -> Result<(u16, u16), nb::Error<E>> {
         // );
 
         Err(nb::Error::WouldBlock)
+    }
+}
+
+/// read2, etc
+impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+where
+    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+        + hal::blocking::spi::Write<u8, Error = SpiError>,
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+    Input: InputPin<Error = GpioError>,
+    GpioError: core::fmt::Debug,
+{
+    fn read_event2<Vendor, VE>(
+        &mut self,
+        uart: &mut UART,
+    ) -> nb::Result<bluetooth_hci::Event<Vendor>, BTError<SpiError, GpioError>>
+    where
+        Vendor: bluetooth_hci::event::VendorEvent<Error = VE>,
+        VE: core::fmt::Debug,
+    {
+        use bluetooth_hci::Controller;
+        const MAX_EVENT_LENGTH: usize = 255;
+        const PACKET_HEADER_LENGTH: usize = 1;
+        const EVENT_PACKET_HEADER_LENGTH: usize = 3;
+        const PARAM_LEN_BYTE: usize = 2;
+
+        // let param_len = self
+        //     .peek(PARAM_LEN_BYTE)
+        //     // .map_err(Self::rewrap_error)
+        //     ? as usize;
+
+        let param_len = match self.peek(PARAM_LEN_BYTE) {
+            Ok(p) => p as usize,
+            Err(nb::Error::WouldBlock) => {
+                uprintln!(uart, "wb1");
+                return Err(nb::Error::WouldBlock);
+            }
+            Err(e) => {
+                panic!("read_event2, other = {:?}", e);
+            }
+        };
+
+        let mut buf = [0; MAX_EVENT_LENGTH + EVENT_PACKET_HEADER_LENGTH];
+        // self.read_into(&mut buf[..EVENT_PACKET_HEADER_LENGTH + param_len])?;
+
+        match self.read_into(&mut buf[..EVENT_PACKET_HEADER_LENGTH + param_len]) {
+            Ok(p) => {}
+            Err(nb::Error::WouldBlock) => {
+                uprintln!(uart, "wb2");
+                return Err(nb::Error::WouldBlock);
+            }
+            Err(e) => {
+                panic!("read_event2, other = {:?}", e);
+            }
+        }
+
+        Ok(
+            bluetooth_hci::event::Event::new(bluetooth_hci::event::Packet(
+                &buf[PACKET_HEADER_LENGTH..EVENT_PACKET_HEADER_LENGTH + param_len],
+            ))
+            .unwrap(),
+        )
+    }
+
+    pub fn read2(
+        &mut self,
+        uart: &mut UART,
+    ) -> nb::Result<
+        bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
+        BTError<SpiError, GpioError>,
+    > {
+        use bluetooth_hci::Controller;
+
+        const PACKET_TYPE_HCI_EVENT: u8 = 0x04;
+
+        loop {
+            match self.peek(0) {
+                Ok(PACKET_TYPE_HCI_EVENT) => {
+                    return Ok(bluetooth_hci::host::uart::Packet::Event(
+                        // self.read_event2(uart).unwrap(),
+                        self.read_event2(uart).unwrap(),
+                    ));
+                }
+                Ok(x) => {
+                    panic!("read2, other = {:?}", x);
+                }
+                Err(nb::Error::WouldBlock) => {
+                    // uprintln!(uart, "wb0");
+                }
+                Err(e) => {
+                    panic!("read2, error = {:?}", e);
+                }
+            }
+        }
     }
 }
 

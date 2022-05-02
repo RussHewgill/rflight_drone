@@ -38,7 +38,7 @@ use crate::{
         hal_bt::ConfigData,
     },
     uart::*,
-    uprintln,
+    uprint, uprintln,
 };
 
 use crate::bluetooth::gap::Commands as GapCommands;
@@ -56,6 +56,12 @@ use crate::bluetooth::ev_command::ReturnParameters as VReturnParameters;
 use crate::bluetooth::{events::BlueNRGEvent, BTError, BluetoothSpi};
 
 pub use self::uuids::*;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TimeoutResult {
+    Ok,
+    Timeout,
+}
 
 pub type BTController<'spi> = BluetoothSpi<
     'spi,
@@ -161,8 +167,8 @@ where
         block!(self.update_characteristic_value(&ps)).unwrap();
         self.read_event_uart(uart)?;
 
-        // block!(bt.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1)).unwrap();
-        // block!(bt.read_event(&mut uart)).unwrap();
+        block!(self.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1))?;
+        self.read_event_uart(uart)?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
@@ -332,6 +338,13 @@ where
 
         unimplemented!()
     }
+
+    pub fn safe_update_char_value(
+        &mut self,
+        char_val: UpdateCharacteristicValueParameters,
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        unimplemented!()
+    }
 }
 
 /// read and handle events
@@ -469,8 +482,8 @@ where
                 Ok(x) => break Ok(x),
                 Err(nb::Error::WouldBlock) => {
                     //
-                    let k = self.data_ready().unwrap();
-                    uprintln!(uart, "rdy = {:?}", k);
+                    // let k = self.data_ready().unwrap();
+                    // uprintln!(uart, "rdy = {:?}", k);
                     // unimplemented!()
                 }
                 Err(other) => {
@@ -507,29 +520,39 @@ where
 
     pub fn ignore_event_timeout(
         &mut self,
+        uart: &mut UART,
         timeout: fugit::MillisDurationU32,
-    ) -> Result<(), BTError<SpiError, GpioError>> {
+    ) -> Result<TimeoutResult, BTError<SpiError, GpioError>> {
         use bluetooth_hci::Controller;
         use stm32f4xx_hal::timer::Event as TimerEvent;
 
         self.delay.clear_interrupt(TimerEvent::Update);
         self.delay.start(timeout).unwrap();
 
+        // uprint!(uart, "w0");
         let p = loop {
+            // uprint!(uart, "w1");
+            // match self.read2(uart) {
             match self.read() {
                 Ok(p) => break p,
                 Err(nb::Error::WouldBlock) => {
                     if self.delay.get_interrupt().contains(TimerEvent::Update) {
+                        // uprint!(uart, "w2");
                         self.delay.cancel().unwrap();
                         self.delay.clear_interrupt(TimerEvent::Update);
-                        return Ok(());
+                        return Ok(TimeoutResult::Timeout);
                     }
+                    // uprint!(uart, "w3");
                 }
                 Err(e) => {
                     panic!("error 1 = {:?}", e);
                 }
             }
         };
+        // uprintln!(uart, "ld");
+
+        self.delay.cancel().unwrap();
+        self.delay.clear_interrupt(TimerEvent::Update);
 
         let bluetooth_hci::host::uart::Packet::Event(e) = p;
         // uprintln!(uart, "event = {:?}", &e);
@@ -540,20 +563,36 @@ where
             Event::Vendor(crate::bluetooth::events::BlueNRGEvent::HalInitialized(
                 reason,
             )) => {
-                // uprintln!(uart, "bt restarted, reason = {:?}", reason);
+                uprintln!(uart, "bt restarted, reason = {:?}", reason);
             }
             Event::CommandComplete(params) => {
                 // Self::handle_event_command_complete(uart, params.return_params);
+                // uprintln!(uart, "CommandComplete = {:?}", params);
+                if params.num_hci_command_packets == 0 {
+                    uprintln!(uart, "controller required halting packets");
+                }
+                match params.return_params {
+                    ReturnParameters::Vendor(
+                        VReturnParameters::GattUpdateCharacteristicValue(status),
+                    ) => {
+                        if status != bluetooth_hci::Status::Success {
+                            uprintln!(uart, "status = {:?}", status);
+                        }
+                    }
+                    _ => {
+                        uprintln!(uart, "return_params = {:?}", params.return_params);
+                    }
+                }
             }
             // Event::LeConnectionComplete(conn) => {
             //     unimplemented!()
             // }
             ev => {
-                // uprintln!(uart, "unhandled event = {:?}", ev);
+                uprintln!(uart, "unhandled event = {:?}", ev);
             }
         }
 
-        Ok(())
+        Ok(TimeoutResult::Ok)
     }
 
     pub fn ignore_event(&mut self) -> Result<(), BTError<SpiError, GpioError>> {

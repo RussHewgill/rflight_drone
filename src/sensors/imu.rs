@@ -78,10 +78,10 @@ where
         self.write_reg(spi, IMURegister::CTRL2_G, cfg.reg_ctrl2_g())?;
         self.write_reg(spi, IMURegister::CTRL3_C, cfg.reg_ctrl3_c())?;
 
-        self.write_reg(spi, IMURegister::CTRL4_C, cfg.reg_ctrl4_c())?;
-        self.write_reg(spi, IMURegister::CTRL6_C, cfg.reg_ctrl6_c())?;
-        self.write_reg(spi, IMURegister::CTRL7_G, cfg.reg_ctrl7_g())?;
-        self.write_reg(spi, IMURegister::CTRL8_XL, cfg.reg_ctrl8_xl())?;
+        // self.write_reg(spi, IMURegister::CTRL4_C, cfg.reg_ctrl4_c())?;
+        // self.write_reg(spi, IMURegister::CTRL6_C, cfg.reg_ctrl6_c())?;
+        // self.write_reg(spi, IMURegister::CTRL7_G, cfg.reg_ctrl7_g())?;
+        // self.write_reg(spi, IMURegister::CTRL8_XL, cfg.reg_ctrl8_xl())?;
 
         Ok(())
     }

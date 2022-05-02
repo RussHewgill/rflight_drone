@@ -36,6 +36,8 @@ use crate::{
     uart::*,
 };
 
+use super::TimeoutResult;
+
 #[derive(Debug, Clone, Copy)]
 pub struct SvLogger {
     // service_handle: ServiceHandle,
@@ -56,7 +58,8 @@ where
 {
     pub fn log_write(
         &mut self,
-        delay: bool,
+        uart: &mut UART,
+        timeout: bool,
         data: &[u8],
     ) -> nb::Result<bool, BTError<SpiError, GpioError>> {
         let logger = if let Some(logger) = self.services.logger {
@@ -75,15 +78,23 @@ where
         };
         block!(self.update_characteristic_value(&val)).unwrap();
 
-        if delay {
-            self.ignore_event_timeout(100.millis())?;
+        if timeout {
+            // uprintln!(uart, "wat 0");
+            let result = self.ignore_event_timeout(uart, 100.millis())?;
+            // uprintln!(uart, "wat 1");
+
+            if result == TimeoutResult::Timeout {
+                Ok(false)
+            } else {
+                Ok(true)
+            }
         } else {
             self.ignore_event()?;
+            Ok(true)
         }
-
-        Ok(true)
     }
 
+    #[cfg(feature = "nope")]
     pub fn log_write_uart(
         &mut self,
         uart: &mut UART,
@@ -118,6 +129,49 @@ where
         Ok(())
     }
 
+    pub fn init_log_service(
+        &mut self,
+        uart: &mut UART,
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        let params = AddServiceParameters {
+            uuid:                  UUID_CONSOLE_LOG_SERVICE,
+            service_type:          crate::bluetooth::gatt::ServiceType::Primary,
+            max_attribute_records: 8,
+        };
+        block!(self.add_service(&params))?;
+
+        let service: GattService = match self.read_event_params_vendor(uart)? {
+            VReturnParameters::GattAddService(service) => service,
+            other => {
+                panic!("other 0 = {:?}", other);
+            }
+        };
+        uprintln!(uart, "service = {:?}", service);
+
+        let params0 = AddCharacteristicParameters {
+            service_handle:            service.service_handle,
+            characteristic_uuid:       UUID_CONSOLE_LOG_CHAR,
+            characteristic_value_len:  18,
+            characteristic_properties: CharacteristicProperty::NOTIFY,
+            security_permissions:      CharacteristicPermission::NONE,
+            gatt_event_mask:           CharacteristicEvent::NONE,
+            encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
+            is_variable:               true,
+            fw_version_before_v72:     false,
+        };
+        block!(self.add_characteristic(&params0))?;
+
+        let c = match self.read_event_params_vendor(uart)? {
+            VReturnParameters::GattAddCharacteristic(c) => c,
+            other => unimplemented!("other = {:?}", other),
+        };
+
+        uprintln!(uart, "c = {:?}", c);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "nope")]
     pub fn init_log_service(
         &mut self,
         uart: &mut UART,

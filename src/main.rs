@@ -138,11 +138,12 @@ mod app {
         let bt_buf = cx.local.bt_buf;
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
-        let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
+        // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
+        let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
 
-        let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
+        // let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
 
-        let mut init_struct = init_all(cp, dp, &mut bt_buf[..], main_period);
+        let mut init_struct = init_all(cp, dp, &mut bt_buf[..]);
 
         let mut uart = init_struct.uart;
         let clocks = init_struct.clocks;
@@ -308,24 +309,22 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
     #[cfg(feature = "nope")]
     // #[task(binds = TIM3, shared = [uart, exti, bt],
-    //        local = [tim3, buf: [u8; 16] = [0; 16]], priority = 4)]
+    // local = [tim3, buf: [u8; 16] = [0; 16]], priority = 4)]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
         (cx.shared.uart, cx.shared.exti, cx.shared.bt).lock(|uart, exti, bt| {
-            // bt.clear_interrupt();
             bt.pause_interrupt(exti);
             uprint!(uart, "0..");
             match bt.log_write(true, &cx.local.buf[..]) {
-                // match bt.log_write(None, &cx.local.buf[..]) {
                 Ok(true) => {
                     // uprintln!(uart, "sent log write command");
                 }
@@ -342,12 +341,77 @@ mod app {
     }
 
     // #[cfg(feature = "nope")]
-    #[task(
-        binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag, uart],
-        local = [tim3, sensors],
-        priority = 4
-    )]
+    #[task(binds = TIM3, shared = [uart, exti, bt, ahrs, sens_data, flight_data],
+           local = [tim3, sensors, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0)], priority = 4)]
+    fn timer_sensors(mut cx: timer_sensors::Context) {
+        cx.local
+            .tim3
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        (
+            cx.shared.uart,
+            cx.shared.exti,
+            cx.shared.bt,
+            cx.shared.ahrs,
+            cx.shared.sens_data,
+            cx.shared.flight_data,
+        )
+            .lock(|uart, exti, bt, ahrs, sd, fd| {
+                // cx.local.sensors.read_data_mag(sd);
+                // cx.local.sensors.read_data_imu(sd, false);
+
+                // let gyro = sd.imu_gyro.read_and_reset();
+                // let acc = sd.imu_acc.read_and_reset();
+                // let mag = sd.magnetometer.read_and_reset();
+                // ahrs.update(gyro, acc, mag);
+
+                // let qq = ahrs.get_quat().coords;
+
+                // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+
+                bt.pause_interrupt(exti);
+                // uprint!(uart, "0..");
+                match bt.log_write(uart, true, &cx.local.buf[..]) {
+                    Ok(true) => {
+                        // uprintln!(uart, "sent log write command");
+                        cx.local.cnt.0 += 1;
+                    }
+                    Ok(false) => {
+                        // uprintln!(uart, "failed to write");
+                        cx.local.cnt.1 += 1;
+                    }
+                    Err(e) => {
+                        uprintln!(uart, "error 0 = {:?}", e);
+                    }
+                }
+
+                uprintln!(uart, "{:?}/{:?}", cx.local.cnt.0, cx.local.cnt.1,);
+
+                // uprintln!(uart, "1");
+                bt.unpause_interrupt(exti);
+
+                // uprintln!(
+                //     uart,
+                //     "{:?}/{:?} = {:.3}",
+                //     cx.local.cnt.0,
+                //     cx.local.cnt.0 + cx.local.cnt.1,
+                //     cx.local.cnt.0 as f32 / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
+                // );
+
+                // uprintln!(uart, "{:?}/{:?}", cx.local.cnt.0, cx.local.cnt.1,);
+            });
+        // timer_sensors::spawn_after(100.millis()).unwrap();
+    }
+
+    #[cfg(feature = "nope")]
+    // #[task(
+    // binds = TIM3,
+    // shared = [ahrs, sens_data, flight_data, tim9_flag],
+    // local = [tim3, sensors],
+    // priority = 4
+    // )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -405,9 +469,9 @@ mod app {
         //
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-           local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
+    #[cfg(feature = "nope")]
+    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+    // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
@@ -556,41 +620,6 @@ mod app {
             // }
         });
     }
-
-    // #[cfg(feature = "nope")]
-    // // #[task(capacity = 3, shared = [bt, uart, exti], priority = 8)]
-    // fn test_uart(mut cx: test_uart::Context) {
-    //     (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
-    //         uprintln!(uart, "test_uart start");
-
-    //         // let buf = [1, 2, 3, 4];
-    //         let buf = "wat";
-
-    //         // bt.clear_interrupt();
-    //         bt.pause_interrupt(exti);
-    //         // match block!(bt.log_write(uart, buf.as_bytes())) {
-    //         match bt.log_write(uart, buf.as_bytes()) {
-    //             Ok(_) => {
-    //                 uprintln!(uart, "sent log write command");
-    //                 // let i = bt.check_interrupt();
-    //                 // uprintln!(uart, "i = {:?}", i);
-    //             }
-    //             Err(e) => {
-    //                 uprintln!(uart, "error 0 = {:?}", e);
-    //             }
-    //         }
-    //         bt.unpause_interrupt(exti);
-
-    //         uprintln!(uart, "test_uart done");
-    //         test_uart::spawn_after(1.secs()).unwrap();
-
-    //         // if !bt.state.is_connected() {
-    //         //     // uprintln!(uart, "not connected yet");
-    //         //     test_uart::spawn_after(1.secs()).unwrap();
-    //         // } else {
-    //         // }
-    //     });
-    // }
 
     #[idle]
     fn idle(cx: idle::Context) -> ! {
