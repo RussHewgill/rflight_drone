@@ -71,9 +71,10 @@ where
         let logger = if let Some(logger) = self.services.logger {
             logger
         } else {
-            uprintln!(uart, "no logger?");
+            // uprintln!(uart, "no logger?");
             // uprintln!(uart, "");
-            return Ok(false);
+            // return Ok(false);
+            panic!("no logger?");
         };
 
         let val = UpdateCharacteristicValueParameters {
@@ -85,8 +86,10 @@ where
         block!(self.update_characteristic_value(&val)).unwrap();
 
         if timeout {
+            let timeout_duration = 1000.millis();
+
             // uprintln!(uart, "wat 0");
-            let result = self.ignore_event_timeout(uart, 100.millis())?;
+            let result = self.ignore_event_timeout(uart, timeout_duration)?;
             // uprintln!(uart, "wat 1");
 
             if result == TimeoutResult::Timeout {
@@ -135,7 +138,8 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "nope")]
+    // #[cfg(feature = "nope")]
+    /// block
     pub fn init_log_service(
         &mut self,
         uart: &mut UART,
@@ -146,14 +150,32 @@ where
             max_attribute_records: 8,
         };
         block!(self.add_service(&params))?;
+        uprintln!(uart, "sent service");
 
-        let service: GattService = match self.read_event_params_vendor(uart)? {
-            VReturnParameters::GattAddService(service) => service,
+        // let service: GattService = match self.read_event_params_vendor(uart)? {
+        //     VReturnParameters::GattAddService(service) => service,
+        //     other => {
+        //         panic!("other 0 = {:?}", other);
+        //     }
+        // };
+        // uprintln!(uart, "service = {:?}", service);
+
+        let service = match self._read_event(uart)? {
+            Event::CommandComplete(params) => match params.return_params {
+                ReturnParameters::Vendor(vs) => match vs {
+                    VReturnParameters::GattAddService(service) => service,
+                    other => {
+                        panic!("event_params_vendor other 0 = {:?}", other);
+                    }
+                },
+                other => {
+                    panic!("event_params_vendor other 1 = {:?}", other);
+                }
+            },
             other => {
-                panic!("other 0 = {:?}", other);
+                panic!("event_params_vendor other 2 = {:?}", other);
             }
         };
-        uprintln!(uart, "service = {:?}", service);
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
@@ -188,10 +210,10 @@ where
         Ok(())
     }
 
-    // #[cfg(feature = "nope")]
+    #[cfg(feature = "nope")]
+    /// Retry
     pub fn init_log_service(
         &mut self,
-        dwt: &mut Dwt,
         uart: &mut UART,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         self.wait_ms(25.millis());
@@ -227,6 +249,7 @@ where
                     }
                 },
                 Ok(None) => {
+                    uprintln!(uart, "init_log_service, re-sending add_service");
                     block!(self.add_service(&params))?;
                 }
                 Err(e) => panic!("init_log_service error = {:?}", e),
@@ -245,7 +268,6 @@ where
             // | CharacteristicProperty::READ,
             security_permissions:      CharacteristicPermission::NONE,
             gatt_event_mask:           CharacteristicEvent::NONE,
-            // gatt_event_mask: CharacteristicEvent::CONFIRM_READ,
             encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
             is_variable:               true,
             // fw_version_before_v72:     true,
@@ -274,7 +296,8 @@ where
                     }
                 },
                 Ok(None) => {
-                    block!(self.add_service(&params))?;
+                    uprintln!(uart, "init_log_service, re-sending add_characteristic");
+                    block!(self.add_characteristic(&params0))?;
                 }
                 Err(e) => panic!("init_log_service error = {:?}", e),
             }

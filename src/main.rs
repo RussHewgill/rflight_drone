@@ -81,7 +81,7 @@ mod app {
     use crate::{
         bluetooth::gap::Commands as GapCommands,
         bluetooth::gatt::Commands as GattCommands,
-        bluetooth::hal_bt::Commands as HalCommands,
+        bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bt_control::BTState,
         sensors::ahrs::{FlightData, AHRS},
         sensors::{SensorData, Sensors, UQuat},
@@ -92,6 +92,8 @@ mod app {
     use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
 
     use nalgebra as na;
+
+    use heapless::spsc::Queue;
 
     use crate::{
         bt_control::{BTController, BTEvent},
@@ -111,6 +113,7 @@ mod app {
         flight_data: FlightData,
         // bt_chan:  heapless::spsc::Queue<>
         bt:          BTController<'static>,
+        // bt_queue:    heapless::spsc::Queue<bluetooth_hci::Event<BlueNRGEvent>, 10>,
         // delay_bt: DelayMs<TIM2>,
         // delay_bt: TIM2,
         // delay_bt:  CounterMs<TIM2>,
@@ -163,26 +166,36 @@ mod app {
         // uprintln!(uart, "main_period = {:?}", main_period.to_Hz());
         uprintln!(uart, "sensor_period = {:?}", sensor_period.to_Hz());
 
-        // uart.pause();
-        // bt.pause_interrupt(&mut exti);
-        // // match bt.init_bt(&mut uart, &mut delay_bt) {
-        // match bt.init_bt(&mut dwt, &mut uart) {
-        //     Ok(()) => {}
-        //     e => {
-        //         uprintln!(uart, "init_bt error = {:?}", e);
-        //     }
-        // }
-        // bt.unpause_interrupt(&mut exti);
+        uart.pause();
+        bt.pause_interrupt(&mut exti);
+        // match bt.init_bt(&mut uart, &mut delay_bt) {
+        match bt.init_bt(&mut uart) {
+            Ok(()) => {}
+            e => {
+                uprintln!(uart, "init_bt error = {:?}", e);
+            }
+        }
+        uart.unpause();
+
+        bt.unpause_interrupt(&mut exti);
+
+        loop {
+            if !bt.data_ready().unwrap() {
+                break;
+            }
+            uprintln!(uart, "wat 0");
+            bt.read_event_uart(&mut uart).unwrap();
+        }
+
         // bt.clear_interrupt();
-        // // uart.unpause();
-        // // bt.unpend();
+        // bt.unpend();
 
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        // tim3.start(sensor_period).unwrap();
-        // // tim3.start(50.Hz()).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        tim3.start(sensor_period).unwrap();
+        // tim3.start(50.Hz()).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
@@ -295,6 +308,7 @@ mod app {
             sens_data: SensorData::default(),
             flight_data: FlightData::default(),
             bt,
+            // bt_queue: Queue::new(),
             // delay_bt,
             tim9_flag: false,
         };
@@ -307,22 +321,22 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(
-        binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag],
-        local = [tim3, sensors],
-        priority = 4
-    )]
+    #[cfg(feature = "nope")]
+    // #[task(
+    // binds = TIM3,
+    // shared = [ahrs, sens_data, flight_data, tim9_flag],
+    // local = [tim3, sensors],
+    // priority = 4
+    // )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
-        // cx.local
-        //     .tim3
-        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        cx.local
+            .tim3
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
         (
             cx.shared.ahrs,
             cx.shared.sens_data,
@@ -358,12 +372,77 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
     }
 
-    // #[cfg(feature = "nope")]
     #[task(
+        binds = TIM3,
         shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-        local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
+        local = [counter: u32 = 0, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0)],
         priority = 3
     )]
+    fn main_loop(mut cx: main_loop::Context) {
+        *cx.local.counter += 1;
+        if *cx.local.counter >= 10 {
+            *cx.local.counter = 0;
+
+            (
+                cx.shared.uart,
+                cx.shared.flight_data,
+                cx.shared.bt,
+                cx.shared.exti,
+            )
+                .lock(|uart, fd, bt, exti| {
+                    // let qq = fd.quat.coords;
+
+                    // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                    // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                    // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                    // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+
+                    if bt.data_ready().unwrap() {
+                        uprintln!(uart, "data ready?");
+                    }
+
+                    if bt.state.is_connected() {
+                        // uprint!(uart, "sending ({:?})...", *cx.local.counter);
+                        // bt.clear_interrupt();
+                        bt.pause_interrupt(exti);
+                        uprint!(uart, "0..");
+                        match bt.log_write(uart, true, &cx.local.buf[..]) {
+                            Ok(true) => {
+                                // uprintln!(uart, "sent log write command");
+                                cx.local.cnt.0 += 1;
+                            }
+                            Ok(false) => {
+                                // uprintln!(uart, "failed to write");
+                                cx.local.cnt.1 += 1;
+                            }
+                            Err(e) => {
+                                // uprintln!(uart, "error 0 = {:?}", e);
+                            }
+                        }
+                        bt.unpause_interrupt(exti);
+                        uprintln!(uart, "1");
+
+                        uprintln!(
+                            uart,
+                            "{:?}, {:?} = {:.2}",
+                            cx.local.cnt.0,
+                            cx.local.cnt.1,
+                            cx.local.cnt.0 as f32
+                                / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
+                        );
+                    }
+                    // //
+                    // unimplemented!()
+                });
+        }
+    }
+
+    #[cfg(feature = "nope")]
+    // #[task(
+    // shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+    // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
+    // priority = 3
+    // )]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
@@ -390,7 +469,7 @@ mod app {
                             // bt.clear_interrupt();
                             bt.pause_interrupt(exti);
                             uprint!(uart, "0..");
-                            match bt.log_write(uart, true, &cx.local.buf[..]) {
+                            match bt.log_write(uart, false, &cx.local.buf[..]) {
                                 Ok(true) => {
                                     // uprintln!(uart, "sent log write command");
                                 }
@@ -422,7 +501,6 @@ mod app {
         (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
             uprintln!(uart, "bt_irq");
 
-            // exti.pr.modify(|r, w| w.pr4().set_bit());
             bt.clear_interrupt();
             bt.pause_interrupt(exti);
 
@@ -433,8 +511,11 @@ mod app {
                     unimplemented!()
                 }
             };
-
             bt.state.handle_event(uart, event);
+
+            // if !bt.data_ready().unwrap() {
+            //     break;
+            // }
 
             bt.unpause_interrupt(exti);
 

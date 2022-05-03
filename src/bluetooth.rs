@@ -160,7 +160,7 @@ pub struct BTServices {
     pub sensors: Option<SvSensors>,
 }
 
-/// new, pause/resume/check/clear interrupt
+/// new
 impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     pub fn new(
         spi: SPI,
@@ -187,6 +187,7 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
     }
 }
 
+/// pause/resume/check/clear interrupt
 impl<'buf, SPI, CS, Reset, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, PA4>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
@@ -294,9 +295,9 @@ where
         access_byte: AccessByte,
         mut uart: Option<&mut UART>,
     ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
-        let mut x = 0;
+        // let mut x = 0;
         loop {
-            x += 1;
+            // x += 1;
             // let mut write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
             // let mut read_header = [0xff; 5];
             // let e = self.spi.transfer(&mut read_header, &write_header);
@@ -308,18 +309,18 @@ where
                 .map_err(BTError::Spi)
                 .map_err(nb::Error::Other)?;
 
-            if let Some(ref mut uart) = uart {
-                for b in header {
-                    uprint!(uart, "{:#04x} ", b);
-                }
-                uprintln!(uart, "");
-            }
+            // if let Some(ref mut uart) = uart {
+            //     for b in header {
+            //         uprint!(uart, "{:#04x} ", b);
+            //     }
+            //     uprintln!(uart, "");
+            // }
 
             match parse_spi_header(&header) {
                 Ok(lens) => {
-                    if let Some(ref mut uart) = uart {
-                        uprintln!(uart, "ready in {:?} loops", x);
-                    }
+                    // if let Some(ref mut uart) = uart {
+                    //     uprintln!(uart, "ready in {:?} loops", x);
+                    // }
                     return Ok(lens);
                 }
                 Err(nb::Error::WouldBlock) => {
@@ -327,6 +328,9 @@ where
                         .set_high()
                         .map_err(BTError::Gpio)
                         .map_err(nb::Error::Other)?;
+                    // self.wait_ms(2.mill)
+                    cortex_m::asm::nop();
+                    cortex_m::asm::nop();
                     self.cs
                         .set_low()
                         .map_err(BTError::Gpio)

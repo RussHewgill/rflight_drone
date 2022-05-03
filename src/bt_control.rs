@@ -66,11 +66,14 @@ pub enum TimeoutResult {
 
 pub type BTController<'spi> = BluetoothSpi<
     'spi,
-    Spi1<(
-        Pin<'A', 5, Alternate<5>>,
-        Pin<'A', 6, Alternate<5>>,
-        Pin<'A', 7, Alternate<5>>,
-    )>,
+    Spi1<
+        (
+            Pin<'A', 5, Alternate<5>>,
+            Pin<'A', 6, Alternate<5>>,
+            Pin<'A', 7, Alternate<5>>,
+        ),
+        stm32f4xx_hal::spi::TransferModeNormal,
+    >,
     Pin<'B', 0, Output>,
     Pin<'B', 2, Output>,
     PA4,
@@ -111,16 +114,14 @@ where
 {
     fn init_services(
         &mut self,
-        dwt: &mut Dwt,
         uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        self.init_log_service(dwt, uart)?;
+        self.init_log_service(uart)?;
         Ok(())
     }
 
     pub fn init_bt(
         &mut self,
-        dwt: &mut Dwt,
         uart: &mut UART,
         // delay: &mut DelayMs<TIM2>,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
@@ -248,7 +249,7 @@ where
         block!(self.set_discoverable(&d_params)).unwrap();
         self.read_event_uart(uart)?;
 
-        self.init_services(dwt, uart)?;
+        self.init_services(uart)?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
@@ -283,15 +284,6 @@ where
 
         Ok(())
     }
-
-    // pub fn init_advertising(
-    //     &mut self,
-    //     uart: &mut UART,
-    // ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-    //     unimplemented!()
-    // }
-
-    //
 }
 
 /// send commands
@@ -465,6 +457,8 @@ where
         uart: &mut UART,
         // ) -> nb::Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>>
     ) -> Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>> {
+        //
+
         // let x: Result<
         //     bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
         //     bluetooth_hci::host::uart::Error<

@@ -111,6 +111,9 @@ pub fn init_all(
     // (uart, clocks, mono)
     let mut syscfg = dp.SYSCFG.constrain();
 
+    // // let _rtc = hal::rtc::Rtc::rtc(dp.RTC, &mut rcc);
+    // let _rtc = stm32f4xx_hal::rtc::Rtc::new(dp.RTC, &mut dp.PWR);
+
     // // let mut bt_delay = cp.SYST.delay(&clocks);
     // // let bt_delay = dp.TIM2.delay_ms(&clocks);
 
@@ -289,10 +292,11 @@ fn init_bt(
         .speed(Speed::High);
     cs.set_high();
 
-    let reset = reset
+    let mut reset = reset
         .internal_resistor(Pull::Up)
         .into_push_pull_output()
         .speed(Speed::Low);
+    reset.set_high();
 
     // let input = input.into_pull_down_input();
 
