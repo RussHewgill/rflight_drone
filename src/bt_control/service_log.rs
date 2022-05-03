@@ -5,6 +5,7 @@ use hal::digital::v2::{InputPin, OutputPin};
 use stm32f4::stm32f401::{RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
     block,
+    dwt::Dwt,
     gpio::{Alternate, Input, Output, Pin, PA4, PA5, PA6, PA7, PB0, PB2},
     nb,
     prelude::*,
@@ -190,9 +191,13 @@ where
     // #[cfg(feature = "nope")]
     pub fn init_log_service(
         &mut self,
+        dwt: &mut Dwt,
         uart: &mut UART,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         self.wait_ms(25.millis());
+
+        /// how long to wait before re-sending command
+        let timeout = 1000.millis();
 
         let params = AddServiceParameters {
             uuid:                  UUID_CONSOLE_LOG_SERVICE,
@@ -202,11 +207,13 @@ where
 
         let service: GattService = loop {
             block!(self.add_service(&params))?;
-            match self._read_event_timeout(100.millis(), uart) {
+            match self._read_event_timeout(timeout, uart) {
                 Ok(Some(e)) => match e {
                     Event::CommandComplete(params) => match params.return_params {
                         ReturnParameters::Vendor(vs) => match vs {
-                            VReturnParameters::GattAddService(service) => break service,
+                            VReturnParameters::GattAddService(service) => {
+                                break service;
+                            }
                             other => {
                                 uprintln!(uart, "other a 0 = {:?}", other);
                             }
@@ -227,7 +234,7 @@ where
         };
         uprintln!(uart, "service = {:?}", service);
 
-        self.wait_ms(10.millis());
+        self.wait_ms(100.millis());
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
@@ -247,12 +254,12 @@ where
 
         let c = loop {
             block!(self.add_characteristic(&params0))?;
-            match self._read_event_timeout(100.millis(), uart) {
+            match self._read_event_timeout(timeout, uart) {
                 Ok(Some(e)) => match e {
                     Event::CommandComplete(params) => match params.return_params {
                         ReturnParameters::Vendor(vs) => match vs {
                             VReturnParameters::GattAddCharacteristic(service) => {
-                                break service
+                                break service;
                             }
                             other => {
                                 uprintln!(uart, "other b 0 = {:?}", other);

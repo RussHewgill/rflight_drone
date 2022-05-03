@@ -151,6 +151,7 @@ mod app {
         let mut exti = init_struct.exti;
         let mut sensors = init_struct.sensors;
         let mut bt = init_struct.bt;
+        let mut dwt = init_struct.dwt;
 
         // uprintln!(uart, "hclk()     = {:?}", clocks.hclk());
         // uprintln!(uart, "sysclk()   = {:?}", clocks.sysclk());
@@ -165,7 +166,7 @@ mod app {
         uart.pause();
         bt.pause_interrupt(&mut exti);
         // match bt.init_bt(&mut uart, &mut delay_bt) {
-        match bt.init_bt(&mut uart) {
+        match bt.init_bt(&mut dwt, &mut uart) {
             Ok(()) => {}
             e => {
                 uprintln!(uart, "init_bt error = {:?}", e);
@@ -174,7 +175,6 @@ mod app {
         bt.unpause_interrupt(&mut exti);
         bt.clear_interrupt();
         // uart.unpause();
-
         // bt.unpend();
 
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
@@ -287,7 +287,7 @@ mod app {
         // uprintln!(uart, "interval = {:?}", interval);
 
         let shared = Shared {
-            dwt: init_struct.dwt,
+            dwt,
             uart,
             exti,
             ahrs,
@@ -307,146 +307,24 @@ mod app {
         // // timer_sensors::spawn_after(1.secs()).unwrap();
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // timer_sensors::spawn_after(100.millis()).unwrap();
+        timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(binds = TIM3, shared = [uart, exti, bt],
-    // local = [tim3, buf: [u8; 16] = [0; 16]], priority = 4)]
-    fn timer_sensors(mut cx: timer_sensors::Context) {
-        cx.local
-            .tim3
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        (cx.shared.uart, cx.shared.exti, cx.shared.bt).lock(|uart, exti, bt| {
-            bt.pause_interrupt(exti);
-            uprint!(uart, "0..");
-            match bt.log_write(uart, true, &cx.local.buf[..]) {
-                Ok(true) => {
-                    // uprintln!(uart, "sent log write command");
-                    uprintln!(uart, "1");
-                }
-                Ok(false) => {
-                    uprintln!(uart, "failed to write");
-                }
-                Err(e) => {
-                    uprintln!(uart, "error 0 = {:?}", e);
-                }
-            }
-            uprintln!(uart, "1");
-            bt.unpause_interrupt(exti);
-        });
-    }
-
-    #[cfg(feature = "nope")]
-    // #[task(binds = TIM3, shared = [uart, exti, bt, ahrs, sens_data, flight_data],
-    // local = [tim3, sensors, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0)], priority = 4)]
-    fn timer_sensors(mut cx: timer_sensors::Context) {
-        cx.local
-            .tim3
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        (
-            cx.shared.uart,
-            cx.shared.exti,
-            cx.shared.bt,
-            cx.shared.ahrs,
-            cx.shared.sens_data,
-            cx.shared.flight_data,
-        )
-            .lock(|uart, exti, bt, ahrs, sd, fd| {
-                // cx.local.sensors.read_data_mag(sd);
-                // cx.local.sensors.read_data_imu(sd, false);
-
-                // let gyro = sd.imu_gyro.read_and_reset();
-                // let acc = sd.imu_acc.read_and_reset();
-                // let mag = sd.magnetometer.read_and_reset();
-                // ahrs.update(gyro, acc, mag);
-
-                // let qq = ahrs.get_quat().coords;
-
-                // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
-
-                if bt.state.is_connected() {
-                    bt.pause_interrupt(exti);
-                    // uprint!(uart, "0..");
-                    match bt.log_write(uart, true, &cx.local.buf[..]) {
-                        Ok(true) => {
-                            // uprintln!(uart, "sent log write command");
-                            cx.local.cnt.0 += 1;
-                        }
-                        Ok(false) => {
-                            // uprintln!(uart, "failed to write");
-                            cx.local.cnt.1 += 1;
-                        }
-                        Err(e) => {
-                            uprintln!(uart, "error 0 = {:?}", e);
-                        }
-                    }
-
-                    // uprintln!(uart, "{:?}/{:?}", cx.local.cnt.0, cx.local.cnt.1,);
-
-                    // uprintln!(uart, "1");
-                    bt.unpause_interrupt(exti);
-                }
-
-                uprintln!(
-                    uart,
-                    "{:?}/{:?} = {:.3}",
-                    cx.local.cnt.0,
-                    cx.local.cnt.0 + cx.local.cnt.1,
-                    cx.local.cnt.0 as f32 / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
-                );
-
-                // uprintln!(uart, "{:?}/{:?}", cx.local.cnt.0, cx.local.cnt.1,);
-            });
-        // timer_sensors::spawn_after(100.millis()).unwrap();
-    }
-
     // #[cfg(feature = "nope")]
     #[task(
-    binds = TIM3,
-    shared = [ahrs, sens_data, flight_data, tim9_flag],
-    local = [tim3, sensors],
-    priority = 4
+        // binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag, uart],
+        local = [tim3, sensors],
+        priority = 4
     )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
-        cx.local
-            .tim3
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        (
-            cx.shared.ahrs,
-            cx.shared.sens_data,
-            cx.shared.flight_data,
-            cx.shared.tim9_flag,
-        )
-            .lock(|ahrs, sd, fd, tim9_flag| {
-                /// Read sensor data
-                cx.local.sensors.read_data_mag(sd);
-                cx.local.sensors.read_data_imu(sd, false);
-
-                /// update AHRS
-                let gyro = sd.imu_gyro.read_and_reset();
-                let acc = sd.imu_acc.read_and_reset();
-                let mag = sd.magnetometer.read_and_reset();
-                ahrs.update(gyro, acc, mag);
-
-                /// update FlightData
-                fd.update(&ahrs);
-
-                *tim9_flag = true;
-            });
-    }
-
-    #[cfg(feature = "nope")]
-    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag, ahrs, sens_data],
-    //        local = [sensors], priority = 3)]
-    fn main_loop(mut cx: main_loop::Context) {
+        // cx.local
+        //     .tim3
+        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
         (
             cx.shared.ahrs,
             cx.shared.sens_data,
@@ -455,26 +333,33 @@ mod app {
             cx.shared.uart,
         )
             .lock(|ahrs, sd, fd, tim9_flag, uart| {
-                // /// Read sensor data
-                // cx.local.sensors.read_data_mag(sd);
-                // cx.local.sensors.read_data_imu(sd, false);
-                // let gyro = sd.imu_gyro.read_and_reset();
-                // let acc = sd.imu_acc.read_and_reset();
-                // let mag = sd.magnetometer.read_and_reset();
-                // uprintln!(uart, "acc = {:?}", acc);
+                /// Read sensor data
+                cx.local.sensors.read_data_mag(sd);
+                cx.local.sensors.read_data_imu(sd, false);
 
-                //
+                /// update AHRS
+                let gyro = sd.imu_gyro.read_and_reset();
+                let acc = sd.imu_acc.read_and_reset();
+                let mag = sd.magnetometer.read_and_reset();
+
+                print_v3(uart, gyro);
+                print_v3(uart, acc);
+                print_v3(uart, mag);
+                uprintln!(uart, "");
+
+                ahrs.update(gyro, acc, mag);
+
+                /// update FlightData
+                fd.update(&ahrs);
+
+                *tim9_flag = true;
             });
-
-        // main_loop::spawn_after(100.millis()).unwrap();
-        // // main_loop::spawn().unwrap();
-
-        //
+        timer_sensors::spawn_after(100.millis()).unwrap();
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-           local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
+    #[cfg(feature = "nope")]
+    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+    // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
@@ -524,70 +409,6 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
         main_loop::spawn().unwrap();
-    }
-
-    #[cfg(feature = "nope")]
-    // #[task(binds = TIM3, shared = [bt, delay_bt, exti, ahrs, uart, dwt],
-    //        local = [tim3, sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16], interval],
-    //        priority = 3
-    // )]
-    // #[task(shared = [bt, delay_bt, exti, ahrs, uart, dwt],
-    // local = [sensors, counter: u32 = 0, buf: [u8; 16] = [0; 16], interval], priority = 3)]
-    fn timer_sensors(mut cx: timer_sensors::Context) {
-        cx.local
-            .tim3
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-
-        *cx.local.counter += 1;
-
-        cx.local.sensors.read_data_mag();
-        cx.local.sensors.read_data_imu(false);
-
-        // (cx.shared.ahrs, cx.shared.exti).lock(|ahrs, exti| {
-        (cx.shared.uart, cx.shared.ahrs, cx.shared.exti).lock(|uart, ahrs, exti| {
-            let gyro = cx.local.sensors.data.imu_gyro.read_and_reset();
-            let acc = cx.local.sensors.data.imu_acc.read_and_reset();
-            let mag = cx.local.sensors.data.magnetometer.read_and_reset();
-
-            if let Some(q) = ahrs.update(gyro, acc, mag) {
-                if *cx.local.counter >= 10 {
-                    (cx.shared.bt, cx.shared.delay_bt).lock(|bt, delay_bt| {
-                        *cx.local.counter = 0;
-
-                        let qq = q.coords;
-
-                        cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                        cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                        cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                        cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
-
-                        // uprint!(uart, "sending ({:?})...", *cx.local.counter);
-                        bt.clear_interrupt();
-                        bt.pause_interrupt(exti);
-                        uprint!(uart, "0..");
-                        match bt.log_write(&cx.local.buf[..]) {
-                            Ok(true) => {
-                                // uprintln!(uart, "sent log write command");
-                            }
-                            Ok(false) => {
-                                // uprintln!(uart, "failed to write");
-                            }
-                            Err(e) => {
-                                // uprintln!(uart, "error 0 = {:?}", e);
-                            }
-                        }
-                        bt.unpause_interrupt(exti);
-                        uprintln!(uart, "1");
-                    });
-                }
-
-                let _ = UQuat::default().euler_angles();
-            }
-        });
-
-        // timer_sensors::spawn_after(2.secs()).unwrap();
-        // timer_sensors::spawn_after(cx.local.interval.convert()).unwrap();
-        // unimplemented!()
     }
 
     // #[cfg(feature = "nope")]

@@ -320,23 +320,13 @@ fn init_bt(
     // let mut spi = spi1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);
     // let mut spi = spi1.spi((sck, miso, mosi), mode, 2.MHz(), &clocks);
     // let mut spi = spi1.spi((sck, miso, mosi), mode, 4.MHz(), &clocks);
+
+    /// 8 MHz seems to work most reliably (PCLK / 8)
     let mut spi = spi1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
-    // let mut spi = spi1.spi((sck, miso, mosi), mode, 100.kHz(), &clocks);
 
-    // let mut buffer = [0u8; 512];
-
-    // let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
     let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, buf, delay);
 
-    // let x = {
-    //     use core::ops::Deref;
-    //     let spi1 = unsafe { &(*SPI1::ptr()) };
-    //     spi1.deref().cr1.read().br().bits()
-    // };
-    // uprintln!(uart, "x = {:#05b}", x);
-
     bt
-    // unimplemented!()
 }
 
 fn init_led(pb4: PB4, pb5: PB5) -> LEDs {

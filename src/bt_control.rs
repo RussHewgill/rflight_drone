@@ -7,6 +7,7 @@ use hal::digital::v2::{InputPin, OutputPin};
 use stm32f4::stm32f401::{RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
     block,
+    dwt::Dwt,
     gpio::{Alternate, Input, Output, Pin, PA4, PA5, PA6, PA7, PB0, PB2},
     nb,
     prelude::*,
@@ -110,15 +111,16 @@ where
 {
     fn init_services(
         &mut self,
+        dwt: &mut Dwt,
         uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        self.init_log_service(uart)?;
-        // self.init_sensor_service(uart)?;
+        self.init_log_service(dwt, uart)?;
         Ok(())
     }
 
     pub fn init_bt(
         &mut self,
+        dwt: &mut Dwt,
         uart: &mut UART,
         // delay: &mut DelayMs<TIM2>,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
@@ -246,7 +248,7 @@ where
         block!(self.set_discoverable(&d_params)).unwrap();
         self.read_event_uart(uart)?;
 
-        self.init_services(uart)?;
+        self.init_services(dwt, uart)?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
