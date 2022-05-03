@@ -134,6 +134,7 @@ where
         Ok(())
     }
 
+    #[cfg(feature = "nope")]
     pub fn init_log_service(
         &mut self,
         uart: &mut UART,
@@ -164,6 +165,8 @@ where
             is_variable:               true,
             fw_version_before_v72:     false,
         };
+
+        // self.wait_ms(50.millis());
         block!(self.add_characteristic(&params0))?;
         uprintln!(uart, "sent c");
 
@@ -184,7 +187,7 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "nope")]
+    // #[cfg(feature = "nope")]
     pub fn init_log_service(
         &mut self,
         uart: &mut UART,
@@ -197,46 +200,23 @@ where
             max_attribute_records: 8,
         };
 
-        // block!(self.add_service(&params))?;
-        // self.wait_ms(25.millis());
-        // // uprintln!(uart, "wat 0");
-        // let service: GattService = match self.read_event_params_vendor(uart)? {
-        //     VReturnParameters::GattAddService(service) => service,
-        //     other => {
-        //         panic!("other 0 = {:?}", other);
-        //     }
-        // };
-        // uprintln!(uart, "service = {:?}", service);
-
         let service: GattService = loop {
             block!(self.add_service(&params))?;
-
-            // let k = self.data_ready().unwrap();
-            // uprintln!(uart, "0 = {:?}", k);
-            // let k = self.data_ready().unwrap();
-            // uprintln!(uart, "1 = {:?}", k);
-            // let k = self.data_ready().unwrap();
-            // uprintln!(uart, "2 = {:?}", k);
-            // let k = self.data_ready().unwrap();
-            // uprintln!(uart, "3 = {:?}", k);
-
-            match self._read_event_timeout(25.millis(), uart) {
-                // match self._read_event(uart) {
+            match self._read_event_timeout(100.millis(), uart) {
                 Ok(Some(e)) => match e {
-                    // Ok(e) => match e {
                     Event::CommandComplete(params) => match params.return_params {
                         ReturnParameters::Vendor(vs) => match vs {
                             VReturnParameters::GattAddService(service) => break service,
                             other => {
-                                uprintln!(uart, "other 0 = {:?}", other);
+                                uprintln!(uart, "other a 0 = {:?}", other);
                             }
                         },
                         other => {
-                            uprintln!(uart, "other 1 = {:?}", other);
+                            uprintln!(uart, "other a 1 = {:?}", other);
                         }
                     },
                     other => {
-                        uprintln!(uart, "other 2 = {:?}", other);
+                        uprintln!(uart, "other a 2 = {:?}", other);
                     }
                 },
                 Ok(None) => {
@@ -264,17 +244,10 @@ where
             // fw_version_before_v72:     true,
             fw_version_before_v72:     false,
         };
-        // block!(self.add_characteristic(&params0))?;
-
-        // let c = match self.read_event_params_vendor(uart)? {
-        //     VReturnParameters::GattAddCharacteristic(c) => c,
-        //     other => unimplemented!("other = {:?}", other),
-        // };
-        // uprintln!(uart, "c = {:?}", c);
 
         let c = loop {
             block!(self.add_characteristic(&params0))?;
-            match self._read_event_timeout(25.millis(), uart) {
+            match self._read_event_timeout(100.millis(), uart) {
                 Ok(Some(e)) => match e {
                     Event::CommandComplete(params) => match params.return_params {
                         ReturnParameters::Vendor(vs) => match vs {
@@ -282,15 +255,15 @@ where
                                 break service
                             }
                             other => {
-                                uprintln!(uart, "other 0 = {:?}", other);
+                                uprintln!(uart, "other b 0 = {:?}", other);
                             }
                         },
                         other => {
-                            uprintln!(uart, "other 1 = {:?}", other);
+                            uprintln!(uart, "other b 1 = {:?}", other);
                         }
                     },
                     other => {
-                        uprintln!(uart, "other 2 = {:?}", other);
+                        uprintln!(uart, "other b 2 = {:?}", other);
                     }
                 },
                 Ok(None) => {

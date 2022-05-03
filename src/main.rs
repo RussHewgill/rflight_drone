@@ -138,8 +138,8 @@ mod app {
         let bt_buf = cx.local.bt_buf;
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
-        // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
-        let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
+        let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
+        // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
 
         // let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
 
@@ -309,7 +309,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -341,9 +341,9 @@ mod app {
         });
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(binds = TIM3, shared = [uart, exti, bt, ahrs, sens_data, flight_data],
-           local = [tim3, sensors, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0)], priority = 4)]
+    #[cfg(feature = "nope")]
+    // #[task(binds = TIM3, shared = [uart, exti, bt, ahrs, sens_data, flight_data],
+    // local = [tim3, sensors, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0)], priority = 4)]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -357,20 +357,20 @@ mod app {
             cx.shared.flight_data,
         )
             .lock(|uart, exti, bt, ahrs, sd, fd| {
-                cx.local.sensors.read_data_mag(sd);
-                cx.local.sensors.read_data_imu(sd, false);
+                // cx.local.sensors.read_data_mag(sd);
+                // cx.local.sensors.read_data_imu(sd, false);
 
-                let gyro = sd.imu_gyro.read_and_reset();
-                let acc = sd.imu_acc.read_and_reset();
-                let mag = sd.magnetometer.read_and_reset();
-                ahrs.update(gyro, acc, mag);
+                // let gyro = sd.imu_gyro.read_and_reset();
+                // let acc = sd.imu_acc.read_and_reset();
+                // let mag = sd.magnetometer.read_and_reset();
+                // ahrs.update(gyro, acc, mag);
 
-                let qq = ahrs.get_quat().coords;
+                // let qq = ahrs.get_quat().coords;
 
-                cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+                // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
                 if bt.state.is_connected() {
                     bt.pause_interrupt(exti);
@@ -408,13 +408,13 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    // binds = TIM3,
-    // shared = [ahrs, sens_data, flight_data, tim9_flag],
-    // local = [tim3, sensors],
-    // priority = 4
-    // )]
+    // #[cfg(feature = "nope")]
+    #[task(
+    binds = TIM3,
+    shared = [ahrs, sens_data, flight_data, tim9_flag],
+    local = [tim3, sensors],
+    priority = 4
+    )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -472,9 +472,9 @@ mod app {
         //
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-    // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
+    // #[cfg(feature = "nope")]
+    #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+           local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
@@ -498,10 +498,10 @@ mod app {
                             cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
                             // uprint!(uart, "sending ({:?})...", *cx.local.counter);
-                            bt.clear_interrupt();
+                            // bt.clear_interrupt();
                             bt.pause_interrupt(exti);
                             uprint!(uart, "0..");
-                            match bt.log_write(true, &cx.local.buf[..]) {
+                            match bt.log_write(uart, true, &cx.local.buf[..]) {
                                 Ok(true) => {
                                     // uprintln!(uart, "sent log write command");
                                 }
