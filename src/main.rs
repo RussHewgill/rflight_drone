@@ -163,27 +163,28 @@ mod app {
         // uprintln!(uart, "main_period = {:?}", main_period.to_Hz());
         uprintln!(uart, "sensor_period = {:?}", sensor_period.to_Hz());
 
-        uart.pause();
-        bt.pause_interrupt(&mut exti);
-        // match bt.init_bt(&mut uart, &mut delay_bt) {
-        match bt.init_bt(&mut dwt, &mut uart) {
-            Ok(()) => {}
-            e => {
-                uprintln!(uart, "init_bt error = {:?}", e);
-            }
-        }
-        bt.unpause_interrupt(&mut exti);
-        bt.clear_interrupt();
-        // uart.unpause();
-        // bt.unpend();
+        // uart.pause();
+        // bt.pause_interrupt(&mut exti);
+        // // match bt.init_bt(&mut uart, &mut delay_bt) {
+        // match bt.init_bt(&mut dwt, &mut uart) {
+        //     Ok(()) => {}
+        //     e => {
+        //         uprintln!(uart, "init_bt error = {:?}", e);
+        //     }
+        // }
+        // bt.unpause_interrupt(&mut exti);
+        // bt.clear_interrupt();
+        // // uart.unpause();
+        // // bt.unpend();
 
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        tim3.start(sensor_period).unwrap();
-        // tim3.start(50.Hz()).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // tim3.start(sensor_period).unwrap();
+        // // tim3.start(50.Hz()).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
+        /// enable sensors and configure settings
         init_sensors(&mut sensors);
 
         #[cfg(feature = "nope")]
@@ -304,20 +305,17 @@ mod app {
             // interval,
         };
 
-        // // timer_sensors::spawn_after(1.secs()).unwrap();
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        timer_sensors::spawn_after(100.millis()).unwrap();
-
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
     // #[cfg(feature = "nope")]
     #[task(
-        // binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag, uart],
+        binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag],
         local = [tim3, sensors],
         priority = 4
     )]
@@ -330,9 +328,10 @@ mod app {
             cx.shared.sens_data,
             cx.shared.flight_data,
             cx.shared.tim9_flag,
-            cx.shared.uart,
+            // cx.shared.uart,
         )
-            .lock(|ahrs, sd, fd, tim9_flag, uart| {
+            // .lock(|ahrs, sd, fd, tim9_flag, uart| {
+            .lock(|ahrs, sd, fd, tim9_flag| {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
@@ -342,10 +341,12 @@ mod app {
                 let acc = sd.imu_acc.read_and_reset();
                 let mag = sd.magnetometer.read_and_reset();
 
-                print_v3(uart, gyro);
-                print_v3(uart, acc);
-                print_v3(uart, mag);
-                uprintln!(uart, "");
+                // // print_v3(uart, gyro, 2);
+                // // print_v3(uart, acc, 2);
+                // print_v3(uart, mag, 3);
+                // // uprintln!(uart, "");
+
+                // uprintln!(uart, "d = {:0>4.2}", d);
 
                 ahrs.update(gyro, acc, mag);
 
@@ -354,12 +355,15 @@ mod app {
 
                 *tim9_flag = true;
             });
-        timer_sensors::spawn_after(100.millis()).unwrap();
+        // timer_sensors::spawn_after(100.millis()).unwrap();
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-    // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]], priority = 3)]
+    // #[cfg(feature = "nope")]
+    #[task(
+        shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+        local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
+        priority = 3
+    )]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
@@ -890,7 +894,7 @@ fn main_imu3() -> ! {
 
 // #[entry]
 #[allow(unreachable_code)]
-// #[cfg(feature = "nope")]
+#[cfg(feature = "nope")]
 fn main_imu2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();

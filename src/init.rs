@@ -231,7 +231,7 @@ pub fn init_sensors(sensors: &mut Sensors) {
     imu_cfg.block_data_update = true;
 
     imu_cfg.acc_power = AccelPowerModes::Normal104;
-    // imu_cfg.acc_power = AccelPowerModes::High6660;
+    // imu_cfg.acc_power = AccelPowerModes::High6660; // default in ST firmware
     imu_cfg.acc_scale = AccelScaleFactor::S4;
 
     // imu_cfg.acc_analog_lp_bandwidth = AccelAnalogBandwidth::BW1500;
@@ -239,7 +239,7 @@ pub fn init_sensors(sensors: &mut Sensors) {
     // imu_cfg.acc_digital_filter_config = AccelDigFilterConfig::OdrLowPass400;
 
     imu_cfg.gyro_power = GyroPowerModes::Normal104;
-    // imu_cfg.gyro_power = GyroPowerModes::High416;
+    // imu_cfg.gyro_power = GyroPowerModes::High416; // default in ST firmware
     imu_cfg.gyro_scale = GyroScaleFactor::S2000;
 
     // // gyro low-pass filter
@@ -251,7 +251,8 @@ pub fn init_sensors(sensors: &mut Sensors) {
     });
 
     sensors.with_spi_mag(|spi, mag| {
-        mag.init_continuous(spi).unwrap();
+        mag.init_continuous(spi, crate::sensors::magneto::MagDataRate::R100)
+            .unwrap();
     });
 }
 

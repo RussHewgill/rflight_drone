@@ -2,9 +2,13 @@ use stm32f4xx_hal::prelude::*;
 
 use crate::{sensors::V3, uart::*, uprintln};
 
-pub fn print_v3(uart: &mut UART, vec: V3) {
-    // uprintln!(uart, "[{:.3},{:.3},{:.3}]", vec.x, vec.y, vec.z);
-    uprintln!(uart, "[{:.2},{:.2},{:.2}]", vec.x, vec.y, vec.z);
+pub fn print_v3(uart: &mut UART, vec: V3, n: usize) {
+    match n {
+        1 => uprintln!(uart, "[{:>4.1},{:>4.1},{:>4.1}]", vec.x, vec.y, vec.z),
+        2 => uprintln!(uart, "[{:>5.2},{:>5.2},{:>5.2}]", vec.x, vec.y, vec.z),
+        3 => uprintln!(uart, "[{:>6.3},{:>6.3},{:>6.3}]", vec.x, vec.y, vec.z),
+        _ => unimplemented!(),
+    }
 }
 
 pub fn uart_clear_screen(uart: &mut UART) {

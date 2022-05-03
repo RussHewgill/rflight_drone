@@ -84,10 +84,10 @@ impl core::fmt::Write for UART {
 macro_rules! uprint {
 	  ($uart:expr, $fmt:expr) => {
         // core::fmt::Write::write_str(&mut $uart, concat!($fmt, "\r\n")).unwrap();
-        $uart.write_str($fmt).unwrap();
+        $uart.write_str($fmt).unwrap()
 	  };
 	  ($uart:expr, $fmt:expr, $($arg:tt)*) => {
-        $uart.write_fmt(format_args!($fmt, $($arg)*)).unwrap();
+        $uart.write_fmt(format_args!($fmt, $($arg)*)).unwrap()
         // core::fmt::Write::write_fmt(&mut $uart, format_args!($fmt, $($arg)*)).unwrap();
 	  };
 }
@@ -95,14 +95,14 @@ macro_rules! uprint {
 #[macro_export]
 macro_rules! uprintln {
 	  ($uart:expr) => {
-        writeln!($uart.tx, "").unwrap();
+        writeln!($uart.tx, "").unwrap()
 	  };
 	  ($uart:expr, $fmt:expr) => {
-        $uart.write_str(concat!($fmt, "\r\n")).unwrap();
+        $uart.write_str(concat!($fmt, "\r\n")).unwrap()
         // core::fmt::Write::write_str(&mut $uart, concat!($fmt, "\r\n")).unwrap();
 	  };
 	  ($uart:expr, $fmt:expr, $($arg:tt)*) => {
-        $uart.write_fmt(format_args!(concat!($fmt, "\r\n"), $($arg)*)).unwrap();
+        $uart.write_fmt(format_args!(concat!($fmt, "\r\n"), $($arg)*)).unwrap()
         // core::fmt::Write::write_fmt(&mut $uart, format_args!(concat!($fmt, "\r\n"), $($arg)*)).unwrap();
 	  };
 }

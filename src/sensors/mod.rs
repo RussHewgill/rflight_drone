@@ -40,6 +40,19 @@ pub struct DataVal {
     changed: bool,
 }
 
+/// Board: (battery connector in upper right, pointing up)
+///     +X = Right
+///     +Y = Up
+///     +Z = Normal
+/// Acc: (x,y,z) same as board
+/// Gyro: (p,r,q)
+///     +p = rotation about x
+///     +r = rotation about y
+///     +z = rotation about z
+/// Mag: (x,y,z)
+///     +X = Right
+///     +Y = Down
+///     +Z = Normal
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SensorData {
     pub imu_acc:      DataVal,

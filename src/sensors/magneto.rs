@@ -34,12 +34,21 @@ where
         Ok(())
     }
 
-    pub fn init_continuous(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+    pub fn init_continuous(
+        &mut self,
+        spi: &mut Spi3,
+        odr: MagDataRate,
+    ) -> nb::Result<(), SpiError> {
         /// Enable temperature compensation
         /// LP = 0, high power mode
         /// ODR = 00, Output Data Rate = 10Hz
         /// MD  = 00, Continuous mode
-        self.write_reg(spi, MagRegister::CFG_REG_A, 0x80)?;
+        // self.write_reg(spi, MagRegister::CFG_REG_A, 0x80)?;
+        let val = 0
+            | 0b1000_0000 // temperature compensation
+            | odr.to_val();
+        self.write_reg(spi, MagRegister::CFG_REG_A, val)?;
+
         // self.write_reg(MagRegister::CFG_REG_C, 0x01)?; // Data Ready signal pin isn't connected
         Ok(())
     }
@@ -200,6 +209,21 @@ where
 
         self.cs.set_high().ok();
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum MagDataRate {
+    R10  = 0b00,
+    R20  = 0b01,
+    R50  = 0b10,
+    R100 = 0b11,
+}
+
+impl MagDataRate {
+    fn to_val(self) -> u8 {
+        (self as u8) << 2
     }
 }
 
