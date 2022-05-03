@@ -269,7 +269,7 @@ fn init_bt_interrupt(
     pa4.trigger_on_edge(exti, stm32f4xx_hal::gpio::Edge::Rising);
     pa4.clear_interrupt_pending_bit();
     pa4.into_input()
-    // pa4.into_input().internal_resistor(Pull::None)
+    // pa4.into_input().internal_resistor(Pull::Down)
 }
 
 fn init_bt(
@@ -308,6 +308,7 @@ fn init_bt(
     // let miso = miso.into_alternate::<5>();
     let miso = miso
         .internal_resistor(Pull::None)
+        // .internal_resistor(Pull::Down) // XXX: nope
         .into_push_pull_output()
         .into_alternate::<5>()
         .speed(Speed::High);

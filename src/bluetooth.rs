@@ -330,7 +330,7 @@ where
                         .map_err(nb::Error::Other)?;
                     // self.wait_ms(2.mill)
                     cortex_m::asm::nop();
-                    cortex_m::asm::nop();
+                    // cortex_m::asm::nop();
                     self.cs
                         .set_low()
                         .map_err(BTError::Gpio)

@@ -397,40 +397,39 @@ mod app {
                     // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
                     // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
-                    if bt.data_ready().unwrap() {
-                        uprintln!(uart, "data ready?");
-                    }
+                    // if bt.data_ready().unwrap() {
+                    //     uprintln!(uart, "data ready?");
+                    // }
 
-                    if bt.state.is_connected() {
-                        // uprint!(uart, "sending ({:?})...", *cx.local.counter);
-                        // bt.clear_interrupt();
-                        bt.pause_interrupt(exti);
-                        uprint!(uart, "0..");
-                        match bt.log_write(uart, true, &cx.local.buf[..]) {
-                            Ok(true) => {
-                                // uprintln!(uart, "sent log write command");
-                                cx.local.cnt.0 += 1;
-                            }
-                            Ok(false) => {
-                                // uprintln!(uart, "failed to write");
-                                cx.local.cnt.1 += 1;
-                            }
-                            Err(e) => {
-                                // uprintln!(uart, "error 0 = {:?}", e);
-                            }
+                    // if bt.state.is_connected() {
+
+                    // uprint!(uart, "sending ({:?})...", *cx.local.counter);
+                    // bt.clear_interrupt();
+                    bt.pause_interrupt(exti);
+                    uprint!(uart, "0..");
+                    match bt.log_write(uart, true, &cx.local.buf[..]) {
+                        Ok(true) => {
+                            // uprintln!(uart, "sent log write command");
+                            cx.local.cnt.0 += 1;
                         }
-                        bt.unpause_interrupt(exti);
-                        uprintln!(uart, "1");
-
-                        uprintln!(
-                            uart,
-                            "{:?}, {:?} = {:.2}",
-                            cx.local.cnt.0,
-                            cx.local.cnt.1,
-                            cx.local.cnt.0 as f32
-                                / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
-                        );
+                        Ok(false) => {
+                            // uprintln!(uart, "failed to write");
+                            cx.local.cnt.1 += 1;
+                        }
+                        Err(e) => {
+                            // uprintln!(uart, "error 0 = {:?}", e);
+                        }
                     }
+                    bt.unpause_interrupt(exti);
+                    uprintln!(uart, "1");
+
+                    uprintln!(
+                        uart,
+                        "{:?}, {:?} = {:.2}",
+                        cx.local.cnt.0,
+                        cx.local.cnt.1,
+                        cx.local.cnt.0 as f32 / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
+                    );
                     // //
                     // unimplemented!()
                 });

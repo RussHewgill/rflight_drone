@@ -532,12 +532,14 @@ where
             match self.read() {
                 Ok(p) => break p,
                 Err(nb::Error::WouldBlock) => {
-                    if self.delay.get_interrupt().contains(TimerEvent::Update) {
-                        // uprint!(uart, "w2");
-                        self.delay.cancel().unwrap();
-                        self.delay.clear_interrupt(TimerEvent::Update);
-                        return Ok(TimeoutResult::Timeout);
-                    }
+
+                    // if self.delay.get_interrupt().contains(TimerEvent::Update) {
+                    //     // uprint!(uart, "w2");
+                    //     self.delay.cancel().unwrap();
+                    //     self.delay.clear_interrupt(TimerEvent::Update);
+                    //     return Ok(TimeoutResult::Timeout);
+                    // }
+
                     // uprint!(uart, "w3");
                 }
                 Err(e) => {
@@ -555,6 +557,7 @@ where
         match e {
             Event::ConnectionComplete(params) => {
                 // handle the new connection
+                uprintln!(uart, "new connection");
             }
             Event::Vendor(crate::bluetooth::events::BlueNRGEvent::HalInitialized(
                 reason,
@@ -572,7 +575,9 @@ where
                         VReturnParameters::GattUpdateCharacteristicValue(status),
                     ) => {
                         if status != bluetooth_hci::Status::Success {
-                            uprintln!(uart, "status = {:?}", status);
+                            uprintln!(uart, "status 0 = {:?}", status);
+                        } else {
+                            uprintln!(uart, "status 1 = {:?}", status);
                         }
                     }
                     _ => {
