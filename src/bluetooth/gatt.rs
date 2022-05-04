@@ -896,8 +896,10 @@ pub trait Commands {
 }
 
 // impl<CS, Reset, Input, GpioError> Commands for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
-impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
-    for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
+//     for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> Commands
+    for crate::bluetooth::BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,

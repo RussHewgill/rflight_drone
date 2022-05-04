@@ -63,8 +63,22 @@ pub enum TimeoutResult {
     Timeout,
 }
 
-pub type BTController<'spi> = BluetoothSpi<
-    'spi,
+// pub type BTController<'spi> = BluetoothSpi<
+//     'spi,
+//     Spi1<
+//         (
+//             Pin<'A', 5, Alternate<5>>,
+//             Pin<'A', 6, Alternate<5>>,
+//             Pin<'A', 7, Alternate<5>>,
+//         ),
+//         stm32f4xx_hal::spi::TransferModeNormal,
+//     >,
+//     Pin<'B', 0, Output>,
+//     Pin<'B', 2, Output>,
+//     PA4,
+// >;
+
+pub type BTController = BluetoothSpi<
     Spi1<
         (
             Pin<'A', 5, Alternate<5>>,
@@ -102,7 +116,8 @@ mod uuids {
 }
 
 /// init
-impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
@@ -341,7 +356,8 @@ where
 }
 
 /// read and handle events
-impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,

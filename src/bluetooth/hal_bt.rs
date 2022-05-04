@@ -51,7 +51,8 @@ pub trait Commands {
     ///
     /// The controller will generate a [command
     /// complete](crate::event::command::ReturnParameters::HalReadConfigData) event.
-    fn read_config_data(&mut self, param: ConfigParameter) -> nb::Result<(), Self::Error>;
+    fn read_config_data(&mut self, param: ConfigParameter)
+        -> nb::Result<(), Self::Error>;
 
     /// This command sets the TX power level of the BlueNRG-MS.
     ///
@@ -180,8 +181,10 @@ pub trait Commands {
     fn get_anchor_period(&mut self) -> nb::Result<(), Self::Error>;
 }
 
-impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
-    for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
+//     for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> Commands
+    for crate::bluetooth::BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
@@ -201,7 +204,10 @@ where
         crate::opcode::HAL_WRITE_CONFIG_DATA
     );
 
-    fn read_config_data(&mut self, param: ConfigParameter) -> nb::Result<(), Self::Error> {
+    fn read_config_data(
+        &mut self,
+        param: ConfigParameter,
+    ) -> nb::Result<(), Self::Error> {
         self.write_command(crate::opcode::HAL_READ_CONFIG_DATA, &[param as u8])
     }
 
@@ -267,8 +273,8 @@ fn rewrap_error<E>(e: nb::Error<E>) -> nb::Error<Error<E>> {
 
 /// Low-level configuration parameters for the controller.
 pub struct ConfigData {
-    offset: u8,
-    length: u8,
+    offset:    u8,
+    length:    u8,
     value_buf: [u8; ConfigData::MAX_LENGTH],
 }
 
@@ -302,8 +308,8 @@ impl ConfigData {
     /// field or building the structure to write.
     pub fn public_address(addr: hci::BdAddr) -> ConfigDataDiversifierBuilder {
         let mut data = Self {
-            offset: 0,
-            length: 6,
+            offset:    0,
+            length:    6,
             value_buf: [0; Self::MAX_LENGTH],
         };
 
@@ -320,8 +326,8 @@ impl ConfigData {
     /// field or building the structure to write.
     pub fn diversifier(d: u16) -> ConfigDataEncryptionRootBuilder {
         let mut data = Self {
-            offset: 6,
-            length: 2,
+            offset:    6,
+            length:    2,
             value_buf: [0; Self::MAX_LENGTH],
         };
         LittleEndian::write_u16(&mut data.value_buf[0..2], d);
@@ -335,10 +341,12 @@ impl ConfigData {
     /// [`write_config_data`](Commands::write_config_data).  The builder associated functions allow
     /// us to start with any field, and the returned builder allows only either chaining the next
     /// field or building the structure to write.
-    pub fn encryption_root(key: &hci::host::EncryptionKey) -> ConfigDataIdentityRootBuilder {
+    pub fn encryption_root(
+        key: &hci::host::EncryptionKey,
+    ) -> ConfigDataIdentityRootBuilder {
         let mut data = Self {
-            offset: 8,
-            length: 16,
+            offset:    8,
+            length:    16,
             value_buf: [0; Self::MAX_LENGTH],
         };
         data.value_buf[0..16].copy_from_slice(&key.0);
@@ -352,10 +360,12 @@ impl ConfigData {
     /// [`write_config_data`](Commands::write_config_data).  The builder associated functions allow
     /// us to start with any field, and the returned builder allows only either chaining the next
     /// field or building the structure to write.
-    pub fn identity_root(key: &hci::host::EncryptionKey) -> ConfigDataLinkLayerOnlyBuilder {
+    pub fn identity_root(
+        key: &hci::host::EncryptionKey,
+    ) -> ConfigDataLinkLayerOnlyBuilder {
         let mut data = Self {
-            offset: 24,
-            length: 16,
+            offset:    24,
+            length:    16,
             value_buf: [0; Self::MAX_LENGTH],
         };
         data.value_buf[0..16].copy_from_slice(&key.0);
@@ -370,8 +380,8 @@ impl ConfigData {
     /// field or building the structure to write.
     pub fn link_layer_only(ll_only: bool) -> ConfigDataRoleBuilder {
         let mut data = Self {
-            offset: 40,
-            length: 1,
+            offset:    40,
+            length:    1,
             value_buf: [0; Self::MAX_LENGTH],
         };
         data.value_buf[0] = ll_only as u8;
@@ -386,8 +396,8 @@ impl ConfigData {
     /// field or building the structure to write.
     pub fn role(role: Role) -> ConfigDataCompleteBuilder {
         let mut data = Self {
-            offset: 41,
-            length: 1,
+            offset:    41,
+            length:    1,
             value_buf: [0; Self::MAX_LENGTH],
         };
         data.value_buf[0] = role as u8;
@@ -524,7 +534,7 @@ pub enum Role {
     /// Peripheral and primary device.
     /// - Only one connection.
     /// - 6 KB of RAM retention.
-    Peripheral6Kb = 1,
+    Peripheral6Kb  = 1,
 
     /// Peripheral and primary device.
     /// - Only one connection.
@@ -534,7 +544,7 @@ pub enum Role {
     /// Primary device and peripheral
     /// - Up to 8 connections
     /// - 12 KB of RAM retention
-    Primary12Kb = 3,
+    Primary12Kb    = 3,
 
     /// Primary device and peripheral.
     /// - Simultaneous advertising and scanning
@@ -548,10 +558,10 @@ pub enum Role {
 #[repr(u8)]
 pub enum ConfigParameter {
     /// Bluetooth public address.
-    PublicAddress = 0,
+    PublicAddress  = 0,
 
     /// Diversifier used to derive CSRK (connection signature resolving key).
-    Diversifier = 6,
+    Diversifier    = 6,
 
     /// Encryption root key used to derive the LTK (long-term key) and CSRK (connection signature
     /// resolving key).
@@ -559,13 +569,13 @@ pub enum ConfigParameter {
 
     /// Identity root key used to derive the LTK (long-term key) and CSRK (connection signature
     /// resolving key).
-    IdentityRoot = 24,
+    IdentityRoot   = 24,
 
     /// Switch on/off Link Layer only mode.
-    LinkLayerOnly = 40,
+    LinkLayerOnly  = 40,
 
     /// BlueNRG-MS roles and mode configuration.
-    Role = 41,
+    Role           = 41,
 }
 
 /// Transmitter power levels available for the system.
@@ -576,9 +586,9 @@ pub enum ConfigParameter {
 #[repr(u16)]
 pub enum PowerLevel {
     /// PA level 0, low power.
-    DbmNeg18 = 0x000,
+    DbmNeg18   = 0x000,
     /// PA level 0, high power.
-    DbmNeg15 = 0x001,
+    DbmNeg15   = 0x001,
     /// PA level 1, low power.
     DbmNeg14_7 = 0x100,
     /// PA level 1, high power.
@@ -586,25 +596,25 @@ pub enum PowerLevel {
     /// PA level 2, low power.
     DbmNeg11_4 = 0x200,
     /// PA level 2, high power.
-    DbmNeg8_4 = 0x201,
+    DbmNeg8_4  = 0x201,
     /// PA level 3, low power.
-    DbmNeg8_1 = 0x300,
+    DbmNeg8_1  = 0x300,
     /// PA level 3, high power.
-    DbmNeg5_1 = 0x301,
+    DbmNeg5_1  = 0x301,
     /// PA level 4, low power.
-    DbmNeg4_9 = 0x400,
+    DbmNeg4_9  = 0x400,
     /// PA level 4, high power.
-    DbmNeg2_1 = 0x401,
+    DbmNeg2_1  = 0x401,
     /// PA level 5, low power.
-    DbmNeg1_6 = 0x500,
+    DbmNeg1_6  = 0x500,
     /// PA level 5, high power.
-    Dbm1_4 = 0x501,
+    Dbm1_4     = 0x501,
     /// PA level 6, low power.
-    Dbm1_7 = 0x600,
+    Dbm1_7     = 0x600,
     /// PA level 6, high power.
-    Dbm4_7 = 0x601,
+    Dbm4_7     = 0x601,
     /// PA level 7, low power.
-    Dbm5_0 = 0x700,
+    Dbm5_0     = 0x700,
     /// PA level 7, high power.
-    Dbm8_0 = 0x701,
+    Dbm8_0     = 0x701,
 }

@@ -48,7 +48,8 @@ pub struct SvLogger {
     pub char_handle:    CharacteristicHandle,
 }
 
-impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
@@ -176,6 +177,7 @@ where
                 panic!("event_params_vendor other 2 = {:?}", other);
             }
         };
+        uprintln!(uart, "service = {:?}", service);
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,

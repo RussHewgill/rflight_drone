@@ -62,17 +62,13 @@ pub struct InitStruct {
     pub mono:    MonoTimer<TIM5, 1_000_000>,
     pub sensors: Sensors,
     // pub sensors:  (SensSpi, Pin<'B', 12, Output>),
-    pub bt:      BTController<'static>,
+    // pub bt:      BTController<'static>,
+    pub bt:      BTController,
     // pub delay_bt: DelayMs<TIM2>,
     pub tim9:    TIM9,
 }
 
-pub fn init_all(
-    mut cp: CorePeripherals,
-    mut dp: Peripherals,
-    bt_buf: &'static mut [u8],
-    // main_period: stm32f4xx_hal::time::Hertz,
-) -> InitStruct {
+pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
     init_all_pre(&mut dp.RCC);
 
     // let (clocks, mono) = init_clocks(dp.TIM2, dp.RCC);
@@ -143,7 +139,8 @@ pub fn init_all(
 
     let bt = init_bt(
         dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks,
-        bt_buf, bt_delay, &mut uart,
+        // bt_buf,
+        bt_delay, &mut uart,
     );
 
     let mut sensors = init_sensors_spi(
@@ -281,11 +278,12 @@ fn init_bt(
     miso: PA6,
     mosi: PA7,
     clocks: &Clocks,
-    buf: &'static mut [u8],
+    // buf: &'static mut [u8],
     delay: CounterMs<TIM2>,
     // delay: FTimerMs<TIM2>,
     uart: &mut UART,
-) -> BTController<'static> {
+    // ) -> BTController<'static> {
+) -> BTController {
     let mut cs = cs
         .internal_resistor(Pull::Up)
         .into_push_pull_output()
@@ -330,7 +328,8 @@ fn init_bt(
     /// 8 MHz seems to work most reliably (PCLK / 8)
     let mut spi = spi1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
 
-    let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, buf, delay);
+    // let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, buf, delay);
+    let mut bt: BTController = BluetoothSpi::new(spi, cs, reset, input, delay);
 
     bt
 }

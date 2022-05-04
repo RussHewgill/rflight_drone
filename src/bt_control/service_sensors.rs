@@ -38,10 +38,11 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 pub struct SvSensors {
     service_handle: ServiceHandle,
-    char_handle: CharacteristicHandle,
+    char_handle:    CharacteristicHandle,
 }
 
-impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
@@ -55,8 +56,8 @@ where
         uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         let params = AddServiceParameters {
-            uuid: UUID_CONSOLE_LOG_SERVICE,
-            service_type: crate::bluetooth::gatt::ServiceType::Primary,
+            uuid:                  UUID_CONSOLE_LOG_SERVICE,
+            service_type:          crate::bluetooth::gatt::ServiceType::Primary,
             max_attribute_records: 8,
         };
         block!(self.add_service(&params))?;
@@ -68,18 +69,18 @@ where
         uprintln!(uart, "service = {:?}", service);
 
         let params0 = AddCharacteristicParameters {
-            service_handle: service.service_handle,
-            characteristic_uuid: UUID_CONSOLE_LOG_CHAR,
-            characteristic_value_len: 18,
+            service_handle:            service.service_handle,
+            characteristic_uuid:       UUID_CONSOLE_LOG_CHAR,
+            characteristic_value_len:  18,
             characteristic_properties: CharacteristicProperty::NOTIFY,
             // characteristic_properties: CharacteristicProperty::NOTIFY
             // | CharacteristicProperty::READ,
-            security_permissions: CharacteristicPermission::NONE,
-            gatt_event_mask: CharacteristicEvent::NONE,
+            security_permissions:      CharacteristicPermission::NONE,
+            gatt_event_mask:           CharacteristicEvent::NONE,
             // gatt_event_mask: CharacteristicEvent::CONFIRM_READ,
-            encryption_key_size: EncryptionKeySize::with_value(7).unwrap(),
-            is_variable: true,
-            fw_version_before_v72: true,
+            encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
+            is_variable:               true,
+            fw_version_before_v72:     true,
         };
         block!(self.add_characteristic(&params0))?;
 
@@ -108,7 +109,7 @@ where
 
         let logger = SvSensors {
             service_handle: service.service_handle,
-            char_handle: c.characteristic_handle,
+            char_handle:    c.characteristic_handle,
         };
 
         // self.services = Some(logger);

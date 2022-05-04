@@ -65,9 +65,8 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-#[cfg(feature = "nope")]
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-
+// #[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -116,7 +115,8 @@ mod app {
         sens_data:   SensorData,
         flight_data: FlightData,
         // bt_chan:  heapless::spsc::Queue<>
-        bt:          BTController<'static>,
+        // bt:          BTController<'static>,
+        bt:          BTController,
         // bt_queue:    heapless::spsc::Queue<bluetooth_hci::Event<BlueNRGEvent>, 10>,
         // delay_bt: DelayMs<TIM2>,
         // delay_bt: TIM2,
@@ -150,7 +150,8 @@ mod app {
 
         // let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
 
-        let mut init_struct = init_all(cp, dp, &mut bt_buf[..]);
+        // let mut init_struct = init_all(cp, dp, &mut bt_buf[..]);
+        let mut init_struct = init_all(cp, dp);
 
         let mut uart = init_struct.uart;
         let clocks = init_struct.clocks;
@@ -190,7 +191,7 @@ mod app {
             }
         }
         uart.unpause();
-        bt.unpause_interrupt(&mut exti);
+        // bt.unpause_interrupt(&mut exti);
         loop {
             if !bt.data_ready().unwrap() {
                 break;
@@ -198,6 +199,7 @@ mod app {
             uprintln!(uart, "wat 0");
             bt.read_event_uart(&mut uart).unwrap();
         }
+        bt.unpause_interrupt(&mut exti);
 
         // bt.clear_interrupt();
         // bt.unpend();
@@ -205,9 +207,9 @@ mod app {
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        // /// start timer
-        // tim3.start(sensor_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start timer
+        tim3.start(sensor_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
@@ -465,8 +467,8 @@ mod app {
     }
 }
 
-// #[cfg(feature = "nope")]
-#[entry]
+#[cfg(feature = "nope")]
+// #[entry]
 fn main_bluetooth() -> ! {
     use crate::bluetooth::{AccessByte, BTError, BTServices};
     use crate::spi::{Spi4, SpiError};

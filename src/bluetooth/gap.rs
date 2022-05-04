@@ -17,8 +17,8 @@ pub use hci::types::{ConnectionInterval, ExpectedConnectionLength, ScanWindow};
 pub use hci::{BdAddr, BdAddrType};
 
 use crate::{
-    impl_params, impl_validate_params, impl_validate_variable_length_params, impl_value_params,
-    impl_variable_length_params,
+    impl_params, impl_validate_params, impl_validate_variable_length_params,
+    impl_value_params, impl_variable_length_params,
 };
 
 /// GAP-specific commands for the [`ActiveBlueNRG`](crate::ActiveBlueNRG).
@@ -153,7 +153,10 @@ pub trait Commands {
     ///
     /// A [Command Complete](crate::bluetooth::events::command::ReturnParameters::GapSetIoCapability) event is
     /// generated.
-    fn set_io_capability(&mut self, capability: IoCapability) -> nb::Result<(), Self::Error>;
+    fn set_io_capability(
+        &mut self,
+        capability: IoCapability,
+    ) -> nb::Result<(), Self::Error>;
 
     /// Set the authentication requirements for the device.
     ///
@@ -405,7 +408,10 @@ pub trait Commands {
     ///
     /// A [Command Complete](crate::bluetooth::events::command::ReturnParameters::GapUpdateAdvertisingData)
     /// event is generated.
-    fn update_advertising_data(&mut self, data: &[u8]) -> nb::Result<(), Error<Self::Error>>;
+    fn update_advertising_data(
+        &mut self,
+        data: &[u8],
+    ) -> nb::Result<(), Error<Self::Error>>;
 
     /// This command can be used to delete the specified AD type from the advertisement data if
     /// present.
@@ -418,7 +424,10 @@ pub trait Commands {
     ///
     /// A [Command Complete](crate::bluetooth::events::command::ReturnParameters::GapDeleteAdType) event is
     /// generated.
-    fn delete_ad_type(&mut self, ad_type: AdvertisingDataType) -> nb::Result<(), Self::Error>;
+    fn delete_ad_type(
+        &mut self,
+        ad_type: AdvertisingDataType,
+    ) -> nb::Result<(), Self::Error>;
 
     /// This command can be used to get the current security settings of the device.
     ///
@@ -538,7 +547,10 @@ pub trait Commands {
     /// A [Command Complete](crate::bluetooth::events::command::ReturnParameters::GapAllowRebond) event is
     /// generated. Even if the command is given when it is not valid, success will be returned but
     /// internally it will have no effect.
-    fn allow_rebond(&mut self, conn_handle: hci::ConnectionHandle) -> nb::Result<(), Self::Error>;
+    fn allow_rebond(
+        &mut self,
+        conn_handle: hci::ConnectionHandle,
+    ) -> nb::Result<(), Self::Error>;
 
     /// Start the limited discovery procedure.
     ///
@@ -717,7 +729,10 @@ pub trait Commands {
     /// command [`terminate_procedure`](Commands::terminate_procedure) with the procedure_code set
     /// to
     /// [DirectConnectionEstablishment](crate::bluetooth::events::GapProcedure::DirectConnectionEstablishment).
-    fn create_connection(&mut self, params: &ConnectionParameters) -> nb::Result<(), Self::Error>;
+    fn create_connection(
+        &mut self,
+        params: &ConnectionParameters,
+    ) -> nb::Result<(), Self::Error>;
 
     /// The GAP procedure(s) specified is terminated.
     ///
@@ -733,7 +748,10 @@ pub trait Commands {
     /// will be [Success](hci::Status::Success) and a
     /// [ProcedureCompleted](crate::bluetooth::events::BlueNRGEvent::GapProcedureComplete) event is returned
     /// with the procedure code set to the corresponding procedure.
-    fn terminate_procedure(&mut self, procedure: Procedure) -> nb::Result<(), Error<Self::Error>>;
+    fn terminate_procedure(
+        &mut self,
+        procedure: Procedure,
+    ) -> nb::Result<(), Error<Self::Error>>;
 
     /// Start the connection update procedure.
     ///
@@ -772,7 +790,10 @@ pub trait Commands {
     /// received. If [Success](hci::Status::Success) is returned in the command status event, a
     /// [Pairing Complete](crate::bluetooth::events::BlueNRGEvent::GapPairingComplete) event is returned after
     /// the pairing process is completed.
-    fn send_pairing_request(&mut self, params: &PairingRequest) -> nb::Result<(), Self::Error>;
+    fn send_pairing_request(
+        &mut self,
+        params: &PairingRequest,
+    ) -> nb::Result<(), Self::Error>;
 
     /// This command tries to resolve the address provided with the IRKs present in its database.
     ///
@@ -789,7 +810,10 @@ pub trait Commands {
     /// A [command complete](crate::bluetooth::events::command::ReturnParameters::GapResolvePrivateAddress)
     /// event is generated. If [Success](hci::Status::Success) is returned as the status, then the
     /// address is also returned in the event.
-    fn resolve_private_address(&mut self, addr: hci::BdAddr) -> nb::Result<(), Self::Error>;
+    fn resolve_private_address(
+        &mut self,
+        addr: hci::BdAddr,
+    ) -> nb::Result<(), Self::Error>;
 
     /// This command gets the list of the devices which are bonded. It returns the number of
     /// addresses and the corresponding address types and values.
@@ -860,11 +884,16 @@ pub trait Commands {
     ///
     /// A [command complete](crate::bluetooth::events::command::ReturnParameters::GapIsDeviceBonded) event is
     /// generated.
-    fn is_device_bonded(&mut self, addr: hci::host::PeerAddrType) -> nb::Result<(), Self::Error>;
+    fn is_device_bonded(
+        &mut self,
+        addr: hci::host::PeerAddrType,
+    ) -> nb::Result<(), Self::Error>;
 }
 
-impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
-    for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
+//     for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> Commands
+    for crate::bluetooth::BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
@@ -896,7 +925,10 @@ where
         crate::opcode::GAP_SET_DIRECT_CONNECTABLE
     );
 
-    fn set_io_capability(&mut self, capability: IoCapability) -> nb::Result<(), Self::Error> {
+    fn set_io_capability(
+        &mut self,
+        capability: IoCapability,
+    ) -> nb::Result<(), Self::Error> {
         self.write_command(crate::opcode::GAP_SET_IO_CAPABILITY, &[capability as u8])
     }
 
@@ -973,7 +1005,8 @@ where
         advertising_type: AdvertisingType,
     ) -> nb::Result<(), Error<Self::Error>> {
         match advertising_type {
-            AdvertisingType::ScannableUndirected | AdvertisingType::NonConnectableUndirected => (),
+            AdvertisingType::ScannableUndirected
+            | AdvertisingType::NonConnectableUndirected => (),
             _ => {
                 return Err(nb::Error::Other(Error::BadAdvertisingType(
                     advertising_type,
@@ -995,7 +1028,8 @@ where
         address_type: AddressType,
     ) -> nb::Result<(), Error<Self::Error>> {
         match advertising_type {
-            AdvertisingType::ScannableUndirected | AdvertisingType::NonConnectableUndirected => (),
+            AdvertisingType::ScannableUndirected
+            | AdvertisingType::NonConnectableUndirected => (),
             _ => {
                 return Err(nb::Error::Other(Error::BadAdvertisingType(
                     advertising_type,
@@ -1038,7 +1072,10 @@ where
         crate::opcode::GAP_PERIPHERAL_SECURITY_REQUEST
     );
 
-    fn update_advertising_data(&mut self, data: &[u8]) -> nb::Result<(), Error<Self::Error>> {
+    fn update_advertising_data(
+        &mut self,
+        data: &[u8],
+    ) -> nb::Result<(), Error<Self::Error>> {
         const MAX_LENGTH: usize = 31;
         if data.len() > MAX_LENGTH {
             return Err(nb::Error::Other(Error::BadAdvertisingDataLength(
@@ -1057,7 +1094,10 @@ where
         .map_err(rewrap_error)
     }
 
-    fn delete_ad_type(&mut self, ad_type: AdvertisingDataType) -> nb::Result<(), Self::Error> {
+    fn delete_ad_type(
+        &mut self,
+        ad_type: AdvertisingDataType,
+    ) -> nb::Result<(), Self::Error> {
         self.write_command(crate::opcode::GAP_DELETE_AD_TYPE, &[ad_type as u8])
     }
 
@@ -1110,7 +1150,10 @@ where
     }
 
     #[cfg(feature = "ms")]
-    fn allow_rebond(&mut self, conn_handle: hci::ConnectionHandle) -> nb::Result<(), Self::Error> {
+    fn allow_rebond(
+        &mut self,
+        conn_handle: hci::ConnectionHandle,
+    ) -> nb::Result<(), Self::Error> {
         let mut bytes = [0; 2];
         LittleEndian::write_u16(&mut bytes, conn_handle.0);
         self.write_command(crate::opcode::GAP_ALLOW_REBOND, &bytes)
@@ -1157,7 +1200,10 @@ where
         crate::opcode::GAP_CREATE_CONNECTION
     );
 
-    fn terminate_procedure(&mut self, procedure: Procedure) -> nb::Result<(), Error<Self::Error>> {
+    fn terminate_procedure(
+        &mut self,
+        procedure: Procedure,
+    ) -> nb::Result<(), Error<Self::Error>> {
         if procedure.is_empty() {
             return Err(nb::Error::Other(Error::NoProcedure));
         }
@@ -1178,7 +1224,10 @@ where
         crate::opcode::GAP_SEND_PAIRING_REQUEST
     );
 
-    fn resolve_private_address(&mut self, addr: hci::BdAddr) -> nb::Result<(), Self::Error> {
+    fn resolve_private_address(
+        &mut self,
+        addr: hci::BdAddr,
+    ) -> nb::Result<(), Self::Error> {
         self.write_command(crate::opcode::GAP_RESOLVE_PRIVATE_ADDRESS, &addr.0)
     }
 
@@ -1200,7 +1249,10 @@ where
         crate::opcode::GAP_START_OBSERVATION_PROCEDURE
     );
 
-    fn is_device_bonded(&mut self, addr: hci::host::PeerAddrType) -> nb::Result<(), Self::Error> {
+    fn is_device_bonded(
+        &mut self,
+        addr: hci::host::PeerAddrType,
+    ) -> nb::Result<(), Self::Error> {
         let mut bytes = [0; 7];
         addr.copy_into_slice(&mut bytes);
 
@@ -1380,11 +1432,15 @@ impl<'a, 'b> DiscoverableParameters<'a, 'b> {
         bytes[0] = self.advertising_type as u8;
         LittleEndian::write_u16(
             &mut bytes[1..],
-            to_connection_length_value(self.advertising_interval.unwrap_or(no_interval).0),
+            to_connection_length_value(
+                self.advertising_interval.unwrap_or(no_interval).0,
+            ),
         );
         LittleEndian::write_u16(
             &mut bytes[3..],
-            to_connection_length_value(self.advertising_interval.unwrap_or(no_interval).1),
+            to_connection_length_value(
+                self.advertising_interval.unwrap_or(no_interval).1,
+            ),
         );
         bytes[5] = self.address_type as u8;
         bytes[6] = self.filter_policy as u8;
@@ -1412,7 +1468,8 @@ impl<'a, 'b> DiscoverableParameters<'a, 'b> {
         bytes[(advertising_data_len_index + 1)
             ..(advertising_data_len_index + 1 + self.advertising_data.len())]
             .copy_from_slice(self.advertising_data);
-        let conn_interval_index = advertising_data_len_index + 1 + self.advertising_data.len();
+        let conn_interval_index =
+            advertising_data_len_index + 1 + self.advertising_data.len();
         LittleEndian::write_u16(
             &mut bytes[conn_interval_index..],
             if self.conn_interval.0.is_some() {
@@ -1443,7 +1500,9 @@ impl<'a, 'b> DiscoverableParameters<'a, 'b> {
         // The serialized name includes one byte indicating the type of name. That byte is not
         // included if the name is empty.
         match self.local_name {
-            Some(LocalName::Shortened(bytes)) | Some(LocalName::Complete(bytes)) => 1 + bytes.len(),
+            Some(LocalName::Shortened(bytes)) | Some(LocalName::Complete(bytes)) => {
+                1 + bytes.len()
+            }
             None => 0,
         }
     }
@@ -1549,13 +1608,13 @@ impl DirectConnectableParameters {
 #[derive(Copy, Clone, Debug)]
 pub enum IoCapability {
     /// Display Only
-    Display = 0x00,
+    Display         = 0x00,
     /// Display yes/no
-    DisplayConfirm = 0x01,
+    DisplayConfirm  = 0x01,
     /// Keyboard Only
-    Keyboard = 0x02,
+    Keyboard        = 0x02,
     /// No Input, no output
-    None = 0x03,
+    None            = 0x03,
     /// Keyboard display
     KeyboardDisplay = 0x04,
 }
@@ -1656,7 +1715,7 @@ pub enum Authorization {
     /// Accept the connection.
     Authorized = 0x01,
     /// Reject the connection.
-    Rejected = 0x02,
+    Rejected   = 0x02,
 }
 
 bitflags! {
@@ -1679,11 +1738,11 @@ bitflags! {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AddressType {
     /// Public device address.
-    Public = 0x00,
+    Public               = 0x00,
     /// Static random device address.
-    Random = 0x01,
+    Random               = 0x01,
     /// Controller generates Resolvable Private Address.
-    ResolvablePrivate = 0x02,
+    ResolvablePrivate    = 0x02,
     /// Controller generates Resolvable Private Address. based on the local IRK from resolving
     /// list.
     NonResolvablePrivate = 0x03,
@@ -1719,39 +1778,39 @@ impl SecurityRequestParameters {
 #[repr(u8)]
 pub enum AdvertisingDataType {
     /// Flags
-    Flags = 0x01,
+    Flags                         = 0x01,
     /// 16-bit service UUID
-    Uuid16 = 0x02,
+    Uuid16                        = 0x02,
     /// Complete list of 16-bit service UUIDs
-    UuidCompleteList16 = 0x03,
+    UuidCompleteList16            = 0x03,
     /// 32-bit service UUID
-    Uuid32 = 0x04,
+    Uuid32                        = 0x04,
     /// Complete list of 32-bit service UUIDs
-    UuidCompleteList32 = 0x05,
+    UuidCompleteList32            = 0x05,
     /// 128-bit service UUID
-    Uuid128 = 0x06,
+    Uuid128                       = 0x06,
     /// Complete list of 128-bit service UUIDs.
-    UuidCompleteList128 = 0x07,
+    UuidCompleteList128           = 0x07,
     /// Shortened local name
-    ShortenedLocalName = 0x08,
+    ShortenedLocalName            = 0x08,
     /// Complete local name
-    CompleteLocalName = 0x09,
+    CompleteLocalName             = 0x09,
     /// Transmitter power level
-    TxPowerLevel = 0x0A,
+    TxPowerLevel                  = 0x0A,
     /// Serurity Manager TK Value
-    SecurityManagerTkValue = 0x10,
+    SecurityManagerTkValue        = 0x10,
     /// Serurity Manager out-of-band flags
     SecurityManagerOutOfBandFlags = 0x11,
     /// Connection interval
-    PeripheralConnectionInterval = 0x12,
+    PeripheralConnectionInterval  = 0x12,
     /// Service solicitation list, 16-bit UUIDs
-    SolicitUuidList16 = 0x14,
+    SolicitUuidList16             = 0x14,
     /// Service solicitation list, 32-bit UUIDs
-    SolicitUuidList32 = 0x15,
+    SolicitUuidList32             = 0x15,
     /// Service data
-    ServiceData = 0x16,
+    ServiceData                   = 0x16,
     /// Manufacturer-specific data
-    ManufacturerSpecificData = 0xFF,
+    ManufacturerSpecificData      = 0xFF,
 }
 
 bitflags! {
@@ -1862,7 +1921,8 @@ impl<'a> AutoConnectionEstablishmentParameters<'a> {
 
     fn validate<E>(&self) -> Result<(), Error<E>> {
         const MAX_WHITE_LIST_LENGTH: usize = 33;
-        if self.white_list.len() > MAX_WHITE_LIST_LENGTH - if cfg!(feature = "ms") { 0 } else { 1 }
+        if self.white_list.len()
+            > MAX_WHITE_LIST_LENGTH - if cfg!(feature = "ms") { 0 } else { 1 }
         {
             return Err(Error::WhiteListTooLong);
         }
@@ -1895,7 +1955,8 @@ impl<'a> AutoConnectionEstablishmentParameters<'a> {
         bytes[index] = self.white_list.len() as u8;
         let index = index + 1;
         for i in 0..self.white_list.len() {
-            self.white_list[i].copy_into_slice(&mut bytes[(index + 7 * i)..(index + 7 * (i + 1))]);
+            self.white_list[i]
+                .copy_into_slice(&mut bytes[(index + 7 * i)..(index + 7 * (i + 1))]);
         }
 
         len
@@ -1993,7 +2054,8 @@ impl<'a> SelectiveConnectionEstablishmentParameters<'a> {
         bytes[6] = self.filter_duplicates as u8;
         bytes[7] = self.white_list.len() as u8;
         for i in 0..self.white_list.len() {
-            self.white_list[i].copy_into_slice(&mut bytes[(8 + 7 * i)..(8 + 7 * (i + 1))]);
+            self.white_list[i]
+                .copy_into_slice(&mut bytes[(8 + 7 * i)..(8 + 7 * (i + 1))]);
         }
 
         len

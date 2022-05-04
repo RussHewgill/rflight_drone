@@ -49,7 +49,10 @@ use crate::{
     uprint, uprintln,
 };
 
-use self::{events::BlueNRGEvent, rx_buffer::Buffer};
+use self::{
+    events::BlueNRGEvent,
+    rx_buffer::{Buffer, Buffer2},
+};
 
 /// // SPI Configuration
 /// #define BNRG_SPI_MODE               SPI_MODE_MASTER
@@ -134,14 +137,14 @@ pub enum BTError<SpiError, GpioError> {
     Gpio(GpioError),
 }
 
-pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
-    // pub struct BluetoothSpi<SPI, CS, Reset, Input> {
+// pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
+pub struct BluetoothSpi<SPI, CS, Reset, Input> {
     spi:    SPI,
     cs:     CS,
     reset:  Reset,
     input:  Input,
-    // buffer: ArrayVec<u8, 256>,
-    buffer: Buffer<'buf, u8>,
+    // buffer: Buffer<'buf, u8>,
+    buffer: Buffer2<u8, 512>,
 
     // pub delay: DelayMs<TIM2>,
     pub delay: CounterMs<TIM2>,
@@ -161,13 +164,13 @@ pub struct BTServices {
 }
 
 /// new
-impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
+impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
     pub fn new(
         spi: SPI,
         cs: CS,
         reset: Reset,
         input: Input,
-        buffer: &'buf mut [u8],
+        // buffer: &'buf mut [u8],
         delay: CounterMs<TIM2>,
         // delay: FTimerMs<TIM2>,
     ) -> Self {
@@ -176,7 +179,8 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
             cs,
             reset,
             input,
-            buffer: Buffer::new(buffer),
+            // buffer: Buffer::new(buffer),
+            buffer: Buffer2::new(),
 
             // delay: Some(delay),
             delay,
@@ -188,7 +192,8 @@ impl<'buf, SPI, CS, Reset, Input> BluetoothSpi<'buf, SPI, CS, Reset, Input> {
 }
 
 /// pause/resume/check/clear interrupt
-impl<'buf, SPI, CS, Reset, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, PA4>
+// impl<'buf, SPI, CS, Reset, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, PA4>
+impl<SPI, CS, Reset, GpioError> BluetoothSpi<SPI, CS, Reset, PA4>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
@@ -219,18 +224,11 @@ where
 
 /// reset, bluenrg fns
 // impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
-impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
-
-    // SPI: Transfer<u8, Error = SpiError>
-    //     + Write<u8, Error = SpiError>
-    //     + Read<u8, Error = SpiError>
-    //     + TransferInplace<u8, Error = SpiError>,
-    // CS: OutputPin<Error = GpioError>,
-    // Reset: OutputPin<Error = GpioError>,
-    // Input: InputPin<Error = GpioError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -480,17 +478,12 @@ where
     }
 }
 
-// impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<CS, Reset, Input>
-impl<'buf, SPI, CS, Reset, Input, GpioError> Controller
-    for BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> Controller
+//     for BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
-    // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
-    // SPI: Transfer<u8, Error = SpiError>
-    //     + Write<u8, Error = SpiError>
-    //     + Read<u8, Error = SpiError>
-    //     + TransferInplace<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -604,7 +597,8 @@ fn parse_spi_header<E>(header: &[u8; 5]) -> Result<(u16, u16), nb::Error<E>> {
 }
 
 /// read2, etc
-impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
+impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
         + hal::blocking::spi::Write<u8, Error = SpiError>,
