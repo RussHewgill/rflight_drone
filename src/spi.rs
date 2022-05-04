@@ -56,6 +56,8 @@ mod spi4 {
                     .clear_bit()
                     .crcen() // hardware CRC disabled (?)
                     .clear_bit()
+                    .rxonly() // bidirectional mode
+                    .clear_bit()
             });
 
             spi.cr2.modify(|_, w| {
@@ -76,10 +78,105 @@ mod spi4 {
 
     /// read, send
     impl Spi4 {
-        pub fn write(&mut self, bytes: &[u8]) -> nb::Result<(), SpiError> {
-            unimplemented!()
+        /// blocking
+        pub fn write(&mut self, bytes: &[u8]) -> Result<(), SpiError> {
+            while self.spi_is_busy() {
+                cortex_m::asm::nop();
+            }
+            /// 1. Enable SPI
+            self.enable(true);
+
+            /// 2,3. Send byte, then wait for TXE = 1
+            for b in bytes.into_iter() {
+                self.send_u8(*b);
+
+                while !self.is_txe() {
+                    cortex_m::asm::nop();
+                }
+            }
+
+            /// 4. Wait until BSY = 0
+            while self.is_bsy() {
+                cortex_m::asm::nop();
+            }
+            self.enable(false);
+
+            Ok(())
         }
 
+        /// blocking
+        pub fn transfer(&mut self, read: &mut [u8], send: &[u8]) -> Result<(), SpiError> {
+            // assert!(read.len() > 1);
+            // assert_eq!(read.len(), send.len());
+
+            let mut send = send.into_iter();
+            let mut read = read.iter_mut();
+
+            while self.spi_is_busy() {
+                cortex_m::asm::nop();
+            }
+            /// 1. Enable SPI
+            self.enable(true);
+
+            /// 2. Write first u8, this clears the TXE flag
+            self.send_u8(*send.next().unwrap());
+
+            loop {
+                /// 3a. Wait until TXE = 1
+                while !self.is_txe() {
+                    cortex_m::asm::nop();
+                }
+
+                /// 3b. Write second u8
+                if let Some(b) = send.next() {
+                    self.send_u8(*b);
+                } else {
+                    break;
+                }
+
+                /// 3c. Wait until RXNE = 1
+                while !self.is_rxne() {
+                    cortex_m::asm::nop();
+                }
+
+                /// 3d. Read first received u8
+                if let Some(b) = read.next() {
+                    *b = self.read_u8();
+                } else {
+                    break;
+                }
+            }
+
+            /// 4a. wait until RXNE = 1
+            while !self.is_rxne() {
+                cortex_m::asm::nop();
+            }
+
+            /// 4b. Read last byte
+            if let Some(b) = read.next() {
+                *b = self.read_u8();
+            }
+
+            /// 5a. Wait until TXE = 1
+            while !self.is_txe() {
+                cortex_m::asm::nop();
+            }
+
+            /// 5b. Wait until BSY = 0
+            while self.is_bsy() {
+                cortex_m::asm::nop();
+            }
+
+            /// 5c. Disable SPI
+            self.enable(false);
+
+            // while self.spi_is_busy() {
+            //     cortex_m::asm::nop();
+            // }
+            Ok(())
+        }
+
+        #[cfg(feature = "nope")]
         pub fn transfer(
             &mut self,
             read: &mut [u8],

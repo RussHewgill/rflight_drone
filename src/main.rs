@@ -24,6 +24,7 @@ pub mod utils;
 use adc::*;
 use bluetooth::*;
 use bluetooth2::*;
+use bluetooth_hci::host::Hci;
 use bt_control::*;
 use flight_control::*;
 use init::init_all_pre;
@@ -169,6 +170,16 @@ mod app {
         // uprintln!(uart, "main_period = {:?}", main_period.to_Hz());
         uprintln!(uart, "sensor_period = {:?}", sensor_period.to_Hz());
 
+        // uprintln!(uart, "wat 0");
+        // bt.pause_interrupt(&mut exti);
+        // uprintln!(uart, "wat 1");
+        // block!(bt.read_local_version_information()).unwrap();
+        // uprintln!(uart, "wat 2");
+        // bt.read_event_uart(&mut uart).unwrap();
+        // uprintln!(uart, "wat 3");
+        // bt.unpause_interrupt(&mut exti);
+        // uprintln!(uart, "wat 4");
+
         uart.pause();
         bt.pause_interrupt(&mut exti);
         // match bt.init_bt(&mut uart, &mut delay_bt) {
@@ -179,9 +190,7 @@ mod app {
             }
         }
         uart.unpause();
-
         bt.unpause_interrupt(&mut exti);
-
         loop {
             if !bt.data_ready().unwrap() {
                 break;
@@ -196,9 +205,9 @@ mod app {
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        /// start timer
-        tim3.start(sensor_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start timer
+        // tim3.start(sensor_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
@@ -459,6 +468,8 @@ mod app {
 // #[cfg(feature = "nope")]
 #[entry]
 fn main_bluetooth() -> ! {
+    use crate::bluetooth::{AccessByte, BTError, BTServices};
+    use crate::spi::{Spi4, SpiError};
     use stm32f4xx_hal::gpio::Pull;
 
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
@@ -473,14 +484,24 @@ fn main_bluetooth() -> ! {
         .modify(|r, w| w.gpioaen().set_bit().gpioben().set_bit());
 
     let mut rcc = dp.RCC.constrain();
-    let clocks = rcc.cfgr.freeze();
+    let clocks = rcc
+        .cfgr
+        .use_hse(16.MHz())
+        // .sysclk(32.MHz())
+        .sysclk(64.MHz())
+        // .require_pll48clk()
+        .freeze();
 
     let gpioa = dp.GPIOA.split();
     let gpiob = dp.GPIOB.split();
 
+    let mut syscfg = dp.SYSCFG.constrain();
+    let bt_delay = dp.TIM2.counter_ms(&clocks);
+    let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
+
     let cs = gpiob.pb0;
     let reset = gpiob.pb2;
-    let input = gpioa.pa4;
+    let mut input = gpioa.pa4;
     let sck = gpioa.pa5;
     let miso = gpioa.pa6;
     let mosi = gpioa.pa7;
@@ -517,10 +538,42 @@ fn main_bluetooth() -> ! {
         .speed(Speed::High)
         .into_alternate::<5>();
 
-    let mode = Mode {
+    let mode = stm32f4xx_hal::spi::Mode {
         polarity: stm32f4xx_hal::spi::Polarity::IdleLow,
         phase:    stm32f4xx_hal::spi::Phase::CaptureOnFirstTransition,
     };
+
+    // let mut input = input.into_input();
+    input.make_interrupt_source(&mut syscfg);
+    input.enable_interrupt(&mut dp.EXTI);
+    input.trigger_on_edge(&mut dp.EXTI, stm32f4xx_hal::gpio::Edge::Rising);
+    input.clear_interrupt_pending_bit();
+    let input = input.into_input();
+
+    uprintln!(uart, "wat 0");
+    let spi = Spi4::new(dp.SPI1, mode, sck, miso, mosi);
+
+    // static mut BLE_BUFFER: [u8; 512] = [0u8; 512];
+    // let buffer = unsafe { &mut BLE_BUFFER[..] };
+
+    let mut buffer = [0u8; 512];
+
+    uprintln!(uart, "wat 1");
+    let mut bt = BluetoothSpi2::new(spi, cs, reset, input, bt_delay, &mut buffer);
+
+    // uprintln!(uart, "wat 2");
+    // let e = bt.block_until_ready(AccessByte::Read, Some(&mut uart));
+    // uprintln!(uart, "e 1 = {:?}", e);
+
+    bt.reset().unwrap();
+    uprintln!(uart, "wat 2");
+    bt.read_event_uart(&mut uart).unwrap();
+    uprintln!(uart, "wat 3");
+
+    block!(bt.read_local_version_information()).unwrap();
+    uprintln!(uart, "wat 4");
+    bt.read_event_uart(&mut uart).unwrap();
+    uprintln!(uart, "wat 5");
 
     loop {}
 }

@@ -16,14 +16,13 @@ use stm32f4xx_hal::{
 };
 
 use bluetooth_hci::{
-    host::Hci, types::FixedConnectionInterval, BdAddrType, ConnectionHandle,
-};
-use bluetooth_hci::{
+    host::Hci,
     host::{
         uart::{CommandHeader, Hci as HciUart},
         AdvertisingInterval, AdvertisingParameters,
     },
-    BdAddr,
+    types::FixedConnectionInterval,
+    BdAddr, BdAddrType, ConnectionHandle,
 };
 
 use crate::{

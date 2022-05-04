@@ -290,6 +290,7 @@ where
         self.input.is_high()
     }
 
+    /// XXX: nop between cs toggle?
     pub fn block_until_ready(
         &mut self,
         access_byte: AccessByte,
@@ -329,7 +330,8 @@ where
                         .map_err(BTError::Gpio)
                         .map_err(nb::Error::Other)?;
                     // self.wait_ms(2.mill)
-                    cortex_m::asm::nop();
+                    // XXX: ???
+                    // cortex_m::asm::nop();
                     // cortex_m::asm::nop();
                     self.cs
                         .set_low()
