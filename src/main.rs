@@ -8,6 +8,7 @@
 
 pub mod adc;
 pub mod bluetooth;
+pub mod bluetooth2;
 pub mod bt_control;
 pub mod flight_control;
 pub mod init;
@@ -22,6 +23,7 @@ pub mod utils;
 
 use adc::*;
 use bluetooth::*;
+use bluetooth2::*;
 use bt_control::*;
 use flight_control::*;
 use init::init_all_pre;
@@ -62,8 +64,9 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-// #[cfg(feature = "nope")]
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -193,96 +196,12 @@ mod app {
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
+        /// start timer
         tim3.start(sensor_period).unwrap();
-        // tim3.start(50.Hz()).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
-
-        #[cfg(feature = "nope")]
-        sensors.with_spi_imu(|spi, imu| {
-            use crate::sensors::imu::*;
-
-            // imu.reset(spi).unwrap();
-            // bt.wait_ms(10.millis());
-
-            // imu.init(spi, cfg)
-
-            /// Accelerometer
-            imu.write_reg(spi, IMURegister::CTRL1_XL, 0b0100_0000) // 104 Hz
-                // imu.write_reg(spi, IMURegister::CTRL1_XL, 0b0110_0000) // 416 Hz
-                // imu.write_reg(spi, IMURegister::CTRL1_XL, 0b0111_0000) // 833 Hz
-                .unwrap();
-
-            /// Gyro
-            /// ODR_GL = 0100 = 104 Hz Normal mode
-            imu.write_reg(spi, IMURegister::CTRL2_G, 0b0100_0000)
-                .unwrap();
-
-            let val = 0b0000_0000
-                        | 0b0100_0000 // Block Data Update
-                        | 0b1000 // SIM
-                        | 0b0100; // IF_INC
-
-            /// BDU = 1, Block Data Update
-            /// SIM = 1, 3 wire SPI mode
-            /// IF_INC = 1, increment on multiple byte access
-            imu.write_reg(spi, IMURegister::CTRL3_C, val).unwrap();
-
-            // while !imu.read_new_data_available(spi).unwrap()[2] {
-            //     uprintln!(uart, "no data");
-            //     // cortex_m::asm::nop();
-            // }
-
-            loop {
-                let [r0, r1, r2] = imu.read_new_data_available(spi).unwrap();
-                if r1 && r2 {
-                    break;
-                }
-                uprintln!(uart, "no data");
-            }
-
-            let (data_gyro, data_acc) = imu.read_data(spi).unwrap();
-
-            uprintln!(uart, "data_gyro = {:?}", data_gyro);
-            uprintln!(uart, "data_acc = {:?}", data_acc);
-
-            // let outx_l = imu.read_reg(spi, IMURegister::OUTX_L_XL).unwrap();
-            // let outx_h = imu.read_reg(spi, IMURegister::OUTX_H_XL).unwrap();
-            // let outy_l = imu.read_reg(spi, IMURegister::OUTY_L_XL).unwrap();
-            // let outy_h = imu.read_reg(spi, IMURegister::OUTY_H_XL).unwrap();
-            // let outz_l = imu.read_reg(spi, IMURegister::OUTZ_L_XL).unwrap();
-            // let outz_h = imu.read_reg(spi, IMURegister::OUTZ_H_XL).unwrap();
-
-            // uprintln!(uart, "outx_l = {:?}", outx_l);
-            // uprintln!(uart, "outx_h = {:?}", outx_h);
-            // uprintln!(uart, "outy_l = {:?}", outy_l);
-            // uprintln!(uart, "outy_h = {:?}", outy_h);
-            // uprintln!(uart, "outz_l = {:?}", outz_l);
-            // uprintln!(uart, "outz_h = {:?}", outz_h);
-
-            // let mut data = [0u8; 6];
-            // imu.read_reg_mult(spi, IMURegister::OUTX_L_XL, &mut data)
-            //     .unwrap();
-
-            // let d = imu.read_reg(spi, IMURegister::WHO_AM_I).unwrap();
-            // uprintln!(uart, "d = {:#010b}", d);
-
-            // let mut data = [0u8; 4];
-            // imu.read_reg_mult(spi, IMURegister::WHO_AM_I, &mut data)
-            //     .unwrap();
-
-            // for d in data.iter() {
-            //     uprintln!(uart, "d = {:#010b}", d);
-            // }
-
-            // let (l, h) = (data[0], data[1]);
-            // let v0 = l as i16 | ((h as i16) << 8);
-            // uprintln!(uart, "v0 = {:?}", v0);
-
-            //
-        });
 
         // /// No debug
         // uart.pause();
@@ -373,7 +292,7 @@ mod app {
     }
 
     #[task(
-        binds = TIM3,
+        // binds = TIM3,
         shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
         local = [counter: u32 = 0, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0)],
         priority = 3
@@ -537,18 +456,13 @@ mod app {
     }
 }
 
-#[cfg(feature = "nope")]
-// #[entry]
+// #[cfg(feature = "nope")]
+#[entry]
 fn main_bluetooth() -> ! {
+    use stm32f4xx_hal::gpio::Pull;
+
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
-
-    /// Reset  = PB2
-    /// BLE_CS = PB0
-    /// clk    = PA5
-    /// MISO   = PA6
-    /// MOSI   = PA7
-    /// IRQ    = PA4
 
     /// Enable SPI1 clock
     dp.RCC.apb2enr.modify(|r, w| w.spi1en().set_bit());
@@ -561,243 +475,54 @@ fn main_bluetooth() -> ! {
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze();
 
-    let mode = Mode {
-        polarity: Polarity::IdleLow,
-        phase:    Phase::CaptureOnFirstTransition,
-    };
+    let gpioa = dp.GPIOA.split();
+    let gpiob = dp.GPIOB.split();
 
-    /// Reset pin config, PB2
-    {
-        // // dp.GPIOB.moder.modify(|_, w| w.moder2().output());
-        // dp.GPIOB.pupdr.modify(|_, w| w.pupdr2().pull_up());
-        // dp.GPIOB.otyper.modify(|r, w| w.ot2().push_pull());
-        // dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr2().low_speed());
-        // /// Added to avoid spurious interrupt from the BlueNRG
-        // dp.GPIOB.bsrr.write(|w| w.br2().clear_bit());
-    }
-    /// SCLK pin config, PA5
-    {
-        // dp.GPIOA.ospeedr.modify(|_, w| w.ospeedr5().high_speed());
-        // dp.GPIOA.pupdr.modify(|r, w| w.pupdr5().pull_down());
+    let cs = gpiob.pb0;
+    let reset = gpiob.pb2;
+    let input = gpioa.pa4;
+    let sck = gpioa.pa5;
+    let miso = gpioa.pa6;
+    let mosi = gpioa.pa7;
 
-        // // XXX: ?
-        // dp.GPIOA.otyper.modify(|r, w| w.ot5().push_pull());
-        // dp.GPIOA.moder.modify(|r, w| w.moder5().alternate());
-        // dp.GPIOA.afrl.modify(|r, w| w.afrl5().af5());
-    }
-    /// MISO pin config, PA6
-    {
-        // dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr6().high_speed());
-        // dp.GPIOA.pupdr.modify(|r, w| w.pupdr6().floating());
-
-        // // // XXX: ?
-        // // dp.GPIOA.otyper.modify(|r, w| w.ot6().push_pull());
-        // // dp.GPIOA.moder.modify(|r, w| w.moder6().alternate());
-        // // dp.GPIOA.afrl.modify(|r, w| w.afrl6().af5());
-    }
-    /// MOSI pin config, PA7
-    {
-        // dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr7().high_speed());
-        // dp.GPIOA.pupdr.modify(|r, w| w.pupdr7().floating());
-
-        // // XXX: ?
-        // dp.GPIOA.otyper.modify(|r, w| w.ot7().push_pull());
-        // dp.GPIOA.moder.modify(|r, w| w.moder7().alternate());
-        // dp.GPIOA.afrl.modify(|r, w| w.afrl7().af5());
-    }
-    /// CS pin config, PB0
-    {
-        // dp.GPIOB.ospeedr.modify(|_, w| w.ospeedr0().high_speed());
-        // dp.GPIOB.pupdr.modify(|r, w| w.pupdr0().pull_up());
-
-        // // XXX: ?
-        // dp.GPIOB.moder.modify(|r, w| w.moder0().output());
-    }
-    /// IRQ, PA4
-    #[cfg(feature = "nope")]
-    {
-        /// Enable SYSCFG clock
-        dp.RCC.apb2enr.modify(|r, w| w.syscfgen().set_bit());
-
-        /// Set source for EXTI4 external interrupt to PA4
-        unsafe {
-            dp.SYSCFG
-                .exticr2
-                .modify(|r, w| w.bits(r.bits() & !(0b1111)));
-        }
-
-        dp.EXTI.imr.modify(|r, w| {
-            // w.mr4().
-            w
-        });
-    }
-    {
-        // dp.GPIOA.ospeedr.modify(|r, w| w.ospeedr4().high_speed());
-        // dp.GPIOA.pupdr.modify(|r, w| w.pupdr4().floating());
-    }
-
-    let mut gpioa = dp.GPIOA.split();
-    let mut gpiob = dp.GPIOB.split();
-
-    let mut cs = gpiob
-        .pb0
-        .internal_resistor(stm32f4xx_hal::gpio::Pull::Up)
+    let mut cs = cs
+        .internal_resistor(Pull::Up)
         .into_push_pull_output()
         .speed(Speed::High);
     cs.set_high();
 
-    let mut reset = gpiob
-        .pb2
-        .internal_resistor(stm32f4xx_hal::gpio::Pull::Up)
+    let mut reset = reset
+        .internal_resistor(Pull::Up)
         .into_push_pull_output()
         .speed(Speed::Low);
-    // reset.set_low();
+    reset.set_high();
 
-    /// Speed is only for inputs
-    let input = gpioa.pa4.into_pull_down_input();
+    // let input = input.into_pull_down_input();
 
-    let sck = gpioa
-        .pa5
-        .internal_resistor(stm32f4xx_hal::gpio::Pull::Down)
+    let sck = sck
+        .internal_resistor(Pull::Down)
         .into_push_pull_output()
         .speed(Speed::High)
         .into_alternate::<5>();
-    // let miso = gpioa.pa6.into_push_pull_output().into_alternate::<5>();
-    // let mosi = gpioa.pa7.into_push_pull_output().into_alternate::<5>();
-    let miso = gpioa.pa6.into_alternate::<5>();
-    let mosi = gpioa
-        .pa7
+    // let miso = miso.into_alternate::<5>();
+    let miso = miso
+        .internal_resistor(Pull::None)
+        // .internal_resistor(Pull::Down) // XXX: nope
+        .into_push_pull_output()
+        .into_alternate::<5>()
+        .speed(Speed::High);
+    let mosi = mosi
+        .internal_resistor(Pull::None)
         .into_push_pull_output()
         .speed(Speed::High)
         .into_alternate::<5>();
 
-    let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
+    let mode = Mode {
+        polarity: stm32f4xx_hal::spi::Polarity::IdleLow,
+        phase:    stm32f4xx_hal::spi::Phase::CaptureOnFirstTransition,
+    };
 
-    let mut spi = dp.SPI1.spi((sck, miso, mosi), mode, 1.MHz(), &clocks);
-
-    // dp.SPI1.cr1.modify(|r, w| {
-    //     w.cpha() // clock phase
-    //         .bit(mode.phase == Phase::CaptureOnSecondTransition)
-    //         .cpol() // clock polarity
-    //         .bit(mode.polarity == Polarity::IdleHigh)
-    //         .bidimode() // bidirectional half duplex mode
-    //         .clear_bit()
-    //         .bidioe() // bidi output mode
-    //         .clear_bit()
-    //         .br() // baud rate = 1/16 f_PCLK
-    //         .div16()
-    //         .mstr() // master mode enabled
-    //         .set_bit()
-    //         .ssm() // software slave management
-    //         .set_bit()
-    //         .ssi()
-    //         .set_bit()
-    //         .dff() // 8 bit data frame format
-    //         .eight_bit()
-    //         .lsbfirst() // MSB first
-    //         .clear_bit()
-    //         .crcen() // hardware CRC disabled (?)
-    //         .clear_bit()
-    // });
-    // dp.SPI1.cr2.modify(|_, w| {
-    //     w.ssoe()
-    //         .set_bit() // SS output enabled
-    //         .frf()
-    //         .clear_bit() // Motorola frame format (not TI)
-    // });
-    // let spi = Spi4::new(dp.SPI1, sck, miso, mosi);
-
-    // let k = reset.get_state();
-    // hprintln!("k: {:?}", k);
-
-    uprintln!(uart, "wat 0");
-
-    let mut buffer = [0u8; 512];
-
-    let mut delay = cp.SYST.delay(&clocks);
-
-    let mut bt: BTController<'_> = BluetoothSpi::new(spi, cs, reset, input, &mut buffer);
-
-    // bt.reset_with_delay(&mut delay, 5u32).unwrap();
-    // block!(bt.read_event(&mut uart)).unwrap();
-
-    // // let id: &'static [u8; 12] = unsafe { &*DEVICE_ID_PTR.cast::<[u8; 12]>() };
-    // pub fn device_id() -> &'static [u8; 12] {
-    //     const DEVICE_ID_PTR: *const u8 = 0x1FF0_7A10 as _;
-    //     unsafe { &*DEVICE_ID_PTR.cast::<[u8; 12]>() }
-    // }
-    // let id = device_id();
-
-    // /// Device CF:74:D9:3D:C6:C3 DRN1120
-    // bt.init_bt(&mut uart, &mut delay).unwrap();
-
-    loop {
-        // block!(bt.read_event(&mut uart)).unwrap();
-    }
-
-    #[cfg(feature = "nope")]
-    {
-        bt.reset_with_delay(&mut delay, 5u32).unwrap();
-
-        uprintln!(uart, "wat 1");
-
-        // uprintln!(uart, "c = {:?}", crate::bluetooth::opcode::GATT_INIT);
-
-        use bluetooth_hci::host::uart::Hci as HciUart;
-        use bluetooth_hci::host::Hci;
-        use bluetooth_hci::Controller;
-
-        bt.read_event(&mut uart).unwrap();
-
-        // let e = block!(bt.read_local_version_information()).unwrap();
-        // // let e = block!(bt.read_local_supported_commands()).unwrap();
-        // uprintln!(uart, "e = {:?}", e);
-
-        block!(bt.init_gatt()).unwrap();
-        block!(bt.read_event(&mut uart)).unwrap();
-
-        let role = crate::bluetooth::gap::Role::PERIPHERAL;
-        block!(bt.init_gap(role, false, 7)).unwrap();
-        let gap = block!(bt.read_event_gap_init(&mut uart)).unwrap();
-
-        // block!(bt.le_set_random_address()).unwrap();
-        // block!(bt.read_event(&mut uart)).unwrap();
-
-        // let stm32_uuid = 0x1FFF7A10;
-
-        // static BLE_NAME: &'static [u8; 7] = b"DRN1120";
-
-        // let ps = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
-        //     service_handle: gap.service_handle,
-        //     characteristic_handle: CharacteristicHandle(0),
-        //     offset: 0,
-        //     value: &BLE_NAME[..],
-        // };
-
-        // block!(bt.update_characteristic_value(&ps)).unwrap();
-        // block!(bt.read_event(&mut uart)).unwrap();
-
-        block!(bt.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1)).unwrap();
-        block!(bt.read_event(&mut uart)).unwrap();
-
-        loop {
-            block!(bt.read_event(&mut uart)).unwrap();
-        }
-    }
-
-    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
-
-    // let param_len = block!(bt.test1(&mut uart)).unwrap();
-    // uprintln!(uart, "bt._data_ready() = {:?}", bt._data_ready().unwrap());
-
-    // for c in buffer.chunks(32) {
-    //     for b in c {
-    //         uprint!(uart, "{:#04x} ", b);
-    //     }
-    //     uprintln!(uart, " === ");
-    // }
-
-    // loop {}
+    loop {}
 }
 
 // #[entry]

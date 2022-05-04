@@ -1,7 +1,7 @@
 pub use self::spi3::*;
-// pub use self::spi4::*;
+pub use self::spi4::*;
 
-#[cfg(feature = "nope")]
+// #[cfg(feature = "nope")]
 mod spi4 {
     use core::ptr;
     use embedded_hal::spi::*;
@@ -12,6 +12,7 @@ mod spi4 {
         nb,
         prelude::*,
         rcc::Clocks,
+        spi::{Mode, Phase, Polarity},
         time::*,
     };
 
@@ -22,13 +23,48 @@ mod spi4 {
         mosi: Pin<'A', 7, Alternate<5>>,
     }
 
+    /// new
     impl Spi4 {
         pub fn new(
             spi: SPI1,
+            mode: Mode,
             sck: Pin<'A', 5, Alternate<5>>,
             miso: Pin<'A', 6, Alternate<5>>,
             mosi: Pin<'A', 7, Alternate<5>>,
         ) -> Self {
+            spi.cr1.modify(|_, w| {
+                w.cpha() // clock phase
+                    .bit(mode.phase == Phase::CaptureOnSecondTransition)
+                    .cpol() // clock polarity
+                    .bit(mode.polarity == Polarity::IdleHigh)
+                    .bidimode() // bidirectional half duplex mode
+                    .clear_bit()
+                    // .bidioe() // bidi output mode
+                    // .set_bit()
+                    .br() // baud rate = 1/16 f_PCLK
+                    // .div16()
+                    .div8() // XXX: needed for higher core clock rate
+                    .mstr() // master mode enabled
+                    .set_bit()
+                    .ssm() // software slave management
+                    .set_bit()
+                    .ssi()
+                    .set_bit()
+                    .dff() // 8 bit data frame format
+                    .eight_bit()
+                    .lsbfirst() // MSB first
+                    .clear_bit()
+                    .crcen() // hardware CRC disabled (?)
+                    .clear_bit()
+            });
+
+            spi.cr2.modify(|_, w| {
+                w.ssoe()
+                    .set_bit() // SS output enabled
+                    .frf()
+                    .clear_bit() // Motorola frame format (not TI)
+            });
+
             Self {
                 spi,
                 sck,
