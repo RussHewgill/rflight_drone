@@ -550,16 +550,16 @@ fn main_bluetooth() -> ! {
     input.clear_interrupt_pending_bit();
     let input = input.into_input();
 
-    uprintln!(uart, "wat 0");
-    let spi = Spi4::new(dp.SPI1, mode, sck, miso, mosi);
+    // uprintln!(uart, "wat 0");
+    // let spi = Spi4::new(dp.SPI1, mode, sck, miso, mosi);
+
+    let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
 
     // static mut BLE_BUFFER: [u8; 512] = [0u8; 512];
     // let buffer = unsafe { &mut BLE_BUFFER[..] };
 
-    let mut buffer = [0u8; 512];
-
     uprintln!(uart, "wat 1");
-    let mut bt = BluetoothSpi2::new(spi, cs, reset, input, bt_delay, &mut buffer);
+    let mut bt = BluetoothSpi::new(spi, cs, reset, input, bt_delay);
 
     // uprintln!(uart, "wat 2");
     // let e = bt.block_until_ready(AccessByte::Read, Some(&mut uart));

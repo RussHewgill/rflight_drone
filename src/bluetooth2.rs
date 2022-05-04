@@ -6,9 +6,10 @@ use embedded_hal::digital::v2::{InputPin, OutputPin};
 use stm32f4::stm32f401::{EXTI, TIM2};
 use stm32f4xx_hal::{
     block,
-    gpio::{ExtiPin, PA4},
+    gpio::{Alternate, ExtiPin, Pin, PA4},
     nb,
     prelude::*,
+    spi::Spi1,
     timer::CounterMs,
 };
 
@@ -35,17 +36,22 @@ use crate::{
     uprintln,
 };
 
-pub struct BluetoothSpi2<'buf, CS, Reset, Input> {
-    spi:   Spi4,
+pub struct BluetoothSpi2<CS, Reset, Input> {
+    // pub struct BluetoothSpi2<'buf, CS, Reset, Input> {
+    // spi:   Spi4,
+    spi: Spi1<(
+        Pin<'A', 5, Alternate<5>>,
+        Pin<'A', 6, Alternate<5>>,
+        Pin<'A', 7, Alternate<5>>,
+    )>,
     cs:    CS,
     reset: Reset,
     input: Input,
 
     // buffer: ArrayVec<u8, 512>,
-    // buffer: Buffer2<u8>,
-    // buffer: crate::bluetooth::rx_buffer::Buffer<'static, u8>,
-    buffer: crate::bluetooth::rx_buffer::Buffer<'buf, u8>,
+    buffer: Buffer2<u8>,
 
+    // buffer: crate::bluetooth::rx_buffer::Buffer<'buf, u8>,
     pub delay: CounterMs<TIM2>,
 
     pub state:    BTState,
@@ -53,15 +59,20 @@ pub struct BluetoothSpi2<'buf, CS, Reset, Input> {
 }
 
 /// new
-// impl<CS, Reset, Input> BluetoothSpi2<CS, Reset, Input> {
-impl<'buf, CS, Reset, Input> BluetoothSpi2<'buf, CS, Reset, Input> {
+impl<CS, Reset, Input> BluetoothSpi2<CS, Reset, Input> {
+    // impl<'buf, CS, Reset, Input> BluetoothSpi2<'buf, CS, Reset, Input> {
     pub fn new(
-        spi: Spi4,
+        // spi: Spi4,
+        spi: Spi1<(
+            Pin<'A', 5, Alternate<5>>,
+            Pin<'A', 6, Alternate<5>>,
+            Pin<'A', 7, Alternate<5>>,
+        )>,
         cs: CS,
         reset: Reset,
         input: Input,
         delay: CounterMs<TIM2>,
-        buffer: &'buf mut [u8],
+        // buffer: &'buf mut [u8],
     ) -> Self {
         Self {
             spi,
@@ -69,9 +80,8 @@ impl<'buf, CS, Reset, Input> BluetoothSpi2<'buf, CS, Reset, Input> {
             reset,
             input,
             delay,
-            // buffer: ArrayVec::new(),
-            // buffer: Buffer2::new(),
-            buffer: crate::bluetooth::rx_buffer::Buffer::new(buffer),
+            buffer: Buffer2::new(),
+            // buffer: crate::bluetooth::rx_buffer::Buffer::new(buffer),
             state: BTState::Disconnected,
             services: BTServices::default(),
         }
@@ -79,8 +89,8 @@ impl<'buf, CS, Reset, Input> BluetoothSpi2<'buf, CS, Reset, Input> {
 }
 
 /// pause/resume/check/clear interrupt
-// impl<CS, Reset> BluetoothSpi2<CS, Reset, PA4> {
-impl<'buf, CS, Reset> BluetoothSpi2<'buf, CS, Reset, PA4> {
+impl<CS, Reset> BluetoothSpi2<CS, Reset, PA4> {
+    // impl<'buf, CS, Reset> BluetoothSpi2<'buf, CS, Reset, PA4> {
     pub fn unpend(&mut self) {
         cortex_m::peripheral::NVIC::unpend(self.input.interrupt());
     }
@@ -104,8 +114,8 @@ impl<'buf, CS, Reset> BluetoothSpi2<'buf, CS, Reset, PA4> {
 }
 
 /// reset, wait
-// impl<CS, Reset, Input, GpioError> BluetoothSpi2<CS, Reset, Input>
-impl<'buf, CS, Reset, Input, GpioError> BluetoothSpi2<'buf, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi2<CS, Reset, Input>
+// impl<'buf, CS, Reset, Input, GpioError> BluetoothSpi2<'buf, CS, Reset, Input>
 where
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
@@ -142,8 +152,8 @@ where
 }
 
 /// block until ready
-// impl<CS, Reset, Input, GpioError> BluetoothSpi2<CS, Reset, Input>
-impl<'buf, CS, Reset, Input, GpioError> BluetoothSpi2<'buf, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi2<CS, Reset, Input>
+// impl<'buf, CS, Reset, Input, GpioError> BluetoothSpi2<'buf, CS, Reset, Input>
 where
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
@@ -157,18 +167,24 @@ where
         // let mut x = 0;
         loop {
             // x += 1;
-            // let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+            let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
 
-            let send_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
-            let mut read_header = [0x00, 0x00, 0x00, 0x00, 0x00];
+            // let send_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+            // let mut read_header = [0x00, 0x00, 0x00, 0x00, 0x00];
 
-            self.spi.transfer(&mut read_header, &send_header).unwrap();
+            self.spi
+                .transfer(&mut header)
+                .map_err(BTError::Spi)
+                .map_err(nb::Error::Other)?;
+
+            // self.spi.transfer(&mut read_header, &send_header).unwrap();
             // .map_err(BTError::Spi)
             // .map_err(nb::Error::Other)?;
 
             // uprintln!(uart.as_mut().unwrap(), "e = {:?}", e);
 
-            match parse_spi_header(&read_header) {
+            // match parse_spi_header(&read_header) {
+            match parse_spi_header(&header) {
                 Ok(lens) => {
                     // uprintln!(
                     //     uart.as_mut().unwrap(),
@@ -230,8 +246,8 @@ fn parse_spi_header<E>(header: &[u8; 5]) -> Result<(u16, u16), nb::Error<E>> {
 }
 
 /// try_write, read_available_data
-// impl<CS, Reset, Input, GpioError> BluetoothSpi2<CS, Reset, Input>
-impl<'buf, CS, Reset, Input, GpioError> BluetoothSpi2<'buf, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi2<CS, Reset, Input>
+// impl<'buf, CS, Reset, Input, GpioError> BluetoothSpi2<'buf, CS, Reset, Input>
 where
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
@@ -309,10 +325,16 @@ where
                 for byte in rx.iter_mut() {
                     *byte = 0;
                 }
+
                 self.spi
-                    .transfer(rx, &DUMMY_BYTES)
+                    .transfer(rx)
                     .map_err(BTError::Spi)
                     .map_err(nb::Error::Other)?;
+
+                // self.spi
+                //     .transfer(rx, &DUMMY_BYTES)
+                //     .map_err(BTError::Spi)
+                //     .map_err(nb::Error::Other)?;
             }
             bytes_available -= transfer_count;
         }
@@ -321,9 +343,9 @@ where
     }
 }
 
-// impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi2<CS, Reset, Input>
-impl<'buf, CS, Reset, Input, GpioError> Controller
-    for BluetoothSpi2<'buf, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi2<CS, Reset, Input>
+// impl<'buf, CS, Reset, Input, GpioError> Controller
+//     for BluetoothSpi2<'buf, CS, Reset, Input>
 where
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
@@ -419,8 +441,8 @@ where
 }
 
 /// read_event_uart
-// impl<CS, Reset, Input, GpioError> BluetoothSpi2<CS, Reset, Input>
-impl<'buf, CS, Reset, Input, GpioError> BluetoothSpi2<'buf, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi2<CS, Reset, Input>
+// impl<'buf, CS, Reset, Input, GpioError> BluetoothSpi2<'buf, CS, Reset, Input>
 where
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
