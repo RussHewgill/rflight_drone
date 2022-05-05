@@ -54,7 +54,12 @@ use stm32f4xx_hal::{
     time::*,
 };
 
-use crate::bluetooth::events::BlueNRGEvent;
+use crate::bluetooth::{
+    events::BlueNRGEvent, gap::Commands as GapCommands, gatt::Commands as GattCommands,
+    hal_bt::Commands as HalCommands,
+};
+use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
+use core::convert::Infallible;
 
 #[cfg(feature = "nope")]
 // #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
@@ -555,60 +560,17 @@ fn main_bluetooth() -> ! {
 
     let mut bt = BluetoothSpi::new(spi, cs, reset, input, bt_delay);
 
-    uart.pause();
     bt.pause_interrupt(&mut exti);
-    match bt.init_bt(&mut uart) {
-        Ok(()) => {}
-        e => {
-            uprintln!(uart, "init_bt error = {:?}", e);
-        }
-    }
-    uart.unpause();
-    bt.unpause_interrupt(&mut exti);
-
-    bt.wait_ms(1000.millis());
-    loop {
-        if !bt.data_ready().unwrap() {
-            break;
-        }
-        uprintln!(uart, "wat 4");
-        bt.read_event_uart(&mut uart).unwrap();
-    }
-
-    let buf = [0u8; 16];
-
-    let logger = if let Some(logger) = bt.services.logger {
-        logger
-    } else {
-        // uprintln!(uart, "no logger?");
-        // uprintln!(uart, "");
-        // return Ok(false);
-        panic!("no logger?");
-    };
-
-    use crate::bluetooth::gap::Commands as GapCommands;
-    use crate::bluetooth::gatt::Commands as GattCommands;
-    use crate::bluetooth::hal_bt::Commands as HalCommands;
-
-    use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
-
-    use core::convert::Infallible;
 
     loop {
-        bt.pause_interrupt(&mut exti);
-        uprint!(uart, "0..");
+        uprintln!(uart, "loop");
+        block!(bt.read_local_version_information()).unwrap();
 
-        let val = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
-            service_handle:        logger.service_handle,
-            characteristic_handle: logger.char_handle,
-            offset:                0,
-            value:                 &buf,
-        };
-        block!(bt.update_characteristic_value(&val)).unwrap();
-
+        uprintln!(uart, "wat 0");
         while !bt.data_ready().unwrap() {
             cortex_m::asm::nop();
         }
+        uprintln!(uart, "wat 1");
 
         while bt.data_ready().unwrap() {
             // match bt.read()
@@ -637,21 +599,100 @@ fn main_bluetooth() -> ! {
                 }
             }
         }
+    }
 
-        // match bt.log_write(&mut uart, false, &buf) {
-        //     Ok(true) => {
-        //         // uprintln!(uart, "sent log write command");
-        //     }
-        //     Ok(false) => {
-        //         uprintln!(uart, "failed to write");
-        //     }
-        //     Err(e) => {
-        //         uprintln!(uart, "error 0 = {:?}", e);
-        //     }
-        // }
-
+    #[cfg(feature = "nope")]
+    {
+        uart.pause();
+        bt.pause_interrupt(&mut exti);
+        match bt.init_bt(&mut uart) {
+            Ok(()) => {}
+            e => {
+                uprintln!(uart, "init_bt error = {:?}", e);
+            }
+        }
+        uart.unpause();
         bt.unpause_interrupt(&mut exti);
-        uprintln!(uart, "1");
+
+        bt.wait_ms(1000.millis());
+        loop {
+            if !bt.data_ready().unwrap() {
+                break;
+            }
+            uprintln!(uart, "wat 4");
+            bt.read_event_uart(&mut uart).unwrap();
+        }
+
+        let buf = [0u8; 16];
+
+        let logger = if let Some(logger) = bt.services.logger {
+            logger
+        } else {
+            // uprintln!(uart, "no logger?");
+            // uprintln!(uart, "");
+            // return Ok(false);
+            panic!("no logger?");
+        };
+
+        loop {
+            bt.pause_interrupt(&mut exti);
+            uprint!(uart, "0..");
+
+            let val = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
+                service_handle:        logger.service_handle,
+                characteristic_handle: logger.char_handle,
+                offset:                0,
+                value:                 &buf,
+            };
+            block!(bt.update_characteristic_value(&val)).unwrap();
+
+            while !bt.data_ready().unwrap() {
+                cortex_m::asm::nop();
+            }
+
+            while bt.data_ready().unwrap() {
+                // match bt.read()
+                let x: stm32f4xx_hal::nb::Result<
+                    bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
+                    bluetooth_hci::host::uart::Error<
+                        BTError<SpiError, Infallible>,
+                        crate::bluetooth::events::BlueNRGError,
+                    >,
+                > = bt.read();
+                match x {
+                    Ok(ev) => {
+                        uprintln!(uart, "ev = {:?}", ev);
+                        break;
+                    }
+                    Err(nb::Error::WouldBlock) => {
+                        if bt.is_ovr() {
+                            uprintln!(uart, "overrun");
+                        }
+                        if bt.is_modf() {
+                            uprintln!(uart, "modf");
+                        }
+                    }
+                    Err(e) => {
+                        panic!("error = {:?}", e);
+                    }
+                }
+            }
+
+            // match bt.log_write(&mut uart, false, &buf) {
+            //     Ok(true) => {
+            //         // uprintln!(uart, "sent log write command");
+            //     }
+            //     Ok(false) => {
+            //         uprintln!(uart, "failed to write");
+            //     }
+            //     Err(e) => {
+            //         uprintln!(uart, "error 0 = {:?}", e);
+            //     }
+            // }
+
+            bt.unpause_interrupt(&mut exti);
+            uprintln!(uart, "1");
+        }
     }
 
     // uprintln!(uart, "wat 2");
