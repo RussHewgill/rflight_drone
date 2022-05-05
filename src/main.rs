@@ -482,13 +482,35 @@ fn main_bluetooth() -> ! {
         .ahb1enr
         .modify(|r, w| w.gpioaen().set_bit().gpioben().set_bit());
 
+    // /// Power interface clock enable
+    // dp.RCC.apb1enr.modify(|r, w| w.pwren().set_bit());
+
+    // dp.FLASH.acr.modify(|r, w| {
+    //     w.latency() // wait states
+    //         .ws2()
+    //         .icen() // instruction cache
+    //         .set_bit()
+    //         .dcen() // data cache
+    //         .set_bit()
+    //         .prften() // prefetch
+    //         .set_bit()
+    // });
+
+    // unsafe {
+    //     dp.PWR.cr.modify(|r,w| w.vos().bits(0b));
+    // }
+
     let mut rcc = dp.RCC.constrain();
     let clocks = rcc
         .cfgr
         .use_hse(16.MHz())
+        // .bypass_hse_oscillator()
         // .sysclk(32.MHz())
         .sysclk(64.MHz())
+        // .hclk(64.MHz())
         // .require_pll48clk()
+        // .pclk1(32.MHz())
+        // .pclk2(64.MHz())
         .freeze();
 
     let gpioa = dp.GPIOA.split();
@@ -498,6 +520,15 @@ fn main_bluetooth() -> ! {
     let bt_delay = dp.TIM2.counter_ms(&clocks);
     let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
     let mut exti = dp.EXTI;
+
+    uprintln!(uart, "sysclk()   core = {:?}", clocks.sysclk());
+    uprintln!(uart, "hclk()     AHB1 = {:?}", clocks.hclk());
+    uprintln!(uart, "pclk1()    APB1 = {:?}", clocks.pclk1());
+    uprintln!(uart, "pclk2()    APB2 = {:?}", clocks.pclk2());
+    uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
+    uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
+    uprintln!(uart, "ppre1()    = {:?}", clocks.ppre1());
+    uprintln!(uart, "ppre2()    = {:?}", clocks.ppre2());
 
     let cs = gpiob.pb0;
     let reset = gpiob.pb2;
@@ -553,24 +584,38 @@ fn main_bluetooth() -> ! {
     // uprintln!(uart, "wat 0");
     // let spi = Spi4::new(dp.SPI1, mode, sck, miso, mosi);
 
-    let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    // let spi = dp.SPI1.spi((sck, miso, mosi), mode, 8.MHz(), &clocks);
+    let spi = dp.SPI1.spi((sck, miso, mosi), mode, 2.MHz(), &clocks);
 
     // static mut BLE_BUFFER: [u8; 512] = [0u8; 512];
     // let buffer = unsafe { &mut BLE_BUFFER[..] };
 
     let mut bt = BluetoothSpi::new(spi, cs, reset, input, bt_delay);
 
-    bt.pause_interrupt(&mut exti);
+    // bt.pause_interrupt(&mut exti);
 
+    // use bluetooth_hci::host::HciHeader;
+    // let mut header: [u8; 4] = [0; 4];
+    // let opcode = bluetooth_hci::Opcode::new(0x04, 0x01);
+    // bluetooth_hci::host::uart::CommandHeader::new(opcode, 0).copy_into_slice(&mut header);
+    // let header: &[u8] = &header;
+    // uprintln!(uart, "header[0] = {:#0x}", header[0]);
+    // uprintln!(uart, "header[1] = {:#0x}", header[1]);
+    // uprintln!(uart, "header[2] = {:#0x}", header[2]);
+    // uprintln!(uart, "header[3] = {:#0x}", header[3]);
+    // loop {}
+
+    #[cfg(feature = "nope")]
     loop {
         uprintln!(uart, "loop");
         block!(bt.read_local_version_information()).unwrap();
+        // block!(bt.safe_read_local_ver(&mut uart)).unwrap();
 
-        uprintln!(uart, "wat 0");
-        while !bt.data_ready().unwrap() {
-            cortex_m::asm::nop();
-        }
-        uprintln!(uart, "wat 1");
+        // uprintln!(uart, "wat 0");
+        // while !bt.data_ready().unwrap() {
+        //     cortex_m::asm::nop();
+        // }
+        // uprintln!(uart, "wat 1");
 
         while bt.data_ready().unwrap() {
             // match bt.read()
@@ -601,9 +646,9 @@ fn main_bluetooth() -> ! {
         }
     }
 
-    #[cfg(feature = "nope")]
+    // #[cfg(feature = "nope")]
     {
-        uart.pause();
+        // uart.pause();
         bt.pause_interrupt(&mut exti);
         match bt.init_bt(&mut uart) {
             Ok(()) => {}
@@ -612,18 +657,18 @@ fn main_bluetooth() -> ! {
             }
         }
         uart.unpause();
-        bt.unpause_interrupt(&mut exti);
+        // bt.unpause_interrupt(&mut exti);
 
-        bt.wait_ms(1000.millis());
-        loop {
-            if !bt.data_ready().unwrap() {
-                break;
-            }
-            uprintln!(uart, "wat 4");
-            bt.read_event_uart(&mut uart).unwrap();
-        }
+        // bt.wait_ms(100.millis());
+        // loop {
+        //     if !bt.data_ready().unwrap() {
+        //         break;
+        //     }
+        //     uprintln!(uart, "wat 4");
+        //     bt.read_event_uart(&mut uart).unwrap();
+        // }
 
-        let buf = [0u8; 16];
+        let mut buf = [0u8; 16];
 
         let logger = if let Some(logger) = bt.services.logger {
             logger
@@ -635,7 +680,10 @@ fn main_bluetooth() -> ! {
         };
 
         loop {
-            bt.pause_interrupt(&mut exti);
+            for b in buf.iter_mut() {
+                *b += 1;
+            }
+
             uprint!(uart, "0..");
 
             let val = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
@@ -646,11 +694,11 @@ fn main_bluetooth() -> ! {
             };
             block!(bt.update_characteristic_value(&val)).unwrap();
 
-            while !bt.data_ready().unwrap() {
-                cortex_m::asm::nop();
-            }
+            // while !bt.data_ready().unwrap() {
+            //     cortex_m::asm::nop();
+            // }
 
-            while bt.data_ready().unwrap() {
+            loop {
                 // match bt.read()
                 let x: stm32f4xx_hal::nb::Result<
                     bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
@@ -676,6 +724,9 @@ fn main_bluetooth() -> ! {
                         panic!("error = {:?}", e);
                     }
                 }
+                if !bt.data_ready().unwrap() {
+                    break;
+                }
             }
 
             // match bt.log_write(&mut uart, false, &buf) {
@@ -694,6 +745,32 @@ fn main_bluetooth() -> ! {
             uprintln!(uart, "1");
         }
     }
+
+    // loop {}
+
+    // bt.pause_interrupt(&mut exti);
+    // block!(bt.read_local_version_information()).unwrap();
+    // uprintln!(uart, "wat -1");
+    // bt.read_events_while_ready(&mut uart).unwrap();
+    // uprintln!(uart, "wat 0");
+    // bt.reset().unwrap();
+    // uprintln!(uart, "wat 1");
+    // // bt.read_event_uart(&mut uart).unwrap();
+    // uprintln!(uart, "wat 2");
+    // bt.read_events_while_ready(&mut uart).unwrap();
+    // uprintln!(uart, "wat 3");
+    // bt.unpause_interrupt(&mut exti);
+
+    // // uart.pause();
+    // bt.pause_interrupt(&mut exti);
+    // match bt.init_bt(&mut uart) {
+    //     Ok(()) => {}
+    //     e => {
+    //         uprintln!(uart, "init_bt error = {:?}", e);
+    //     }
+    // }
+    // // uart.unpause();
+    // bt.unpause_interrupt(&mut exti);
 
     // uprintln!(uart, "wat 2");
     // let e = bt.block_until_ready(AccessByte::Read, Some(&mut uart));
