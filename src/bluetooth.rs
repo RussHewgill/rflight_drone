@@ -32,7 +32,7 @@ use stm32f4xx_hal::{
     nb,
     prelude::*,
     rcc::Clocks,
-    spi::{Error as SpiError, NoMiso},
+    spi::{Error as SpiError, NoMiso, Spi1},
     time::*,
     timer::{CounterMs, DelayMs, FTimerMs},
 };
@@ -44,7 +44,7 @@ use bluetooth_hci::{host::HciHeader, Controller, Opcode};
 use byteorder::{ByteOrder, LittleEndian};
 
 use crate::{
-    bt_control::{service_log::SvLogger, service_sensors::SvSensors, BTState},
+    bt_control::{service_log::SvLogger, service_sensors::SvSensors, BTSpi, BTState},
     uart::*,
     uprint, uprintln,
 };
@@ -219,6 +219,22 @@ where
 
     pub fn unpause_interrupt(&mut self, exti: &mut EXTI) {
         self.input.enable_interrupt(exti);
+    }
+}
+
+/// get flags
+impl<CS, Reset> BluetoothSpi<BTSpi, CS, Reset, PA4> {
+    pub fn is_ovr(&self) -> bool {
+        self.spi.is_ovr()
+    }
+    pub fn is_modf(&self) -> bool {
+        self.spi.is_modf()
+    }
+    pub fn is_txe(&self) -> bool {
+        self.spi.is_txe()
+    }
+    pub fn is_rxne(&self) -> bool {
+        self.spi.is_rxne()
     }
 }
 

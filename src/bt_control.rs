@@ -78,19 +78,17 @@ pub enum TimeoutResult {
 //     PA4,
 // >;
 
-pub type BTController = BluetoothSpi<
-    Spi1<
-        (
-            Pin<'A', 5, Alternate<5>>,
-            Pin<'A', 6, Alternate<5>>,
-            Pin<'A', 7, Alternate<5>>,
-        ),
-        stm32f4xx_hal::spi::TransferModeNormal,
-    >,
-    Pin<'B', 0, Output>,
-    Pin<'B', 2, Output>,
-    PA4,
+pub type BTSpi = Spi1<
+    (
+        Pin<'A', 5, Alternate<5>>,
+        Pin<'A', 6, Alternate<5>>,
+        Pin<'A', 7, Alternate<5>>,
+    ),
+    stm32f4xx_hal::spi::TransferModeNormal,
 >;
+
+pub type BTController =
+    BluetoothSpi<BTSpi, Pin<'B', 0, Output>, Pin<'B', 2, Output>, PA4>;
 
 pub type BTEvent = bluetooth_hci::event::Event<BlueNRGEvent>;
 
@@ -474,34 +472,34 @@ where
     ) -> Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>> {
         //
 
-        // let x: Result<
-        //     bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-        //     bluetooth_hci::host::uart::Error<
-        //         BTError<SpiError, GpioError>,
-        //         crate::bluetooth::events::BlueNRGError,
-        //     >,
-        // > = block!(self.read());
-
         let x: Result<
             bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
             bluetooth_hci::host::uart::Error<
                 BTError<SpiError, GpioError>,
                 crate::bluetooth::events::BlueNRGError,
             >,
-        > = loop {
-            match self.read() {
-                Ok(x) => break Ok(x),
-                Err(nb::Error::WouldBlock) => {
-                    //
-                    // let k = self.data_ready().unwrap();
-                    // uprintln!(uart, "rdy = {:?}", k);
-                    // unimplemented!()
-                }
-                Err(other) => {
-                    panic!("_read_event other 0 = {:?}", other);
-                }
-            }
-        };
+        > = block!(self.read());
+
+        // let x: Result<
+        //     bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
+        //     bluetooth_hci::host::uart::Error<
+        //         BTError<SpiError, GpioError>,
+        //         crate::bluetooth::events::BlueNRGError,
+        //     >,
+        // > = loop {
+        //     match self.read() {
+        //         Ok(x) => break Ok(x),
+        //         Err(nb::Error::WouldBlock) => {
+        //             //
+        //             // let k = self.data_ready().unwrap();
+        //             // uprintln!(uart, "rdy = {:?}", k);
+        //             // unimplemented!()
+        //         }
+        //         Err(other) => {
+        //             panic!("_read_event other 0 = {:?}", other);
+        //         }
+        //     }
+        // };
 
         match x {
             Ok(p) => {
