@@ -35,6 +35,9 @@ use byteorder::ByteOrder;
 // use panic_itm as _; // logs messages over ITM; requires ITM support
 use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
+/// defmt global_logger
+use defmt_rtt as _;
+
 // use cortex_m::asm;
 use cortex_m::{iprintln, peripheral::ITM};
 use cortex_m_rt::entry;
@@ -464,8 +467,64 @@ mod app {
     }
 }
 
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 // #[cfg(feature = "nope")]
-#[entry]
+mod app {
+    // use rtt_target::{rprintln, rtt_init_print};
+
+    #[shared]
+    struct Shared {}
+
+    #[local]
+    struct Local {}
+
+    #[init]
+    fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {
+        // rtt_init_print!();
+
+        foo::spawn().unwrap();
+
+        (Shared {}, Local {}, init::Monotonics())
+    }
+
+    #[task(shared = [], local = [x: u32 = 0])]
+    fn foo(cx: foo::Context) {
+        *cx.local.x += 1;
+        // rprintln!("wat {:?}", *cx.local.x);
+        defmt::error!("wat {:?}", *cx.local.x);
+        foo::spawn().unwrap();
+    }
+
+    #[idle]
+    fn idle(_: idle::Context) -> ! {
+        loop {
+            continue;
+        }
+    }
+}
+
+#[cfg(feature = "nope")]
+// #[entry]
+fn main_log_test() -> ! {
+    // let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    // let mut dp = stm32f401::Peripherals::take().unwrap();
+
+    defmt::error!("wat 0");
+    cortex_m::asm::nop();
+    defmt::error!("wat 1");
+
+    // use rtt_target::{rprintln, rtt_init_print};
+    // rtt_init_print!();
+
+    // rprintln!("wat 2");
+    // cortex_m::asm::nop();
+    // rprintln!("wat 3");
+
+    loop {}
+}
+
+// #[cfg(feature = "nope")]
+// #[entry]
 fn main_bluetooth() -> ! {
     use crate::bluetooth::{AccessByte, BTError, BTServices};
     use crate::spi::{Spi4, SpiError};
@@ -523,12 +582,12 @@ fn main_bluetooth() -> ! {
 
     uprintln!(uart, "sysclk()   core = {:?}", clocks.sysclk());
     uprintln!(uart, "hclk()     AHB1 = {:?}", clocks.hclk());
-    uprintln!(uart, "pclk1()    APB1 = {:?}", clocks.pclk1());
-    uprintln!(uart, "pclk2()    APB2 = {:?}", clocks.pclk2());
-    uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
-    uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
-    uprintln!(uart, "ppre1()    = {:?}", clocks.ppre1());
-    uprintln!(uart, "ppre2()    = {:?}", clocks.ppre2());
+    // uprintln!(uart, "pclk1()    APB1 = {:?}", clocks.pclk1());
+    // uprintln!(uart, "pclk2()    APB2 = {:?}", clocks.pclk2());
+    // uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
+    // uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
+    // uprintln!(uart, "ppre1()    = {:?}", clocks.ppre1());
+    // uprintln!(uart, "ppre2()    = {:?}", clocks.ppre2());
 
     let cs = gpiob.pb0;
     let reset = gpiob.pb2;
@@ -557,12 +616,20 @@ fn main_bluetooth() -> ! {
         .speed(Speed::High)
         .into_alternate::<5>();
     // let miso = miso.into_alternate::<5>();
+
+    // let miso = miso
+    //     .internal_resistor(Pull::None)
+    //     // .internal_resistor(Pull::Down) // XXX: nope
+    //     .into_push_pull_output()
+    //     .into_alternate::<5>()
+    //     .speed(Speed::High);
+
     let miso = miso
         .internal_resistor(Pull::None)
-        // .internal_resistor(Pull::Down) // XXX: nope
-        .into_push_pull_output()
+        .into_input()
         .into_alternate::<5>()
         .speed(Speed::High);
+
     let mosi = mosi
         .internal_resistor(Pull::None)
         .into_push_pull_output()

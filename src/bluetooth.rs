@@ -12,7 +12,7 @@ pub mod hal_bt;
 use arrayvec::ArrayVec;
 use core::ptr;
 use cortex_m::peripheral::{NVIC, SYST};
-use cortex_m_semihosting::hprintln;
+use cortex_m_semihosting::{hprint, hprintln};
 use embedded_hal as hal;
 
 use hal::digital::v2::{InputPin, OutputPin};
@@ -311,13 +311,21 @@ where
         mut uart: Option<&mut UART>,
     ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
         // let mut x = 0;
+        let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+
         loop {
+            // cortex_m::asm::nop();
+
             // x += 1;
             // let mut write_header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
             // let mut read_header = [0xff; 5];
             // let e = self.spi.transfer(&mut read_header, &write_header);
 
-            let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+            header[0] = access_byte as u8;
+            header[1] = 0;
+            header[2] = 0;
+            header[3] = 0;
+            header[4] = 0;
 
             self.spi
                 .transfer(&mut header)
@@ -332,11 +340,35 @@ where
             // }
 
             match parse_spi_header(&header) {
+                // Ok(lens) => {
+                //     // if let Some(ref mut uart) = uart {
+                //     //     uprintln!(uart, "ready in {:?} loops", x);
+                //     // }
+                //     return Ok(lens);
+                // }
                 Ok(lens) => {
-                    // if let Some(ref mut uart) = uart {
-                    //     uprintln!(uart, "ready in {:?} loops", x);
-                    // }
-                    return Ok(lens);
+                    /// If write len is 0, device is not ready
+                    if access_byte == AccessByte::Write && lens.0 == 0 {
+                        // hprintln!("w 0");
+                        self.cs
+                            .set_high()
+                            .map_err(BTError::Gpio)
+                            .map_err(nb::Error::Other)?;
+                        self.cs
+                            .set_low()
+                            .map_err(BTError::Gpio)
+                            .map_err(nb::Error::Other)?;
+                    } else {
+                        // hprintln!(
+                        //     "{:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
+                        //     header[0],
+                        //     header[1],
+                        //     header[2],
+                        //     header[3],
+                        //     header[4],
+                        // );
+                        return Ok(lens);
+                    }
                 }
                 Err(nb::Error::WouldBlock) => {
                     self.cs
@@ -480,6 +512,7 @@ where
         Ok(())
     }
 
+    #[cfg(feature = "nope")]
     pub fn write_command(
         &mut self,
         opcode: Opcode,
@@ -491,6 +524,58 @@ where
             .copy_into_slice(&mut header);
 
         self.write(&header, params)
+    }
+
+    pub fn write_command(
+        &mut self,
+        opcode: Opcode,
+        params: &[u8],
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        const HEADER_LEN: usize = 4;
+        let mut header = [0; HEADER_LEN];
+        bluetooth_hci::host::uart::CommandHeader::new(opcode, params.len())
+            .copy_into_slice(&mut header);
+
+        let payload = params;
+
+        self.cs
+            .set_low()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?;
+
+        // hprintln!("a");
+
+        let write_len = self.block_until_ready_for(AccessByte::Write, None)?;
+
+        // hprintln!("w: {:?}", write_len);
+
+        // hprintln!("b");
+
+        if (write_len as usize) < header.len() + payload.len() {
+            return Err(nb::Error::WouldBlock);
+        }
+
+        // hprintln!("c");
+
+        let result = self.try_write(&header, payload);
+
+        // // hprintln!("r = {:?}", result);
+        // match result {
+        //     Ok(_) => hprintln!("d: ok"),
+        //     Err(nb::Error::WouldBlock) => hprintln!("d: wb"),
+        //     Err(nb::Error::Other(BTError::Spi(se))) => {
+        //         hprintln!("d: {:?}", se);
+        //     }
+        //     Err(_) => {
+        //         hprintln!("d: other");
+        //     }
+        // }
+
+        self.cs
+            .set_high()
+            .map_err(BTError::Gpio)
+            .map_err(nb::Error::Other)?;
+        result
     }
 }
 
@@ -630,6 +715,8 @@ where
             .map_err(BTError::Gpio)
             .map_err(nb::Error::Other)?;
 
+        // cortex_m::asm::nop();
+
         let write_len = self.block_until_ready_for(AccessByte::Write, None)?;
         if (write_len as usize) < header.len() + payload.len() {
             return Err(nb::Error::WouldBlock);
@@ -683,6 +770,7 @@ where
                 .set_low()
                 .map_err(BTError::Gpio)
                 .map_err(nb::Error::Other)?;
+            // cortex_m::asm::nop();
             let result = self.read_available_data();
             self.cs
                 .set_high()

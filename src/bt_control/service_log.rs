@@ -161,6 +161,10 @@ where
         // };
         // uprintln!(uart, "service = {:?}", service);
 
+        // while !self.data_ready().unwrap() {
+        //     uprintln!(uart, "data not ready");
+        // }
+
         let service = match self._read_event(uart)? {
             Event::CommandComplete(params) => match params.return_params {
                 ReturnParameters::Vendor(vs) => match vs {
