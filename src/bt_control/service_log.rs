@@ -2,6 +2,7 @@ use bluetooth_hci::{event::command::ReturnParameters, Event};
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
+use rtt_target::rprintln;
 use stm32f4::stm32f401::{RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
     block,
@@ -143,7 +144,7 @@ where
     /// block
     pub fn init_log_service(
         &mut self,
-        uart: &mut UART,
+        // uart: &mut UART,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         let params = AddServiceParameters {
             uuid:                  UUID_CONSOLE_LOG_SERVICE,
@@ -151,7 +152,7 @@ where
             max_attribute_records: 8,
         };
         block!(self.add_service(&params))?;
-        uprintln!(uart, "sent service");
+        rprintln!("sent service");
 
         // let service: GattService = match self.read_event_params_vendor(uart)? {
         //     VReturnParameters::GattAddService(service) => service,
@@ -159,13 +160,13 @@ where
         //         panic!("other 0 = {:?}", other);
         //     }
         // };
-        // uprintln!(uart, "service = {:?}", service);
+        // rprintln!("service = {:?}", service);
 
         // while !self.data_ready().unwrap() {
-        //     uprintln!(uart, "data not ready");
+        //     rprintln!("data not ready");
         // }
 
-        let service = match self._read_event(uart)? {
+        let service = match self._read_event()? {
             Event::CommandComplete(params) => match params.return_params {
                 ReturnParameters::Vendor(vs) => match vs {
                     VReturnParameters::GattAddService(service) => service,
@@ -181,7 +182,7 @@ where
                 panic!("event_params_vendor other 2 = {:?}", other);
             }
         };
-        uprintln!(uart, "service = {:?}", service);
+        rprintln!("service = {:?}", service);
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
@@ -197,14 +198,14 @@ where
 
         // self.wait_ms(50.millis());
         block!(self.add_characteristic(&params0))?;
-        uprintln!(uart, "sent c");
+        rprintln!("sent c");
 
-        let c = match self.read_event_params_vendor(uart)? {
+        let c = match self.read_event_params_vendor()? {
             VReturnParameters::GattAddCharacteristic(c) => c,
             other => unimplemented!("other = {:?}", other),
         };
 
-        uprintln!(uart, "c = {:?}", c);
+        rprintln!("c = {:?}", c);
 
         let logger = SvLogger {
             service_handle: service.service_handle,

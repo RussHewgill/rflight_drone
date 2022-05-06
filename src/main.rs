@@ -40,9 +40,11 @@ use panic_semihosting as _; // logs messages to the host stderr; requires a debu
 // use defmt_rtt as _;
 
 // use cortex_m::asm;
-use cortex_m::{iprintln, peripheral::ITM};
+// use cortex_m::{iprintln, peripheral::ITM};
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
+
+use rtt_target::{rprint, rprintln, rtt_init_print};
 
 use embedded_hal as hal;
 use hal::spi::*;
@@ -468,8 +470,8 @@ mod app {
     }
 }
 
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-// #[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
 mod app {
     use rtt_target::{rprintln, rtt_init_print};
 
@@ -514,7 +516,6 @@ fn main_log_test() -> ! {
     // // cortex_m::asm::nop();
     // defmt::error!("wat 1");
 
-    use rtt_target::{rprintln, rtt_init_print};
     rtt_init_print!();
 
     rprintln!("wat 2");
@@ -524,12 +525,14 @@ fn main_log_test() -> ! {
     loop {}
 }
 
-#[cfg(feature = "nope")]
-// #[entry]
+// #[cfg(feature = "nope")]
+#[entry]
 fn main_bluetooth() -> ! {
     use crate::bluetooth::{AccessByte, BTError, BTServices};
     use crate::spi::{Spi4, SpiError};
     use stm32f4xx_hal::gpio::Pull;
+
+    rtt_init_print!();
 
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
@@ -578,12 +581,13 @@ fn main_bluetooth() -> ! {
 
     let mut syscfg = dp.SYSCFG.constrain();
     let bt_delay = dp.TIM2.counter_ms(&clocks);
-    let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
+    // let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
     let mut exti = dp.EXTI;
 
-    // // defmt::println!("sysclk()   core = {:?}", clocks.sysclk());
-    // // defmt::println!("hclk()     AHB1 = {:?}", clocks.hclk());
-    // defmt::println!("clocks.sysclk() = {:?}", clocks.sysclk());
+    // defmt::println!("sysclk()   core = {:?}", clocks.sysclk());
+    // defmt::println!("hclk()     AHB1 = {:?}", clocks.hclk());
+    rprintln!("sysclk()   core = {:?}", clocks.sysclk());
+    rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
 
     // uprintln!(uart, "sysclk()   core = {:?}", clocks.sysclk());
     // uprintln!(uart, "hclk()     AHB1 = {:?}", clocks.hclk());
@@ -679,7 +683,8 @@ fn main_bluetooth() -> ! {
 
     #[cfg(feature = "nope")]
     loop {
-        uprintln!(uart, "loop");
+        // uprintln!(uart, "loop");
+        rprintln!(uart, "loop");
         block!(bt.read_local_version_information()).unwrap();
         // block!(bt.safe_read_local_ver(&mut uart)).unwrap();
 
@@ -700,15 +705,15 @@ fn main_bluetooth() -> ! {
             > = bt.read();
             match x {
                 Ok(ev) => {
-                    uprintln!(uart, "ev = {:?}", ev);
+                    rprintln!("ev = {:?}", ev);
                     break;
                 }
                 Err(nb::Error::WouldBlock) => {
                     if bt.is_ovr() {
-                        uprintln!(uart, "overrun");
+                        rprintln!("overrun");
                     }
                     if bt.is_modf() {
-                        uprintln!(uart, "modf");
+                        rprintln!("modf");
                     }
                 }
                 Err(e) => {
@@ -722,13 +727,14 @@ fn main_bluetooth() -> ! {
     {
         // uart.pause();
         bt.pause_interrupt(&mut exti);
-        match bt.init_bt(&mut uart) {
+        match bt.init_bt() {
             Ok(()) => {}
             e => {
-                uprintln!(uart, "init_bt error = {:?}", e);
+                // uprintln!(uart, "init_bt error = {:?}", e);
+                rprintln!("init_bt error = {:?}", e);
             }
         }
-        uart.unpause();
+        // uart.unpause();
         // bt.unpause_interrupt(&mut exti);
 
         // bt.wait_ms(100.millis());
@@ -756,7 +762,8 @@ fn main_bluetooth() -> ! {
                 *b += 1;
             }
 
-            uprint!(uart, "0..");
+            // uprint!(uart, "0..");
+            rprint!("0..");
 
             let val = crate::bluetooth::gatt::UpdateCharacteristicValueParameters {
                 service_handle:        logger.service_handle,
@@ -781,15 +788,16 @@ fn main_bluetooth() -> ! {
                 > = bt.read();
                 match x {
                     Ok(ev) => {
-                        uprintln!(uart, "ev = {:?}", ev);
+                        // uprintln!(uart, "ev = {:?}", ev);
+                        rprintln!("ev = {:?}", ev);
                         break;
                     }
                     Err(nb::Error::WouldBlock) => {
                         if bt.is_ovr() {
-                            uprintln!(uart, "overrun");
+                            rprintln!("overrun");
                         }
                         if bt.is_modf() {
-                            uprintln!(uart, "modf");
+                            rprintln!("modf");
                         }
                     }
                     Err(e) => {
@@ -814,7 +822,7 @@ fn main_bluetooth() -> ! {
             // }
 
             bt.unpause_interrupt(&mut exti);
-            uprintln!(uart, "1");
+            rprintln!("1");
         }
     }
 

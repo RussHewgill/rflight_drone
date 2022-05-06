@@ -62,7 +62,7 @@ where
         };
         block!(self.add_service(&params))?;
 
-        let service: GattService = match self.read_event_params_vendor(uart)? {
+        let service: GattService = match self.read_event_params_vendor()? {
             VReturnParameters::GattAddService(service) => service,
             _ => unimplemented!(),
         };
@@ -100,7 +100,7 @@ where
 
         // block!(self.read_event(uart))?;
 
-        let c = match self.read_event_params_vendor(uart)? {
+        let c = match self.read_event_params_vendor()? {
             VReturnParameters::GattAddCharacteristic(c) => c,
             _ => unimplemented!(),
         };

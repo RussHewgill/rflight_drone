@@ -4,6 +4,7 @@ pub mod service_sensors;
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
+use rtt_target::rprintln;
 use stm32f4::stm32f401::{RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
     block,
@@ -126,27 +127,27 @@ where
 {
     fn init_services(
         &mut self,
-        uart: &mut UART,
+        // uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        self.init_log_service(uart)?;
+        self.init_log_service()?;
         Ok(())
     }
 
     pub fn init_bt(
         &mut self,
-        uart: &mut UART,
+        // uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         // self.reset_with_delay(delay, 5u32).unwrap();
         self.reset().unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
         // uart.unpause();
         // block!(self.get_firmware_revision())?;
-        // self.read_event_uart(uart)?;
+        // self.read_event_uart()?;
         // uart.pause();
 
         self.reset().unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
         let addr = gen_bd_addr();
 
@@ -154,16 +155,16 @@ where
         // block!(self.read_event(uart))?;
 
         block!(self.le_set_random_address(addr)).unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
-        uart.unpause();
+        // uart.unpause();
         block!(self.init_gatt()).unwrap();
-        self.read_event_uart(uart)?;
-        uart.pause();
+        self.read_event_uart()?;
+        // uart.pause();
 
         let role = crate::bluetooth::gap::Role::PERIPHERAL;
         block!(self.init_gap(role, false, 7))?;
-        let gap: GapInit = self.read_event_gap_init(uart)?;
+        let gap: GapInit = self.read_event_gap_init()?;
 
         // block!(self.clear_security_database())?;
         // block!(self.read_event(uart))?;
@@ -179,10 +180,10 @@ where
             value:                 BLE_NAME.as_bytes(),
         };
         block!(self.update_characteristic_value(&ps)).unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
         // block!(self.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1))?;
-        // self.read_event_uart(uart)?;
+        // self.read_event_uart()?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
@@ -204,7 +205,7 @@ where
             bonding_required:          true,
         };
         block!(self.set_authentication_requirement(&requirements)).unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
         let ad_params = AdvertisingParameters {
             advertising_interval:      AdvertisingInterval::for_type(
@@ -222,17 +223,17 @@ where
                 bluetooth_hci::host::AdvertisingFilterPolicy::AllowConnectionAndScan,
         };
         block!(self.le_set_advertising_parameters(&ad_params)).unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
         block!(self.le_set_advertising_data(&[])).unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
         block!(self.le_set_scan_response_data(&[])).unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
         // uart.unpause();
         block!(self.le_set_advertise_enable(true))?;
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
         // uart.pause();
 
         let dev_name: &'static [u8; 7] = b"DRN1120";
@@ -254,13 +255,13 @@ where
         };
 
         block!(self.set_nondiscoverable()).unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
-        uart.unpause();
+        // uart.unpause();
         block!(self.set_discoverable(&d_params)).unwrap();
-        self.read_event_uart(uart)?;
+        self.read_event_uart()?;
 
-        self.init_services(uart)?;
+        self.init_services()?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
@@ -426,7 +427,7 @@ where
     pub fn _read_event(
         &mut self,
         // timeout: Option<fugit::MillisDurationU32>,
-        uart: &mut UART,
+        // uart: &mut UART,
         // ) -> nb::Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>>
     ) -> Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>> {
         //
@@ -472,13 +473,13 @@ where
                 > = e;
                 match e {
                     bluetooth_hci::host::uart::Error::Comm(e) => {
-                        uprintln!(uart, "error 0 = {:?}", e);
+                        rprintln!("error 0 = {:?}", e);
                     }
                     bluetooth_hci::host::uart::Error::BadPacketType(e) => {
-                        uprintln!(uart, "error 1 = {:?}", e);
+                        rprintln!("error 1 = {:?}", e);
                     }
                     bluetooth_hci::host::uart::Error::BLE(e) => {
-                        uprintln!(uart, "error 2 = {:?}", e);
+                        rprintln!("error 2 = {:?}", e);
                     }
                 }
                 unimplemented!()
@@ -624,7 +625,7 @@ where
 
     pub fn read_event_uart(
         &mut self,
-        uart: &mut UART,
+        // uart: &mut UART,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         let x: Result<
             bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
@@ -645,16 +646,16 @@ where
                     Event::Vendor(
                         crate::bluetooth::events::BlueNRGEvent::HalInitialized(reason),
                     ) => {
-                        uprintln!(uart, "bt restarted, reason = {:?}", reason);
+                        rprintln!("bt restarted, reason = {:?}", reason);
                     }
                     Event::CommandComplete(params) => {
-                        Self::handle_event_command_complete(uart, params.return_params);
+                        Self::handle_event_command_complete(params.return_params);
                     }
                     // Event::LeConnectionComplete(conn) => {
                     //     unimplemented!()
                     // }
                     ev => {
-                        uprintln!(uart, "unhandled event = {:?}", ev);
+                        rprintln!("unhandled event = {:?}", ev);
                     }
                 }
             }
@@ -666,13 +667,13 @@ where
                 > = e;
                 match e {
                     bluetooth_hci::host::uart::Error::Comm(e) => {
-                        uprintln!(uart, "error 0 = {:?}", e);
+                        rprintln!("error 0 = {:?}", e);
                     }
                     bluetooth_hci::host::uart::Error::BadPacketType(e) => {
-                        uprintln!(uart, "error 1 = {:?}", e);
+                        rprintln!("error 1 = {:?}", e);
                     }
                     bluetooth_hci::host::uart::Error::BLE(e) => {
-                        uprintln!(uart, "error 2 = {:?}", e);
+                        rprintln!("error 2 = {:?}", e);
                     }
                 }
             }
@@ -693,21 +694,21 @@ where
     GpioError: core::fmt::Debug,
 {
     fn handle_event_command_complete(
-        uart: &mut UART,
+        // uart: &mut UART,
         return_params: ReturnParameters<BlueNRGEvent>,
     ) {
         match return_params {
             ReturnParameters::Vendor(VReturnParameters::GattInit(status)) => match status
             {
                 _ => {
-                    uprintln!(uart, "status = {:?}", status);
+                    rprintln!("status = {:?}", status);
                 }
             },
             ReturnParameters::ReadLocalVersionInformation(v) => {
-                uprintln!(uart, "v = {:?}", v);
+                rprintln!("v = {:?}", v);
             }
             ps => {
-                uprintln!(uart, "Other: return_params = {:?}", ps);
+                rprintln!("Other: return_params = {:?}", ps);
             }
         }
     }
@@ -715,12 +716,12 @@ where
     pub fn read_event_params(
         &mut self,
         // timeout: Option<fugit::MillisDurationU32>,
-        uart: &mut UART,
+        // uart: &mut UART,
     ) -> Result<
         bluetooth_hci::event::command::ReturnParameters<BlueNRGEvent>,
         BTError<SpiError, GpioError>,
     > {
-        match self._read_event(uart)? {
+        match self._read_event()? {
             Event::CommandComplete(params) => Ok(params.return_params),
             _ => unimplemented!(),
         }
@@ -729,12 +730,12 @@ where
     pub fn read_event_params_vendor(
         &mut self,
         // timeout: Option<fugit::MillisDurationU32>,
-        uart: &mut UART,
+        // uart: &mut UART,
     ) -> Result<
         crate::bluetooth::ev_command::ReturnParameters,
         BTError<SpiError, GpioError>,
     > {
-        match self._read_event(uart)? {
+        match self._read_event()? {
             Event::CommandComplete(params) => match params.return_params {
                 ReturnParameters::Vendor(vs) => Ok(vs),
                 other => {
@@ -749,9 +750,9 @@ where
 
     pub fn read_event_gap_init(
         &mut self,
-        uart: &mut UART,
+        // uart: &mut UART,
     ) -> Result<GapInit, BTError<SpiError, GpioError>> {
-        match self.read_event_params(uart)? {
+        match self.read_event_params()? {
             ReturnParameters::Vendor(VReturnParameters::GapInit(g)) => return Ok(g),
             _ => unimplemented!(),
         }
