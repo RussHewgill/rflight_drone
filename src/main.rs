@@ -33,11 +33,11 @@ use byteorder::ByteOrder;
 // use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
 // use panic_abort as _; // requires nightly
 // use panic_itm as _; // logs messages over ITM; requires ITM support
-// use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
-use panic_probe as _;
+use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
+                            // use panic_probe as _;
 
-/// defmt global_logger
-use defmt_rtt as _;
+// /// defmt global_logger
+// use defmt_rtt as _;
 
 // use cortex_m::asm;
 use cortex_m::{iprintln, peripheral::ITM};
@@ -471,7 +471,7 @@ mod app {
 #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 // #[cfg(feature = "nope")]
 mod app {
-    // use rtt_target::{rprintln, rtt_init_print};
+    use rtt_target::{rprintln, rtt_init_print};
 
     #[shared]
     struct Shared {}
@@ -481,7 +481,7 @@ mod app {
 
     #[init]
     fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {
-        // rtt_init_print!();
+        rtt_init_print!();
 
         foo::spawn().unwrap();
 
@@ -491,8 +491,8 @@ mod app {
     #[task(shared = [], local = [x: u32 = 0])]
     fn foo(cx: foo::Context) {
         *cx.local.x += 1;
-        // rprintln!("wat {:?}", *cx.local.x);
-        defmt::println!("wat {:?}", *cx.local.x);
+        rprintln!("wat {:?}", *cx.local.x);
+        // defmt::error!("wat {:?}", *cx.local.x);
         foo::spawn().unwrap();
     }
 
@@ -510,21 +510,21 @@ fn main_log_test() -> ! {
     // let mut cp = stm32f401::CorePeripherals::take().unwrap();
     // let mut dp = stm32f401::Peripherals::take().unwrap();
 
-    defmt::println!("wat 0");
-    // cortex_m::asm::nop();
-    defmt::error!("wat 1");
+    // defmt::println!("wat 0");
+    // // cortex_m::asm::nop();
+    // defmt::error!("wat 1");
 
-    // use rtt_target::{rprintln, rtt_init_print};
-    // rtt_init_print!();
+    use rtt_target::{rprintln, rtt_init_print};
+    rtt_init_print!();
 
-    // rprintln!("wat 2");
-    // cortex_m::asm::nop();
-    // rprintln!("wat 3");
+    rprintln!("wat 2");
+    cortex_m::asm::nop();
+    rprintln!("wat 3");
 
     loop {}
 }
 
-// #[cfg(feature = "nope")]
+#[cfg(feature = "nope")]
 // #[entry]
 fn main_bluetooth() -> ! {
     use crate::bluetooth::{AccessByte, BTError, BTServices};
@@ -581,8 +581,12 @@ fn main_bluetooth() -> ! {
     let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
     let mut exti = dp.EXTI;
 
-    uprintln!(uart, "sysclk()   core = {:?}", clocks.sysclk());
-    uprintln!(uart, "hclk()     AHB1 = {:?}", clocks.hclk());
+    // // defmt::println!("sysclk()   core = {:?}", clocks.sysclk());
+    // // defmt::println!("hclk()     AHB1 = {:?}", clocks.hclk());
+    // defmt::println!("clocks.sysclk() = {:?}", clocks.sysclk());
+
+    // uprintln!(uart, "sysclk()   core = {:?}", clocks.sysclk());
+    // uprintln!(uart, "hclk()     AHB1 = {:?}", clocks.hclk());
     // uprintln!(uart, "pclk1()    APB1 = {:?}", clocks.pclk1());
     // uprintln!(uart, "pclk2()    APB2 = {:?}", clocks.pclk2());
     // uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
