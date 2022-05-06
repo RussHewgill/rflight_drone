@@ -33,7 +33,8 @@ use byteorder::ByteOrder;
 // use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
 // use panic_abort as _; // requires nightly
 // use panic_itm as _; // logs messages over ITM; requires ITM support
-use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
+// use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
+use panic_probe as _;
 
 /// defmt global_logger
 use defmt_rtt as _;
@@ -491,7 +492,7 @@ mod app {
     fn foo(cx: foo::Context) {
         *cx.local.x += 1;
         // rprintln!("wat {:?}", *cx.local.x);
-        defmt::error!("wat {:?}", *cx.local.x);
+        defmt::println!("wat {:?}", *cx.local.x);
         foo::spawn().unwrap();
     }
 
@@ -509,8 +510,8 @@ fn main_log_test() -> ! {
     // let mut cp = stm32f401::CorePeripherals::take().unwrap();
     // let mut dp = stm32f401::Peripherals::take().unwrap();
 
-    defmt::error!("wat 0");
-    cortex_m::asm::nop();
+    defmt::println!("wat 0");
+    // cortex_m::asm::nop();
     defmt::error!("wat 1");
 
     // use rtt_target::{rprintln, rtt_init_print};

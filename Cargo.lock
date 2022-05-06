@@ -457,13 +457,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "panic-semihosting"
-version = "0.6.0"
+name = "panic-probe"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee8a3e1233d9073d76a870223512ce4eeea43c067a94a445c13bd6d792d7b1ab"
+checksum = "3ab1f00eac22bd18f8e5cae9555f2820b3a0c166b5b556ee3e203746ea6dcf3a"
 dependencies = [
  "cortex-m",
- "cortex-m-semihosting",
+ "defmt",
 ]
 
 [[package]]
@@ -558,7 +558,7 @@ dependencies = [
  "heapless",
  "micromath",
  "nalgebra",
- "panic-semihosting",
+ "panic-probe",
  "stm32f4",
  "stm32f4xx-hal",
  "systick-monotonic",

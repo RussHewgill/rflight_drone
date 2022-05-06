@@ -3,6 +3,7 @@
 # runner = "qemu-system-arm -cpu cortex-m3 -machine lm3s6965evb -nographic -semihosting-config enable=on,target=native -gdb tcp::3333 -S -kernel"
 # runner = "arm-none-eabi-gdb -ex \"target remote :3333\" -q "
 # runner = "arm-none-eabi-gdb -q "
+runner = "../../../../.cargo/bin/probe-run --chip STM32F401CCUx"
 
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
 
