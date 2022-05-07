@@ -12,8 +12,11 @@ pub mod hal_bt;
 use arrayvec::ArrayVec;
 use core::ptr;
 use cortex_m::peripheral::{NVIC, SYST};
-use cortex_m_semihosting::{hprint, hprintln};
+// use cortex_m_semihosting::{hprint, hprintln};
 use embedded_hal as hal;
+
+// use rtt_target::rprintln;
+use defmt::println as rprintln;
 
 use hal::digital::v2::{InputPin, OutputPin};
 
@@ -512,7 +515,7 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "nope")]
+    // #[cfg(feature = "nope")]
     pub fn write_command(
         &mut self,
         opcode: Opcode,
@@ -522,10 +525,10 @@ where
         let mut header = [0; HEADER_LEN];
         bluetooth_hci::host::uart::CommandHeader::new(opcode, params.len())
             .copy_into_slice(&mut header);
-
         self.write(&header, params)
     }
 
+    #[cfg(feature = "nope")]
     pub fn write_command(
         &mut self,
         opcode: Opcode,
@@ -579,124 +582,6 @@ where
     }
 }
 
-/// safe command test
-#[cfg(feature = "nope")]
-impl<CS, Reset, GpioError> BluetoothSpi<BTSpi, CS, Reset, PA4>
-where
-    CS: OutputPin<Error = GpioError>,
-    Reset: OutputPin<Error = GpioError>,
-    GpioError: core::fmt::Debug,
-{
-    fn block_until_ready_for2(
-        &mut self,
-        access: AccessByte,
-        uart: Option<&mut UART>,
-    ) -> nb::Result<u16, BTError<SpiError, GpioError>> {
-        // let (write_len, read_len) = self.block_until_ready(access, uart)?;
-        let (write_len, read_len) = self.block_until_ready2(access, uart)?;
-        Ok(match access {
-            AccessByte::Read => read_len,
-            AccessByte::Write => write_len,
-        })
-    }
-
-    pub fn block_until_ready2(
-        &mut self,
-        access_byte: AccessByte,
-        mut uart: Option<&mut UART>,
-    ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
-        loop {
-            let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
-
-            self.spi
-                .transfer(&mut header)
-                .map_err(BTError::Spi)
-                .map_err(nb::Error::Other)?;
-
-            if let Some(ref mut uart) = uart {
-                uprintln!(uart, "self.is_ovr()  = {:?}", self.is_ovr());
-                uprintln!(uart, "self.is_modf() = {:?}", self.is_modf());
-            }
-
-            match parse_spi_header(&header) {
-                Ok(lens) => {
-                    return Ok(lens);
-                }
-                Err(nb::Error::WouldBlock) => {
-                    self.cs
-                        .set_high()
-                        .map_err(BTError::Gpio)
-                        .map_err(nb::Error::Other)?;
-                    // XXX: ???
-                    // cortex_m::asm::nop();
-                    // cortex_m::asm::nop();
-                    self.cs
-                        .set_low()
-                        .map_err(BTError::Gpio)
-                        .map_err(nb::Error::Other)?;
-                }
-                Err(e) => return Err(e),
-            }
-        }
-    }
-
-    fn try_write2(
-        &mut self,
-        header: &[u8],
-        payload: &[u8],
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        if !header.is_empty() {
-            self.spi
-                .write(header)
-                .map_err(BTError::Spi)
-                .map_err(nb::Error::Other)?;
-        }
-        if !payload.is_empty() {
-            self.spi
-                .write(payload)
-                .map_err(BTError::Spi)
-                .map_err(nb::Error::Other)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn safe_read_local_ver(
-        &mut self,
-        uart: &mut UART,
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        let payload: &[u8] = &[];
-        let mut header: [u8; 4] = [0; 4];
-        let opcode = bluetooth_hci::Opcode::new(0x04, 0x01);
-        bluetooth_hci::host::uart::CommandHeader::new(opcode, 0)
-            .copy_into_slice(&mut header);
-        let header: &[u8] = &header;
-
-        self.cs
-            .set_low()
-            .map_err(BTError::Gpio)
-            .map_err(nb::Error::Other)?;
-
-        uprintln!(uart, "-1");
-        let write_len = self.block_until_ready_for2(AccessByte::Write, Some(uart))?;
-        uprintln!(uart, "-2");
-
-        if (write_len as usize) < header.len() + payload.len() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        let result = self.try_write2(header, payload);
-        self.cs
-            .set_high()
-            .map_err(BTError::Gpio)
-            .map_err(nb::Error::Other)?;
-
-        result
-    }
-}
-
-// impl<'buf, SPI, CS, Reset, Input, GpioError> Controller
-//     for BluetoothSpi<'buf, SPI, CS, Reset, Input>
 impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>

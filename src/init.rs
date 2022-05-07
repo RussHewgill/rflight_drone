@@ -53,7 +53,7 @@ pub fn init_all_pre(rcc: &mut RCC) {
 
 pub struct InitStruct {
     pub dwt:     Dwt,
-    pub uart:    UART,
+    // pub uart:    UART,
     pub exti:    EXTI,
     // pub tim3:     CounterHz<TIM3>,
     pub tim3:    TIM3,
@@ -78,7 +78,7 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
     let mut gpiob = dp.GPIOB.split();
     let mut gpioc = dp.GPIOC.split();
 
-    let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
+    // let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
     // let mono = DwtSystick::<1_000>::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.sysclk().raw());
     // let mono = DwtSystick::<1_000>::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.hclk().raw());
@@ -140,7 +140,7 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
     let bt = init_bt(
         dp.SPI1, gpiob.pb0, gpiob.pb2, bt_irq, gpioa.pa5, gpioa.pa6, gpioa.pa7, &clocks,
         // bt_buf,
-        bt_delay, &mut uart,
+        bt_delay,
     );
 
     let mut sensors = init_sensors_spi(
@@ -151,7 +151,7 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
 
     InitStruct {
         dwt,
-        uart,
+        // uart,
         exti: dp.EXTI,
         tim3,
         clocks,
@@ -281,7 +281,7 @@ fn init_bt(
     // buf: &'static mut [u8],
     delay: CounterMs<TIM2>,
     // delay: FTimerMs<TIM2>,
-    uart: &mut UART,
+    // uart: &mut UART,
     // ) -> BTController<'static> {
 ) -> BTController {
     let mut cs = cs

@@ -4,7 +4,9 @@ pub mod service_sensors;
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
-use rtt_target::rprintln;
+// use rtt_target::rprintln;
+use defmt::println as rprintln;
+
 use stm32f4::stm32f401::{RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
     block,
@@ -371,7 +373,7 @@ where
         uart: &mut UART,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         while self.data_ready().map_err(BTError::Gpio)? {
-            if self.ignore_event_timeout(uart, 1000.millis())? == TimeoutResult::Timeout {
+            if self.ignore_event_timeout(1000.millis())? == TimeoutResult::Timeout {
                 uprintln!(uart, "read_events_while_ready: timoutout");
                 break;
             }
@@ -473,13 +475,13 @@ where
                 > = e;
                 match e {
                     bluetooth_hci::host::uart::Error::Comm(e) => {
-                        rprintln!("error 0 = {:?}", e);
+                        rprintln!("error 0 = {:?}", defmt::Debug2Format(&e));
                     }
                     bluetooth_hci::host::uart::Error::BadPacketType(e) => {
-                        rprintln!("error 1 = {:?}", e);
+                        rprintln!("error 1 = {:?}", defmt::Debug2Format(&e));
                     }
                     bluetooth_hci::host::uart::Error::BLE(e) => {
-                        rprintln!("error 2 = {:?}", e);
+                        rprintln!("error 2 = {:?}", defmt::Debug2Format(&e));
                     }
                 }
                 unimplemented!()
@@ -489,7 +491,6 @@ where
 
     pub fn ignore_event_timeout(
         &mut self,
-        uart: &mut UART,
         timeout: fugit::MillisDurationU32,
     ) -> Result<TimeoutResult, BTError<SpiError, GpioError>> {
         use bluetooth_hci::Controller;
@@ -528,31 +529,34 @@ where
         match e {
             Event::ConnectionComplete(params) => {
                 // handle the new connection
-                uprintln!(uart, "new connection");
+                rprintln!("new connection");
             }
             Event::Vendor(crate::bluetooth::events::BlueNRGEvent::HalInitialized(
                 reason,
             )) => {
-                uprintln!(uart, "bt restarted, reason = {:?}", reason);
+                rprintln!("bt restarted, reason = {:?}", defmt::Debug2Format(&reason));
             }
             Event::CommandComplete(params) => {
                 // Self::handle_event_command_complete(uart, params.return_params);
-                // uprintln!(uart, "CommandComplete = {:?}", params);
+                // rprintln!("CommandComplete = {:?}", params);
                 if params.num_hci_command_packets == 0 {
-                    uprintln!(uart, "controller required halting packets");
+                    rprintln!("controller required halting packets");
                 }
                 match params.return_params {
                     ReturnParameters::Vendor(
                         VReturnParameters::GattUpdateCharacteristicValue(status),
                     ) => {
                         if status != bluetooth_hci::Status::Success {
-                            uprintln!(uart, "status 0 = {:?}", status);
+                            rprintln!("status 0 = {:?}", defmt::Debug2Format(&status));
                         } else {
-                            uprintln!(uart, "status 1 = {:?}", status);
+                            rprintln!("status 1 = {:?}", defmt::Debug2Format(&status));
                         }
                     }
                     _ => {
-                        uprintln!(uart, "return_params = {:?}", params.return_params);
+                        rprintln!(
+                            "return_params = {:?}",
+                            defmt::Debug2Format(&params.return_params)
+                        );
                     }
                 }
             }
@@ -560,7 +564,7 @@ where
             //     unimplemented!()
             // }
             ev => {
-                uprintln!(uart, "unhandled event = {:?}", ev);
+                rprintln!("unhandled event = {:?}", defmt::Debug2Format(&ev));
             }
         }
 
@@ -646,7 +650,10 @@ where
                     Event::Vendor(
                         crate::bluetooth::events::BlueNRGEvent::HalInitialized(reason),
                     ) => {
-                        rprintln!("bt restarted, reason = {:?}", reason);
+                        rprintln!(
+                            "bt restarted, reason = {:?}",
+                            defmt::Debug2Format(&reason)
+                        );
                     }
                     Event::CommandComplete(params) => {
                         Self::handle_event_command_complete(params.return_params);
@@ -655,7 +662,7 @@ where
                     //     unimplemented!()
                     // }
                     ev => {
-                        rprintln!("unhandled event = {:?}", ev);
+                        rprintln!("unhandled event = {:?}", defmt::Debug2Format(&ev));
                     }
                 }
             }
@@ -667,13 +674,13 @@ where
                 > = e;
                 match e {
                     bluetooth_hci::host::uart::Error::Comm(e) => {
-                        rprintln!("error 0 = {:?}", e);
+                        rprintln!("error 0 = {:?}", defmt::Debug2Format(&e));
                     }
                     bluetooth_hci::host::uart::Error::BadPacketType(e) => {
-                        rprintln!("error 1 = {:?}", e);
+                        rprintln!("error 1 = {:?}", defmt::Debug2Format(&e));
                     }
                     bluetooth_hci::host::uart::Error::BLE(e) => {
-                        rprintln!("error 2 = {:?}", e);
+                        rprintln!("error 2 = {:?}", defmt::Debug2Format(&e));
                     }
                 }
             }
@@ -701,14 +708,14 @@ where
             ReturnParameters::Vendor(VReturnParameters::GattInit(status)) => match status
             {
                 _ => {
-                    rprintln!("status = {:?}", status);
+                    rprintln!("status = {:?}", defmt::Debug2Format(&status));
                 }
             },
             ReturnParameters::ReadLocalVersionInformation(v) => {
-                rprintln!("v = {:?}", v);
+                rprintln!("v = {:?}", defmt::Debug2Format(&v));
             }
             ps => {
-                rprintln!("Other: return_params = {:?}", ps);
+                rprintln!("Other: return_params = {:?}", defmt::Debug2Format(&ps));
             }
         }
     }
@@ -810,42 +817,40 @@ impl BTState {
     //     Self::Connected(st.conn_handle)
     // }
 
-    pub fn handle_event<'buf>(&mut self, uart: &mut UART, event: BTEvent) {
+    pub fn handle_event(&mut self, event: BTEvent) {
         match event {
             Event::LeConnectionComplete(status) => {
                 if status.status == bluetooth_hci::Status::Success {
-                    uprintln!(uart, "new connection established 0");
+                    rprintln!("new connection established 0");
                     *self = Self::Connected(status.conn_handle);
                 } else {
-                    uprintln!(
-                        uart,
+                    rprintln!(
                         "Connection Complete, but status = {:?}",
-                        status.status
+                        defmt::Debug2Format(&status.status)
                     );
                 }
             }
             Event::ConnectionComplete(status) => {
                 if status.status == bluetooth_hci::Status::Success {
-                    uprintln!(uart, "new connection established 1");
+                    rprintln!("new connection established 1");
                     *self = Self::Connected(status.conn_handle);
                 } else {
-                    uprintln!(
-                        uart,
+                    rprintln!(
                         "Connection Complete, but status = {:?}",
-                        status.status
+                        defmt::Debug2Format(&status.status)
                     );
                 }
             }
             Event::Vendor(crate::bluetooth::events::BlueNRGEvent::HalInitialized(
                 reason,
             )) => {
-                uprintln!(uart, "bt restarted, reason = {:?}", reason);
+                rprintln!("bt restarted, reason = {:?}", defmt::Debug2Format(&reason));
             }
             Event::CommandComplete(params) => {
-                uprintln!(uart, "command complete: {:?}", params);
+                rprintln!("command complete: {:?}", defmt::Debug2Format(&params));
             }
             _ => {
-                uprintln!(uart, "unhandled event = {:?}", event);
+                rprintln!("unhandled event = {:?}", defmt::Debug2Format(&event));
             }
         }
     }

@@ -2,7 +2,9 @@ use bluetooth_hci::{event::command::ReturnParameters, Event};
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
-use rtt_target::rprintln;
+// use rtt_target::rprintln;
+use defmt::println as rprintln;
+
 use stm32f4::stm32f401::{RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
     block,
@@ -61,7 +63,6 @@ where
 {
     pub fn log_write(
         &mut self,
-        uart: &mut UART,
         timeout: bool,
         data: &[u8],
     ) -> nb::Result<bool, BTError<SpiError, GpioError>> {
@@ -73,11 +74,10 @@ where
         let logger = if let Some(logger) = self.services.logger {
             logger
         } else {
-            // uprintln!(uart, "no logger?");
-            // uprintln!(uart, "");
-            // return Ok(false);
             panic!("no logger?");
         };
+
+        rprintln!("log_write 0");
 
         let val = UpdateCharacteristicValueParameters {
             service_handle:        logger.service_handle,
@@ -87,11 +87,13 @@ where
         };
         block!(self.update_characteristic_value(&val)).unwrap();
 
+        rprintln!("log_write 1");
+
         if timeout {
             let timeout_duration = 1000.millis();
 
             // uprintln!(uart, "wat 0");
-            let result = self.ignore_event_timeout(uart, timeout_duration)?;
+            let result = self.ignore_event_timeout(timeout_duration)?;
             // uprintln!(uart, "wat 1");
 
             if result == TimeoutResult::Timeout {
@@ -100,44 +102,11 @@ where
                 Ok(true)
             }
         } else {
+            rprintln!("log_write 2");
             self.ignore_event()?;
+            rprintln!("log_write 3");
             Ok(true)
         }
-    }
-
-    #[cfg(feature = "nope")]
-    pub fn log_write_uart(
-        &mut self,
-        uart: &mut UART,
-        data: &[u8],
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        let logger = if let Some(logger) = self.services.logger {
-            logger
-        } else {
-            uprintln!(uart, "no logger?");
-            // uprintln!(uart, "");
-            return Ok(());
-        };
-
-        let val = UpdateCharacteristicValueParameters {
-            service_handle:        logger.service_handle,
-            characteristic_handle: logger.char_handle,
-            offset:                0,
-            value:                 &data,
-        };
-        block!(self.update_characteristic_value(&val)).unwrap();
-
-        // let val = CharacteristicValue {
-        //     service_handle: console_service.0,
-        //     characteristic_handle: console_service.1,
-        //     offset: 0,
-        //     value: &data,
-        // };
-        // block!(self.write_characteristic_value(&val)).unwrap();
-
-        self.read_event_uart(uart)?;
-
-        Ok(())
     }
 
     // #[cfg(feature = "nope")]
@@ -182,7 +151,7 @@ where
                 panic!("event_params_vendor other 2 = {:?}", other);
             }
         };
-        rprintln!("service = {:?}", service);
+        rprintln!("service = {:?}", defmt::Debug2Format(&service));
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
@@ -205,7 +174,7 @@ where
             other => unimplemented!("other = {:?}", other),
         };
 
-        rprintln!("c = {:?}", c);
+        rprintln!("c = {:?}", defmt::Debug2Format(&c));
 
         let logger = SvLogger {
             service_handle: service.service_handle,

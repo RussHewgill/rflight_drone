@@ -33,18 +33,21 @@ use byteorder::ByteOrder;
 // use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
 // use panic_abort as _; // requires nightly
 // use panic_itm as _; // logs messages over ITM; requires ITM support
-use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
-                            // use panic_probe as _;
+// use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
+use panic_probe as _;
 
-// /// defmt global_logger
-// use defmt_rtt as _;
+/// defmt global_logger
+use defmt_rtt as _;
+
+use defmt::println as rprintln;
 
 // use cortex_m::asm;
 // use cortex_m::{iprintln, peripheral::ITM};
+
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
-use rtt_target::{rprint, rprintln, rtt_init_print};
+// use rtt_target::{rprint, rprintln, rtt_init_print};
 
 use embedded_hal as hal;
 use hal::spi::*;
@@ -67,14 +70,16 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-#[cfg(feature = "nope")]
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-
+// #[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
     use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM5, TIM9};
+
+    // use rtt_target::{rprint, rprintln, rtt_init_print};
+    use defmt::println as rprintln;
 
     use stm32f4xx_hal::{
         block,
@@ -112,7 +117,7 @@ mod app {
     #[shared]
     struct Shared {
         dwt:         Dwt,
-        uart:        UART,
+        // uart:        UART,
         exti:        EXTI,
         ahrs:        AHRS,
         sens_data:   SensorData,
@@ -142,6 +147,8 @@ mod app {
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         // debug::exit(debug::EXIT_SUCCESS); // Exit QEMU simulator
 
+        // rtt_init_print!();
+
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
@@ -156,7 +163,7 @@ mod app {
         // let mut init_struct = init_all(cp, dp, &mut bt_buf[..]);
         let mut init_struct = init_all(cp, dp);
 
-        let mut uart = init_struct.uart;
+        // let mut uart = init_struct.uart;
         let clocks = init_struct.clocks;
         let mono = init_struct.mono;
         let mut exti = init_struct.exti;
@@ -172,7 +179,7 @@ mod app {
         // uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
 
         // uprintln!(uart, "main_period = {:?}", main_period.to_Hz());
-        uprintln!(uart, "sensor_period = {:?}", sensor_period.to_Hz());
+        rprintln!("sensor_period = {:?}", sensor_period.to_Hz());
 
         // uprintln!(uart, "wat 0");
         // bt.pause_interrupt(&mut exti);
@@ -184,23 +191,23 @@ mod app {
         // bt.unpause_interrupt(&mut exti);
         // uprintln!(uart, "wat 4");
 
-        uart.pause();
+        // uart.pause();
         bt.pause_interrupt(&mut exti);
         // match bt.init_bt(&mut uart, &mut delay_bt) {
-        match bt.init_bt(&mut uart) {
+        match bt.init_bt() {
             Ok(()) => {}
             e => {
-                uprintln!(uart, "init_bt error = {:?}", e);
+                rprintln!("init_bt error = {:?}", defmt::Debug2Format(&e));
             }
         }
-        uart.unpause();
+        // uart.unpause();
         // bt.unpause_interrupt(&mut exti);
         loop {
             if !bt.data_ready().unwrap() {
                 break;
             }
-            uprintln!(uart, "wat 0");
-            bt.read_event_uart(&mut uart).unwrap();
+            rprintln!("wat 0");
+            bt.read_event_uart().unwrap();
         }
         bt.unpause_interrupt(&mut exti);
 
@@ -235,7 +242,7 @@ mod app {
 
         let shared = Shared {
             dwt,
-            uart,
+            // uart,
             exti,
             ahrs,
             sens_data: SensorData::default(),
@@ -275,9 +282,7 @@ mod app {
             cx.shared.sens_data,
             cx.shared.flight_data,
             cx.shared.tim9_flag,
-            // cx.shared.uart,
         )
-            // .lock(|ahrs, sd, fd, tim9_flag, uart| {
             .lock(|ahrs, sd, fd, tim9_flag| {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd);
@@ -288,13 +293,6 @@ mod app {
                 let acc = sd.imu_acc.read_and_reset();
                 let mag = sd.magnetometer.read_and_reset();
 
-                // // print_v3(uart, gyro, 2);
-                // // print_v3(uart, acc, 2);
-                // print_v3(uart, mag, 3);
-                // // uprintln!(uart, "");
-
-                // uprintln!(uart, "d = {:0>4.2}", d);
-
                 ahrs.update(gyro, acc, mag);
 
                 /// update FlightData
@@ -302,13 +300,13 @@ mod app {
 
                 *tim9_flag = true;
             });
-        // timer_sensors::spawn_after(100.millis()).unwrap();
     }
 
+    // #[cfg(feature = "nope")]
     #[task(
-        // binds = TIM3,
-        shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
-        local = [counter: u32 = 0, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0)],
+        binds = TIM3,
+        shared = [bt, exti, flight_data, dwt, tim9_flag, ahrs, sens_data],
+        local = [counter: u32 = 0, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0), sensors],
         priority = 3
     )]
     fn main_loop(mut cx: main_loop::Context) {
@@ -317,48 +315,55 @@ mod app {
             *cx.local.counter = 0;
 
             (
-                cx.shared.uart,
+                cx.shared.ahrs,
+                cx.shared.sens_data,
                 cx.shared.flight_data,
                 cx.shared.bt,
                 cx.shared.exti,
             )
-                .lock(|uart, fd, bt, exti| {
-                    // let qq = fd.quat.coords;
+                .lock(|ahrs, sd, fd, bt, exti| {
+                    /// Read sensor data
+                    cx.local.sensors.read_data_mag(sd);
+                    cx.local.sensors.read_data_imu(sd, false);
 
-                    // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                    // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                    // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                    // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+                    /// update AHRS
+                    let gyro = sd.imu_gyro.read_and_reset();
+                    let acc = sd.imu_acc.read_and_reset();
+                    let mag = sd.magnetometer.read_and_reset();
 
-                    // if bt.data_ready().unwrap() {
-                    //     uprintln!(uart, "data ready?");
-                    // }
+                    ahrs.update(gyro, acc, mag);
 
-                    // if bt.state.is_connected() {
+                    /// update FlightData
+                    fd.update(&ahrs);
 
-                    // uprint!(uart, "sending ({:?})...", *cx.local.counter);
+                    let qq = fd.quat.coords;
+
+                    cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                    cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                    cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                    cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+
                     // bt.clear_interrupt();
+                    rprintln!("0..");
                     bt.pause_interrupt(exti);
-                    uprint!(uart, "0..");
-                    match bt.log_write(uart, true, &cx.local.buf[..]) {
+                    match bt.log_write(false, &cx.local.buf[..]) {
                         Ok(true) => {
-                            // uprintln!(uart, "sent log write command");
+                            // rprintln!("sent log write command");
                             cx.local.cnt.0 += 1;
                         }
                         Ok(false) => {
-                            // uprintln!(uart, "failed to write");
+                            // rprintln!("failed to write");
                             cx.local.cnt.1 += 1;
                         }
                         Err(e) => {
-                            // uprintln!(uart, "error 0 = {:?}", e);
+                            // rprintln!("error 0 = {:?}", e);
                         }
                     }
                     bt.unpause_interrupt(exti);
-                    uprintln!(uart, "1");
+                    rprintln!("1");
 
-                    uprintln!(
-                        uart,
-                        "{:?}, {:?} = {:.2}",
+                    rprintln!(
+                        "{:?}, {:?} = {=f32:?}",
                         cx.local.cnt.0,
                         cx.local.cnt.1,
                         cx.local.cnt.0 as f32 / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
@@ -371,7 +376,7 @@ mod app {
 
     #[cfg(feature = "nope")]
     // #[task(
-    // shared = [bt, exti, flight_data, uart, dwt, tim9_flag],
+    // shared = [bt, exti, flight_data, dwt, tim9_flag],
     // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
     // priority = 3
     // )]
@@ -383,13 +388,8 @@ mod app {
                 *cx.local.counter += 1;
                 if *cx.local.counter >= 10 {
                     *cx.local.counter = 0;
-                    (
-                        cx.shared.uart,
-                        cx.shared.flight_data,
-                        cx.shared.bt,
-                        cx.shared.exti,
-                    )
-                        .lock(|uart, fd, bt, exti| {
+                    (cx.shared.flight_data, cx.shared.bt, cx.shared.exti).lock(
+                        |fd, bt, exti| {
                             let qq = fd.quat.coords;
 
                             cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
@@ -399,9 +399,9 @@ mod app {
 
                             // uprint!(uart, "sending ({:?})...", *cx.local.counter);
                             // bt.clear_interrupt();
+                            rprintln!("0..");
                             bt.pause_interrupt(exti);
-                            uprint!(uart, "0..");
-                            match bt.log_write(uart, false, &cx.local.buf[..]) {
+                            match bt.log_write(false, &cx.local.buf[..]) {
                                 Ok(true) => {
                                     // uprintln!(uart, "sent log write command");
                                 }
@@ -413,11 +413,12 @@ mod app {
                                 }
                             }
                             bt.unpause_interrupt(exti);
-                            uprintln!(uart, "1");
+                            rprintln!("1");
 
                             // //
                             // unimplemented!()
-                        });
+                        },
+                    );
                 }
             }
         });
@@ -427,23 +428,23 @@ mod app {
     }
 
     // #[cfg(feature = "nope")]
-    #[task(binds = EXTI4, shared = [bt, uart, exti], priority = 8)]
+    #[task(binds = EXTI4, shared = [bt, exti], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
         // cortex_m_semihosting::hprint!("b");
-        (cx.shared.uart, cx.shared.bt, cx.shared.exti).lock(|uart, bt, exti| {
-            uprintln!(uart, "bt_irq");
+        (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
+            rprintln!("bt_irq");
 
             bt.clear_interrupt();
             bt.pause_interrupt(exti);
 
-            let event: BTEvent = match bt._read_event(uart) {
+            let event: BTEvent = match bt._read_event() {
                 Ok(ev) => ev,
                 Err(e) => {
-                    uprintln!(uart, "read event error = {:?}", e);
+                    rprintln!("read event error = {:?}", defmt::Debug2Format(&e));
                     unimplemented!()
                 }
             };
-            bt.state.handle_event(uart, event);
+            bt.state.handle_event(event);
 
             // if !bt.data_ready().unwrap() {
             //     break;
@@ -525,8 +526,8 @@ fn main_log_test() -> ! {
     loop {}
 }
 
-// #[cfg(feature = "nope")]
-#[entry]
+#[cfg(feature = "nope")]
+// #[entry]
 fn main_bluetooth() -> ! {
     use crate::bluetooth::{AccessByte, BTError, BTServices};
     use crate::spi::{Spi4, SpiError};
