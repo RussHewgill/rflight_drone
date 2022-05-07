@@ -104,8 +104,6 @@ mod app {
 
     use nalgebra as na;
 
-    use heapless::spsc::Queue;
-
     use crate::{
         bt_control::{BTController, BTEvent},
         init::*,
@@ -261,18 +259,18 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    // binds = TIM3,
-    // shared = [ahrs, sens_data, flight_data, tim9_flag],
-    // local = [tim3, sensors],
-    // priority = 4
-    // )]
+    // #[cfg(feature = "nope")]
+    #[task(
+        binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag],
+        local = [tim3, sensors],
+        priority = 4
+    )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -302,13 +300,13 @@ mod app {
             });
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(
-        binds = TIM3,
-        shared = [bt, exti, flight_data, dwt, tim9_flag, ahrs, sens_data],
-        local = [counter: u32 = 0, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0), sensors],
-        priority = 3
-    )]
+    #[cfg(feature = "nope")]
+    // #[task(
+    // binds = TIM3,
+    // shared = [bt, exti, flight_data, dwt, tim9_flag, ahrs, sens_data],
+    // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0), sensors],
+    // priority = 3
+    // )]
     fn main_loop(mut cx: main_loop::Context) {
         *cx.local.counter += 1;
         if *cx.local.counter >= 10 {
@@ -374,12 +372,12 @@ mod app {
         }
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    // shared = [bt, exti, flight_data, dwt, tim9_flag],
-    // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
-    // priority = 3
-    // )]
+    // #[cfg(feature = "nope")]
+    #[task(
+        shared = [bt, exti, flight_data, dwt, tim9_flag],
+        local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
+        priority = 3
+    )]
     fn main_loop(mut cx: main_loop::Context) {
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
@@ -474,7 +472,35 @@ mod app {
 // #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 #[cfg(feature = "nope")]
 mod app {
-    use rtt_target::{rprintln, rtt_init_print};
+    use cortex_m_semihosting::{debug, hprintln};
+    use fugit::MillisDurationU32;
+    use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM5, TIM9};
+
+    // use rtt_target::{rprint, rprintln, rtt_init_print};
+    use defmt::println as rprintln;
+
+    use stm32f4xx_hal::{
+        block,
+        dwt::Dwt,
+        gpio::{Output, Pin},
+        prelude::*,
+        timer::{CounterHz, CounterMs, DelayMs},
+    };
+
+    use crate::{
+        bluetooth::gap::Commands as GapCommands,
+        bluetooth::gatt::Commands as GattCommands,
+        bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
+        bt_control::BTState,
+        sensors::ahrs::{FlightData, AHRS},
+        sensors::{SensorData, Sensors, UQuat},
+        time::MonoTimer,
+        utils::*,
+    };
+
+    use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
+
+    use nalgebra as na;
 
     #[shared]
     struct Shared {}
@@ -483,21 +509,45 @@ mod app {
     struct Local {}
 
     #[init]
-    fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {
-        rtt_init_print!();
+    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        // foo::spawn().unwrap();
 
-        foo::spawn().unwrap();
+        let mut cp: stm32f401::CorePeripherals = cx.core;
+        let mut dp: stm32f401::Peripherals = cx.device;
+
+        let mut rcc = dp.RCC.constrain();
+
+        rprintln!("wat 0");
+
+        let clocks = rcc
+            .cfgr
+            //
+            .use_hse(16.MHz())
+            // .sysclk(32.MHz())
+            // .sysclk(64.MHz())
+            .sysclk(84.MHz())
+            // .require_pll48clk()
+            .freeze();
+
+        rprintln!("wat 1");
+
+        rprintln!("sysclk()   core = {:?}", clocks.sysclk());
+        rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
+
+        let bt_delay = dp.TIM2.counter_us(&clocks);
+
+        rprintln!("wat 2");
 
         (Shared {}, Local {}, init::Monotonics())
     }
 
-    #[task(shared = [], local = [x: u32 = 0])]
-    fn foo(cx: foo::Context) {
-        *cx.local.x += 1;
-        rprintln!("wat {:?}", *cx.local.x);
-        // defmt::error!("wat {:?}", *cx.local.x);
-        foo::spawn().unwrap();
-    }
+    // #[task(shared = [], local = [x: u32 = 0])]
+    // fn foo(cx: foo::Context) {
+    //     *cx.local.x += 1;
+    //     rprintln!("wat {:?}", *cx.local.x);
+    //     // defmt::error!("wat {:?}", *cx.local.x);
+    //     foo::spawn().unwrap();
+    // }
 
     #[idle]
     fn idle(_: idle::Context) -> ! {
@@ -509,19 +559,48 @@ mod app {
 
 #[cfg(feature = "nope")]
 // #[entry]
-fn main_log_test() -> ! {
-    // let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    // let mut dp = stm32f401::Peripherals::take().unwrap();
+fn main_clock_test() -> ! {
+    let mut cp = stm32f401::CorePeripherals::take().unwrap();
+    let mut dp = stm32f401::Peripherals::take().unwrap();
 
-    // defmt::println!("wat 0");
-    // // cortex_m::asm::nop();
-    // defmt::error!("wat 1");
+    dp.RCC.ahb1enr.modify(|r, w| {
+        w.gpioaen()
+            .set_bit()
+            .gpioben()
+            .set_bit()
+            .gpiocen()
+            .set_bit()
+    });
 
-    rtt_init_print!();
+    /// Enable SPI1 clock
+    dp.RCC.apb2enr.modify(|r, w| w.spi1en().set_bit());
+
+    /// Enable SPI2 clock
+    dp.RCC.apb1enr.write(|w| w.spi2en().set_bit());
+
+    /// Enable SYSCFG clock
+    dp.RCC.apb2enr.modify(|r, w| w.syscfgen().set_bit());
+
+    rprintln!("wat 0");
+
+    let mut rcc = dp.RCC.constrain();
+
+    rprintln!("wat 1");
+
+    let clocks = rcc
+        .cfgr
+        //
+        .use_hse(16.MHz())
+        // .sysclk(32.MHz())
+        // .sysclk(64.MHz())
+        .sysclk(84.MHz())
+        // .require_pll48clk()
+        .freeze();
 
     rprintln!("wat 2");
-    cortex_m::asm::nop();
-    rprintln!("wat 3");
+
+    rprintln!("sysclk()   core = {:?}", clocks.sysclk());
+    rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
 
     loop {}
 }

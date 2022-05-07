@@ -37,7 +37,7 @@ use stm32f4xx_hal::{
     rcc::Clocks,
     spi::{Error as SpiError, NoMiso, Spi1},
     time::*,
-    timer::{CounterMs, DelayMs, FTimerMs},
+    timer::{CounterMs, CounterUs, DelayMs, FTimerMs},
 };
 
 use bluetooth_hci::host::uart::{CommandHeader, Hci as HciUart};
@@ -151,7 +151,7 @@ pub struct BluetoothSpi<CS, Reset, Input> {
     buffer: Buffer2<u8, 512>,
 
     // pub delay: DelayMs<TIM2>,
-    pub delay: CounterMs<TIM2>,
+    pub delay: CounterUs<TIM2>,
 
     // pub delay: Option<FTimerMs<TIM2>>,
 
@@ -175,7 +175,7 @@ impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
         reset: Reset,
         input: Input,
         // buffer: &'buf mut [u8],
-        delay: CounterMs<TIM2>,
+        delay: CounterUs<TIM2>,
         // delay: FTimerMs<TIM2>,
     ) -> Self {
         Self {
@@ -259,7 +259,7 @@ where
     Input: InputPin<Error = GpioError>,
 {
     /// ms must be greater than 1
-    pub fn wait_ms(&mut self, ms: fugit::MillisDurationU32) {
+    pub fn wait_ms(&mut self, ms: fugit::MicrosDurationU32) {
         // if ms == 1.millis() {
         //     return;
         // }
@@ -319,6 +319,7 @@ where
                     /// If write len is 0, device is not ready
                     /// Sometimes SPI timing issues cause the ready byte to be offset,
                     /// which causes incorrect write length
+                    /// // XXX: assuming that this will always cause write len > 127 is unsound
                     if header[2] == 0x02 {
                         rprintln!("w -1");
                         rprintln!(
@@ -343,7 +344,7 @@ where
 
                     if access_byte == AccessByte::Write && (lens.0 == 0 || lens.0 > 127) {
                         if lens.0 == 0 {
-                            rprintln!("w 0");
+                            // rprintln!("w 0");
                         } else {
                             rprintln!("w 1");
                         }
@@ -356,14 +357,14 @@ where
                             .map_err(BTError::Gpio)
                             .map_err(nb::Error::Other)?;
                     } else {
-                        rprintln!(
-                            "header = {:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
-                            header[0],
-                            header[1],
-                            header[2],
-                            header[3],
-                            header[4],
-                        );
+                        // rprintln!(
+                        //     "header = {:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
+                        //     header[0],
+                        //     header[1],
+                        //     header[2],
+                        //     header[3],
+                        //     header[4],
+                        // );
 
                         return Ok(lens);
                     }
@@ -579,8 +580,7 @@ where
         // cortex_m::asm::nop();
 
         let write_len = self.block_until_ready_for(AccessByte::Write, None)?;
-
-        rprintln!("write_len = {:?}", write_len);
+        // rprintln!("write_len = {:?}", write_len);
 
         if (write_len as usize) < header.len() + payload.len() {
             return Err(nb::Error::WouldBlock);

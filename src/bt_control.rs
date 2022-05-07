@@ -377,7 +377,7 @@ where
     /// blocks, but doesn't use nb::block!
     pub fn _read_event_timeout(
         &mut self,
-        timeout: fugit::MillisDurationU32,
+        timeout: fugit::MicrosDurationU32,
         uart: &mut UART,
     ) -> Result<Option<bluetooth_hci::Event<BlueNRGEvent>>, BTError<SpiError, GpioError>>
     {
@@ -484,7 +484,7 @@ where
 
     pub fn ignore_event_timeout(
         &mut self,
-        timeout: Option<fugit::MillisDurationU32>,
+        timeout: Option<fugit::MicrosDurationU32>,
     ) -> Result<TimeoutResult, BTError<SpiError, GpioError>> {
         use bluetooth_hci::Controller;
         use stm32f4xx_hal::timer::Event as TimerEvent;
@@ -562,7 +562,7 @@ where
                         if status != bluetooth_hci::Status::Success {
                             rprintln!("status 0 = {:?}", defmt::Debug2Format(&status));
                         } else {
-                            rprintln!("status 1 = {:?}", defmt::Debug2Format(&status));
+                            // rprintln!("status 1 = {:?}", defmt::Debug2Format(&status));
                         }
                     }
                     _ => {

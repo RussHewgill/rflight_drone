@@ -11,7 +11,9 @@ use stm32f4xx_hal::gpio::{
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Mode, NoMiso};
 use stm32f4xx_hal::syscfg::SysCfg;
-use stm32f4xx_hal::timer::{CounterHz, CounterMs, DelayMs, FTimerMs, SysDelay, Timer};
+use stm32f4xx_hal::timer::{
+    CounterHz, CounterMs, CounterUs, DelayMs, FTimerMs, SysDelay, Timer,
+};
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::bluetooth::BluetoothSpi;
@@ -113,7 +115,7 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
     // // let mut bt_delay = cp.SYST.delay(&clocks);
     // // let bt_delay = dp.TIM2.delay_ms(&clocks);
 
-    let bt_delay = dp.TIM2.counter_ms(&clocks);
+    let bt_delay = dp.TIM2.counter_us(&clocks);
     // let bt_delay = FTimerMs::new(dp.TIM2, &clocks);
 
     // {
@@ -279,7 +281,7 @@ fn init_bt(
     mosi: PA7,
     clocks: &Clocks,
     // buf: &'static mut [u8],
-    delay: CounterMs<TIM2>,
+    delay: CounterUs<TIM2>,
     // delay: FTimerMs<TIM2>,
     // uart: &mut UART,
     // ) -> BTController<'static> {
@@ -360,7 +362,8 @@ fn init_clocks(rcc: RCC) -> Clocks {
         //
         .use_hse(16.MHz())
         // .sysclk(32.MHz())
-        .sysclk(64.MHz())
+        // .sysclk(64.MHz())
+        .sysclk(84.MHz())
         // .require_pll48clk()
         .freeze();
 

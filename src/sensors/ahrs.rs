@@ -100,7 +100,20 @@ impl AHRS {
     }
 }
 
+impl AHRS {
+    pub fn update(
+        &mut self,
+        // uart: &mut UART,
+        gyro: V3,
+        acc: V3,
+        mag: V3,
+    ) -> Option<&UQuat> {
+        Some(&self.quat)
+    }
+}
+
 /// update
+#[cfg(feature = "nope")]
 impl AHRS {
     pub fn update(
         &mut self,
@@ -225,7 +238,10 @@ impl AHRS {
 
         Some(&self.quat)
     }
+}
 
+/// set_heading, compass, reset
+impl AHRS {
     pub fn set_heading(&mut self, heading: f32) {
         use nalgebra::{ComplexField, RealField}; // for sin, atan2
 
