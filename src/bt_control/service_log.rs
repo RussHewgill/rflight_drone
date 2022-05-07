@@ -52,10 +52,8 @@ pub struct SvLogger {
 }
 
 // impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
-impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 where
-    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-        + hal::blocking::spi::Write<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,

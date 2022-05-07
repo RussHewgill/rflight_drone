@@ -168,9 +168,9 @@ pub struct BTServices {
 }
 
 /// new
-impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
+impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
     pub fn new(
-        spi: SPI,
+        spi: BTSpi,
         cs: CS,
         reset: Reset,
         input: Input,
@@ -197,10 +197,10 @@ impl<SPI, CS, Reset, Input> BluetoothSpi<SPI, CS, Reset, Input> {
 
 /// pause/resume/check/clear interrupt
 // impl<'buf, SPI, CS, Reset, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, PA4>
-impl<SPI, CS, Reset, GpioError> BluetoothSpi<SPI, CS, Reset, PA4>
+impl<CS, Reset, GpioError> BluetoothSpi<CS, Reset, PA4>
 where
-    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-        + hal::blocking::spi::Write<u8, Error = SpiError>,
+    // SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+    //     + hal::blocking::spi::Write<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
 {
@@ -227,7 +227,7 @@ where
 }
 
 /// get flags
-impl<CS, Reset> BluetoothSpi<BTSpi, CS, Reset, PA4> {
+impl<CS, Reset> BluetoothSpi<CS, Reset, PA4> {
     pub fn is_ovr(&self) -> bool {
         self.spi.is_ovr()
     }
@@ -252,7 +252,7 @@ impl<CS, Reset> BluetoothSpi<BTSpi, CS, Reset, PA4> {
 //     CS: OutputPin<Error = GpioError>,
 //     Reset: OutputPin<Error = GpioError>,
 //     Input: InputPin<Error = GpioError>,
-impl<CS, Reset, Input, GpioError> BluetoothSpi<BTSpi, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 where
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
@@ -281,34 +281,6 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "nope")]
-    pub fn reset_with_delay<D, UXX>(
-        &mut self,
-        delay: &mut D,
-        time: UXX,
-    ) -> nb::Result<(), GpioError>
-    where
-        D: hal::blocking::delay::DelayMs<UXX>,
-        UXX: Copy,
-    {
-        self.reset.set_low().map_err(nb::Error::Other)?;
-        // self.reset.set_high().map_err(nb::Error::Other)?;
-        delay.delay_ms(time);
-
-        self.reset.set_high().map_err(nb::Error::Other)?;
-        // self.reset.set_low().map_err(nb::Error::Other)?;
-        delay.delay_ms(time);
-
-        Ok(())
-    }
-
-    // pub fn _data_ready(&self) -> nb::Result<bool, BTError<SpiError, GpioError>> {
-    //     self.input
-    //         .is_high()
-    //         .map_err(BTError::Gpio)
-    //         .map_err(nb::Error::Other)
-    // }
-
     pub fn data_ready(&self) -> Result<bool, Input::Error> {
         self.input.is_high()
     }
@@ -320,7 +292,7 @@ where
         mut uart: Option<&mut UART>,
     ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
         // let mut x = 0;
-        let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
+        // let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
 
         loop {
             // cortex_m::asm::nop();
@@ -330,35 +302,51 @@ where
             // let mut read_header = [0xff; 5];
             // let e = self.spi.transfer(&mut read_header, &write_header);
 
-            header[0] = access_byte as u8;
-            header[1] = 0;
-            header[2] = 0;
-            header[3] = 0;
-            header[4] = 0;
+            let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
 
             self.spi
                 .transfer(&mut header)
                 .map_err(BTError::Spi)
                 .map_err(nb::Error::Other)?;
 
-            // if let Some(ref mut uart) = uart {
-            //     for b in header {
-            //         uprint!(uart, "{:#04x} ", b);
-            //     }
-            //     uprintln!(uart, "");
+            // for word in header.iter_mut() {
+            //     block!(self.spi.send(*word)).unwrap();
+            //     *word = block!(self.spi.read()).unwrap();
             // }
 
             match parse_spi_header(&header) {
-                // Ok(lens) => {
-                //     // if let Some(ref mut uart) = uart {
-                //     //     uprintln!(uart, "ready in {:?} loops", x);
-                //     // }
-                //     return Ok(lens);
-                // }
                 Ok(lens) => {
                     /// If write len is 0, device is not ready
-                    if access_byte == AccessByte::Write && lens.0 == 0 {
-                        // hprintln!("w 0");
+                    /// Sometimes SPI timing issues cause the ready byte to be offset,
+                    /// which causes incorrect write length
+                    if header[2] == 0x02 {
+                        rprintln!("w -1");
+                        rprintln!(
+                            "header = {:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
+                            header[0],
+                            header[1],
+                            header[2],
+                            header[3],
+                            header[4],
+                        );
+                    } else if header[4] == 0x02 {
+                        rprintln!("w -2");
+                        rprintln!(
+                            "header = {:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
+                            header[0],
+                            header[1],
+                            header[2],
+                            header[3],
+                            header[4],
+                        );
+                    }
+
+                    if access_byte == AccessByte::Write && (lens.0 == 0 || lens.0 > 127) {
+                        if lens.0 == 0 {
+                            rprintln!("w 0");
+                        } else {
+                            rprintln!("w 1");
+                        }
                         self.cs
                             .set_high()
                             .map_err(BTError::Gpio)
@@ -369,13 +357,14 @@ where
                             .map_err(nb::Error::Other)?;
                     } else {
                         rprintln!(
-                            "{:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
+                            "header = {:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
                             header[0],
                             header[1],
                             header[2],
                             header[3],
                             header[4],
                         );
+
                         return Ok(lens);
                     }
                 }
@@ -492,35 +481,6 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "nope")]
-    fn read_available_data_into(
-        &mut self,
-        uart: &mut UART,
-        buf: &mut [u8],
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        if !self
-            .data_ready()
-            .map_err(BTError::Gpio)
-            .map_err(nb::Error::Other)?
-        {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        let read_len = self.block_until_ready_for(AccessByte::Read, Some(uart))? as usize;
-
-        if read_len > buf.len() {
-            uprintln!(uart, "buffer too small");
-            return Ok(());
-        }
-
-        self.spi
-            .transfer(&mut buf[..read_len])
-            .map_err(BTError::Spi)
-            .map_err(nb::Error::Other)?;
-
-        Ok(())
-    }
-
     // #[cfg(feature = "nope")]
     pub fn write_command(
         &mut self,
@@ -598,7 +558,7 @@ where
 }
 
 // impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
-impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<BTSpi, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<CS, Reset, Input>
 where
     // SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
     //     + hal::blocking::spi::Write<u8, Error = SpiError>,

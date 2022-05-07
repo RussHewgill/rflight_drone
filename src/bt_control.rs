@@ -90,8 +90,7 @@ pub type BTSpi = Spi1<
     stm32f4xx_hal::spi::TransferModeNormal,
 >;
 
-pub type BTController =
-    BluetoothSpi<BTSpi, Pin<'B', 0, Output>, Pin<'B', 2, Output>, PA4>;
+pub type BTController = BluetoothSpi<Pin<'B', 0, Output>, Pin<'B', 2, Output>, PA4>;
 
 pub type BTEvent = bluetooth_hci::event::Event<BlueNRGEvent>;
 
@@ -117,11 +116,8 @@ mod uuids {
 }
 
 /// init
-// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
-impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 where
-    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-        + hal::blocking::spi::Write<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -358,16 +354,13 @@ where
 }
 
 /// read and handle events
-// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
-// impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
-// where
-//     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-//         + hal::blocking::spi::Write<u8, Error = SpiError>,
-//     CS: OutputPin<Error = GpioError>,
-//     Reset: OutputPin<Error = GpioError>,
-//     Input: InputPin<Error = GpioError>,
-//     GpioError: core::fmt::Debug,
-impl BTController {
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
+where
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+    Input: InputPin<Error = GpioError>,
+    GpioError: core::fmt::Debug,
+{
     pub fn read_events_while_ready(
         &mut self,
         uart: &mut UART,
@@ -712,10 +705,8 @@ impl BTController {
 }
 
 /// Specific events
-impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 where
-    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-        + hal::blocking::spi::Write<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,

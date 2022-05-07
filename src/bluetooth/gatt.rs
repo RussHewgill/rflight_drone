@@ -895,14 +895,13 @@ pub trait Commands {
     ) -> nb::Result<(), Error<Self::Error>>;
 }
 
-// impl<CS, Reset, Input, GpioError> Commands for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
-// impl<'buf, SPI, CS, Reset, Input, GpioError> Commands
-//     for crate::bluetooth::BluetoothSpi<'buf, SPI, CS, Reset, Input>
-impl<SPI, CS, Reset, Input, GpioError> Commands
-    for crate::bluetooth::BluetoothSpi<SPI, CS, Reset, Input>
+// impl<SPI, CS, Reset, Input, GpioError> Commands
+//     for crate::bluetooth::BluetoothSpi<SPI, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> Commands
+    for crate::bluetooth::BluetoothSpi<CS, Reset, Input>
 where
-    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-        + hal::blocking::spi::Write<u8, Error = SpiError>,
+    // SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+    //     + hal::blocking::spi::Write<u8, Error = SpiError>,
     // SPI: Transfer<u8, Error = SpiError> + Write<u8, Error = SpiError> + Read<u8, Error = SpiError>,
     // SPI: Transfer<u8, Error = SpiError>
     //     + Write<u8, Error = SpiError>
