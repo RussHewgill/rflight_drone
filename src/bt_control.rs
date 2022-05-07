@@ -359,21 +359,21 @@ where
 
 /// read and handle events
 // impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
-impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
-where
-    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-        + hal::blocking::spi::Write<u8, Error = SpiError>,
-    CS: OutputPin<Error = GpioError>,
-    Reset: OutputPin<Error = GpioError>,
-    Input: InputPin<Error = GpioError>,
-    GpioError: core::fmt::Debug,
-{
+// impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
+// where
+//     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+//         + hal::blocking::spi::Write<u8, Error = SpiError>,
+//     CS: OutputPin<Error = GpioError>,
+//     Reset: OutputPin<Error = GpioError>,
+//     Input: InputPin<Error = GpioError>,
+//     GpioError: core::fmt::Debug,
+impl BTController {
     pub fn read_events_while_ready(
         &mut self,
         uart: &mut UART,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         while self.data_ready().map_err(BTError::Gpio)? {
-            if self.ignore_event_timeout(1000.millis())? == TimeoutResult::Timeout {
+            if self.ignore_event_timeout(Some(1000.millis()))? == TimeoutResult::Timeout {
                 uprintln!(uart, "read_events_while_ready: timoutout");
                 break;
             }
@@ -491,40 +491,60 @@ where
 
     pub fn ignore_event_timeout(
         &mut self,
-        timeout: fugit::MillisDurationU32,
+        timeout: Option<fugit::MillisDurationU32>,
     ) -> Result<TimeoutResult, BTError<SpiError, GpioError>> {
         use bluetooth_hci::Controller;
         use stm32f4xx_hal::timer::Event as TimerEvent;
 
-        self.delay.clear_interrupt(TimerEvent::Update);
-        self.delay.start(timeout).unwrap();
+        let x: Result<
+            bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
+            bluetooth_hci::host::uart::Error<
+                BTError<SpiError, GpioError>,
+                crate::bluetooth::events::BlueNRGError,
+            >,
+        > = if let Some(timeout) = timeout {
+            self.delay.clear_interrupt(TimerEvent::Update);
+            self.delay.start(timeout).unwrap();
 
-        // uprint!(uart, "w0");
-        let p = loop {
-            // uprint!(uart, "w1");
-            // match self.read2(uart) {
-            match self.read() {
-                Ok(p) => break p,
-                Err(nb::Error::WouldBlock) => {
-                    if self.delay.get_interrupt().contains(TimerEvent::Update) {
-                        // uprint!(uart, "w2");
-                        self.delay.cancel().unwrap();
-                        self.delay.clear_interrupt(TimerEvent::Update);
-                        return Ok(TimeoutResult::Timeout);
+            // uprint!(uart, "w0");
+            let p = loop {
+                // uprint!(uart, "w1");
+                // match self.read2(uart) {
+                match self.read() {
+                    Ok(p) => break p,
+                    Err(nb::Error::WouldBlock) => {
+                        if self.delay.get_interrupt().contains(TimerEvent::Update) {
+                            // uprint!(uart, "w2");
+                            self.delay.cancel().unwrap();
+                            self.delay.clear_interrupt(TimerEvent::Update);
+                            return Ok(TimeoutResult::Timeout);
+                        }
+                        // uprint!(uart, "w3");
                     }
-                    // uprint!(uart, "w3");
+                    Err(e) => {
+                        panic!("error 1 = {:?}", e);
+                    }
                 }
-                Err(e) => {
-                    panic!("error 1 = {:?}", e);
-                }
-            }
+            };
+            // uprintln!(uart, "ld");
+
+            self.delay.cancel().unwrap();
+            self.delay.clear_interrupt(TimerEvent::Update);
+            Ok(p)
+            // unimplemented!()
+        } else {
+            block!(self.read())
+            // unimplemented!()
         };
-        // uprintln!(uart, "ld");
 
-        self.delay.cancel().unwrap();
-        self.delay.clear_interrupt(TimerEvent::Update);
+        let e = match x {
+            Ok(p) => {
+                let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                e
+            }
+            _ => unimplemented!(),
+        };
 
-        let bluetooth_hci::host::uart::Packet::Event(e) = p;
         // uprintln!(uart, "event = {:?}", &e);
         match e {
             Event::ConnectionComplete(params) => {
@@ -571,6 +591,7 @@ where
         Ok(TimeoutResult::Ok)
     }
 
+    #[cfg(feature = "nope")]
     pub fn ignore_event(&mut self) -> Result<(), BTError<SpiError, GpioError>> {
         let x: Result<
             bluetooth_hci::host::uart::Packet<BlueNRGEvent>,

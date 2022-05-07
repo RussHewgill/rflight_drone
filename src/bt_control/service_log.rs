@@ -77,7 +77,7 @@ where
             panic!("no logger?");
         };
 
-        rprintln!("log_write 0");
+        // rprintln!("log_write 0");
 
         let val = UpdateCharacteristicValueParameters {
             service_handle:        logger.service_handle,
@@ -87,24 +87,19 @@ where
         };
         block!(self.update_characteristic_value(&val)).unwrap();
 
-        rprintln!("log_write 1");
+        // rprintln!("log_write 1");
 
-        if timeout {
-            let timeout_duration = 1000.millis();
+        let timeout_duration = if timeout { Some(1000.millis()) } else { None };
 
-            // uprintln!(uart, "wat 0");
-            let result = self.ignore_event_timeout(timeout_duration)?;
-            // uprintln!(uart, "wat 1");
+        // rprintln!("log_write 2");
+        let result = self.ignore_event_timeout(timeout_duration)?;
+        // rprintln!("log_write 3");
 
-            if result == TimeoutResult::Timeout {
-                Ok(false)
-            } else {
-                Ok(true)
-            }
+        if result == TimeoutResult::Timeout {
+            // rprintln!("log_write 4");
+            Ok(false)
         } else {
-            rprintln!("log_write 2");
-            self.ignore_event()?;
-            rprintln!("log_write 3");
+            // rprintln!("log_write 5");
             Ok(true)
         }
     }

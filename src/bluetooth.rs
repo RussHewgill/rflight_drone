@@ -141,8 +141,9 @@ pub enum BTError<SpiError, GpioError> {
 }
 
 // pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
-pub struct BluetoothSpi<SPI, CS, Reset, Input> {
-    spi:    SPI,
+// pub struct BluetoothSpi<SPI, CS, Reset, Input> {
+pub struct BluetoothSpi<CS, Reset, Input> {
+    spi:    BTSpi,
     cs:     CS,
     reset:  Reset,
     input:  Input,
@@ -244,10 +245,15 @@ impl<CS, Reset> BluetoothSpi<BTSpi, CS, Reset, PA4> {
 /// reset, bluenrg fns
 // impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 // impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
-impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
+// impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
+// where
+//     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+//         + hal::blocking::spi::Write<u8, Error = SpiError>,
+//     CS: OutputPin<Error = GpioError>,
+//     Reset: OutputPin<Error = GpioError>,
+//     Input: InputPin<Error = GpioError>,
+impl<CS, Reset, Input, GpioError> BluetoothSpi<BTSpi, CS, Reset, Input>
 where
-    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-        + hal::blocking::spi::Write<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -362,14 +368,14 @@ where
                             .map_err(BTError::Gpio)
                             .map_err(nb::Error::Other)?;
                     } else {
-                        // hprintln!(
-                        //     "{:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
-                        //     header[0],
-                        //     header[1],
-                        //     header[2],
-                        //     header[3],
-                        //     header[4],
-                        // );
+                        rprintln!(
+                            "{:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
+                            header[0],
+                            header[1],
+                            header[2],
+                            header[3],
+                            header[4],
+                        );
                         return Ok(lens);
                     }
                 }
@@ -525,6 +531,15 @@ where
         let mut header = [0; HEADER_LEN];
         bluetooth_hci::host::uart::CommandHeader::new(opcode, params.len())
             .copy_into_slice(&mut header);
+
+        // rprintln!(
+        //     "header = {=u8:#x}, {=u8:#x}, {=u8:#x}, {=u8:#x}",
+        //     header[0],
+        //     header[1],
+        //     header[2],
+        //     header[3],
+        // );
+
         self.write(&header, params)
     }
 
@@ -582,10 +597,11 @@ where
     }
 }
 
-impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
+// impl<SPI, CS, Reset, Input, GpioError> Controller for BluetoothSpi<SPI, CS, Reset, Input>
+impl<CS, Reset, Input, GpioError> Controller for BluetoothSpi<BTSpi, CS, Reset, Input>
 where
-    SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-        + hal::blocking::spi::Write<u8, Error = SpiError>,
+    // SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
+    //     + hal::blocking::spi::Write<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
     Input: InputPin<Error = GpioError>,
@@ -603,6 +619,9 @@ where
         // cortex_m::asm::nop();
 
         let write_len = self.block_until_ready_for(AccessByte::Write, None)?;
+
+        rprintln!("write_len = {:?}", write_len);
+
         if (write_len as usize) < header.len() + payload.len() {
             return Err(nb::Error::WouldBlock);
         }
@@ -701,8 +720,8 @@ fn parse_spi_header<E>(header: &[u8; 5]) -> Result<(u16, u16), nb::Error<E>> {
     }
 }
 
+#[cfg(feature = "nope")]
 /// read2, etc
-// impl<'buf, SPI, CS, Reset, Input, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, Input>
 impl<SPI, CS, Reset, Input, GpioError> BluetoothSpi<SPI, CS, Reset, Input>
 where
     SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
