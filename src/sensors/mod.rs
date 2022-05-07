@@ -44,7 +44,10 @@ pub struct DataVal {
 ///     +X = Right
 ///     +Y = Up
 ///     +Z = Normal
-/// Acc: (x,y,z) same as board
+/// Acc: +ve g means that axis is pointing up
+///     +X = Left ??
+///     +Y = Up
+///     +Z = Normal
 /// Gyro: (p,r,q)
 ///     +p = rotation about x
 ///     +r = rotation about y

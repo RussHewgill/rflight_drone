@@ -6,338 +6,335 @@ use crate::{math::*, uart::*, uprintln};
 use super::{UQuat, V3};
 
 // pub use self::madgwick_prev::*;
+pub use self::fusion::*;
 
-#[derive(Debug, Clone, Copy)]
-pub struct AHRS {
-    quat:          UQuat,
-    sample_period: f32,
-    beta:          f32,
+mod fusion {
+    use nalgebra::{Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
-    prev_acc: V3,
+    use crate::{math::*, uart::*, uprintln};
 
-    cfg_gain:              f32,
-    cfg_acc_rejection:     f32,
-    cfg_mag_rejection:     f32,
-    cfg_rejection_timeout: u32,
+    use super::{UQuat, V3};
 
-    initializing:     bool,
-    ramped_gain:      f32,
-    ramped_gain_step: f32,
-
-    half_acc_feedback: V3,
-    half_mag_feedback: V3,
-
-    acc_ignored:           bool,
-    acc_rejection_timer:   u32,
-    acc_rejection_timeout: bool,
-    mag_ignored:           bool,
-    mag_rejection_timer:   u32,
-    mag_rejection_timeout: bool,
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct FlightData {
-    /// Rotation using North-West-Up convention
-    pub quat:        UQuat,
-    /// accelerometer measurement with the 1 g of gravity removed
-    pub lin_accel:   V3,
-    /// accelerometer measurement in the Earth coordinate frame with the 1 g of gravity removed
-    pub earth_accel: V3,
-    // pub prev_acc:     V3,
-    // /// integrated accel to estimate velocity
-    // pub est_velocity: V3,
-}
-
-impl FlightData {
-    pub fn update(&mut self, ahrs: &AHRS) {
-        self.quat = ahrs.get_quat();
-        self.lin_accel = ahrs.get_linear_accel();
-        self.earth_accel = ahrs.get_earth_accel();
-
-        // self.prev_acc = ahrs.prev_acc;
-        // self.est_velocity += self.lin_accel * ahrs.sample_period;
-        // // self.est_velocity += self.earth_accel * ahrs.sample_period;
+    #[derive(Debug, Default, Clone, Copy)]
+    pub struct FlightData {
+        /// Rotation using North-West-Up convention
+        pub quat:        UQuat,
+        /// accelerometer measurement with the 1 g of gravity removed
+        pub lin_accel:   V3,
+        /// accelerometer measurement in the Earth coordinate frame with the 1 g of gravity removed
+        pub earth_accel: V3,
+        // pub prev_acc:     V3,
+        // /// integrated accel to estimate velocity
+        // pub est_velocity: V3,
     }
 
-    /// roll, pitch, yaw
-    pub fn get_euler_angles(&self) -> (f32, f32, f32) {
-        self.quat.euler_angles()
-    }
-}
+    impl FlightData {
+        pub fn update(&mut self, ahrs: &AHRS) {
+            self.quat = ahrs.get_quat();
+            self.lin_accel = ahrs.get_linear_accel();
+            self.earth_accel = ahrs.get_earth_accel();
 
-/// new
-impl AHRS {
-    pub const INIT_TIME: f32 = 3.0;
-    pub const INITIAL_GAIN: f32 = 10.0;
-
-    pub fn new(sample_period: f32, beta: f32) -> Self {
-        Self {
-            quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
-            sample_period,
-            beta,
-
-            prev_acc: V3::zeros(),
-
-            cfg_gain: 0.5,
-            cfg_acc_rejection: 10.0,
-            cfg_mag_rejection: 20.0,
-            cfg_rejection_timeout: (5.0 / sample_period) as u32,
-
-            initializing: true,
-            ramped_gain: Self::INITIAL_GAIN,
-            ramped_gain_step: (Self::INITIAL_GAIN - beta) / Self::INIT_TIME,
-
-            half_acc_feedback: V3::zeros(),
-            half_mag_feedback: V3::zeros(),
-
-            acc_ignored: false,
-            acc_rejection_timer: 0,
-            acc_rejection_timeout: false,
-            mag_ignored: false,
-            mag_rejection_timer: 0,
-            mag_rejection_timeout: false,
-        }
-    }
-}
-
-impl AHRS {
-    pub fn update(
-        &mut self,
-        // uart: &mut UART,
-        gyro: V3,
-        acc: V3,
-        mag: V3,
-    ) -> Option<&UQuat> {
-        Some(&self.quat)
-    }
-}
-
-/// update
-#[cfg(feature = "nope")]
-impl AHRS {
-    pub fn update(
-        &mut self,
-        // uart: &mut UART,
-        gyro: V3,
-        acc: V3,
-        mag: V3,
-    ) -> Option<&UQuat> {
-        self.prev_acc = acc;
-
-        if self.initializing {
-            self.ramped_gain -= self.ramped_gain_step * self.sample_period;
-
-            if self.ramped_gain < self.cfg_gain {
-                self.ramped_gain = self.cfg_gain;
-                self.initializing = false;
-                self.acc_rejection_timeout = false; // XXX: ?
-            }
+            // self.prev_acc = ahrs.prev_acc;
+            // self.est_velocity += self.lin_accel * ahrs.sample_period;
+            // // self.est_velocity += self.earth_accel * ahrs.sample_period;
         }
 
-        /// Calculate direction of gravity indicated by algorithm
-        let half_gravity = {
-            let q = self.quat.coords;
-            V3::new(
-                q.x * q.z - q.w * q.y,
-                q.w * q.x + q.y * q.z,
-                q.w * q.w - 0.5 + q.z * q.z,
-            )
-        };
-        // uprintln!(uart, "half_gravity = {:?}", half_gravity);
+        /// roll, pitch, yaw
+        pub fn get_euler_angles(&self) -> (f32, f32, f32) {
+            self.quat.euler_angles()
+        }
+    }
 
-        // {
-        //     let q = self.quat.as_ref();
-        //     // Reference direction of Earth's magnetic field (Quaternion should still be conj of q)
-        //     let h = q * (Quaternion::from_parts(0.0, mag) * q.conjugate());
-        //     let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
-        //     uprintln!(uart, "b = {:?}", b);
-        // }
+    #[derive(Debug, Clone, Copy)]
+    pub struct AHRS {
+        quat:          UQuat,
+        sample_period: f32,
+        beta:          f32,
 
-        let mut half_acc_feedback = V3::zeros();
-        self.acc_ignored = true;
-        /// Calculate accelerometer feedback
-        if !(acc == V3::zeros()) {
-            /// Enter acceleration recovery state if acceleration rejection times out
-            if self.acc_rejection_timer >= self.cfg_rejection_timeout {
-                let q = self.quat;
-                self.reset();
-                self.quat = q;
-                self.acc_rejection_timer = 0;
-                self.acc_rejection_timeout = true;
+        prev_acc: V3,
+
+        cfg_gain:              f32,
+        cfg_acc_rejection:     f32,
+        cfg_mag_rejection:     f32,
+        cfg_rejection_timeout: u32,
+
+        initializing:     bool,
+        ramped_gain:      f32,
+        ramped_gain_step: f32,
+
+        half_acc_feedback: V3,
+        half_mag_feedback: V3,
+
+        acc_ignored:           bool,
+        acc_rejection_timer:   u32,
+        acc_rejection_timeout: bool,
+        mag_ignored:           bool,
+        mag_rejection_timer:   u32,
+        mag_rejection_timeout: bool,
+    }
+
+    /// new
+    impl AHRS {
+        pub const INIT_TIME: f32 = 3.0;
+        pub const INITIAL_GAIN: f32 = 10.0;
+
+        pub fn new(sample_period: f32, beta: f32) -> Self {
+            Self {
+                quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
+                sample_period,
+                beta,
+
+                prev_acc: V3::zeros(),
+
+                cfg_gain: 0.5,
+                cfg_acc_rejection: 10.0,
+                cfg_mag_rejection: 20.0,
+                cfg_rejection_timeout: (5.0 / sample_period) as u32,
+
+                initializing: true,
+                ramped_gain: Self::INITIAL_GAIN,
+                ramped_gain_step: (Self::INITIAL_GAIN - beta) / Self::INIT_TIME,
+
+                half_acc_feedback: V3::zeros(),
+                half_mag_feedback: V3::zeros(),
+
+                acc_ignored: false,
+                acc_rejection_timer: 0,
+                acc_rejection_timeout: false,
+                mag_ignored: false,
+                mag_rejection_timer: 0,
+                mag_rejection_timeout: false,
             }
+        }
+    }
 
-            // Calculate accelerometer feedback scaled by 0.5
-            self.half_acc_feedback = acc.normalize().cross(&half_gravity);
+    /// update
+    impl AHRS {
+        pub fn update(
+            &mut self,
+            // uart: &mut UART,
+            gyro: V3,
+            acc: V3,
+            mag: V3,
+        ) -> Option<&UQuat> {
+            self.prev_acc = acc;
 
-            /// Ignore accelerometer if acceleration distortion detected
-            if self.initializing
-                || half_acc_feedback.norm_squared() <= self.cfg_acc_rejection
-            {
-                half_acc_feedback = self.half_acc_feedback;
-                self.acc_ignored = false;
-                if self.acc_rejection_timer >= 10 {
-                    self.acc_rejection_timer -= 10;
+            let mut mag = mag;
+            mag.y = -mag.y;
+
+            if self.initializing {
+                self.ramped_gain -= self.ramped_gain_step * self.sample_period;
+
+                if self.ramped_gain < self.cfg_gain {
+                    self.ramped_gain = self.cfg_gain;
+                    self.initializing = false;
+                    self.acc_rejection_timeout = false; // XXX: ?
                 }
-            } else {
-                self.acc_rejection_timer += 1;
-            }
-        }
-
-        let mut half_mag_feedback = V3::zeros();
-        self.mag_ignored = true;
-        /// Calculate magnetometer feedback
-        if !(mag == V3::zeros()) {
-            self.mag_rejection_timeout = false;
-            /// Set to compass heading if magnetic rejection times out
-            if self.mag_rejection_timer >= self.cfg_rejection_timeout {
-                self.set_heading(Self::compass_calc_heading(acc, mag));
-                self.mag_rejection_timer = 0;
-                self.mag_rejection_timeout = true;
             }
 
-            /// Compute direction of west indicated by algorithm
-            let half_west = {
+            /// Calculate direction of gravity indicated by algorithm
+            let half_gravity = {
                 let q = self.quat.coords;
                 V3::new(
-                    q.x * q.y + q.w * q.z,
-                    q.w * q.w - 0.5 + q.y * q.y,
-                    q.y * q.z - q.w * q.x,
+                    q.x * q.z - q.w * q.y,
+                    q.w * q.x + q.y * q.z,
+                    q.w * q.w - 0.5 + q.z * q.z,
                 )
             };
+            // uprintln!(uart, "half_gravity = {:?}", half_gravity);
 
-            // Calculate magnetometer feedback scaled by 0.5
-            self.half_mag_feedback =
-                half_gravity.cross(&mag).normalize().cross(&half_west);
+            // {
+            //     let q = self.quat.as_ref();
+            //     // Reference direction of Earth's magnetic field (Quaternion should still be conj of q)
+            //     let h = q * (Quaternion::from_parts(0.0, mag) * q.conjugate());
+            //     let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
+            //     uprintln!(uart, "b = {:?}", b);
+            // }
 
-            // Ignore magnetometer if magnetic distortion detected
-            if self.initializing
-                || self.half_mag_feedback.norm_squared() <= self.cfg_mag_rejection
-            {
-                half_mag_feedback = self.half_mag_feedback;
-                self.mag_ignored = false;
-                if self.mag_rejection_timer >= 10 {
-                    self.mag_rejection_timer -= 10;
+            let mut half_acc_feedback = V3::zeros();
+            self.acc_ignored = true;
+            /// Calculate accelerometer feedback
+            if !(acc == V3::zeros()) {
+                /// Enter acceleration recovery state if acceleration rejection times out
+                if self.acc_rejection_timer >= self.cfg_rejection_timeout {
+                    let q = self.quat;
+                    self.reset();
+                    self.quat = q;
+                    self.acc_rejection_timer = 0;
+                    self.acc_rejection_timeout = true;
                 }
-            } else {
-                self.mag_rejection_timer += 1;
+
+                // Calculate accelerometer feedback scaled by 0.5
+                self.half_acc_feedback = acc.normalize().cross(&half_gravity);
+
+                /// Ignore accelerometer if acceleration distortion detected
+                if self.initializing
+                    || half_acc_feedback.norm_squared() <= self.cfg_acc_rejection
+                {
+                    half_acc_feedback = self.half_acc_feedback;
+                    self.acc_ignored = false;
+                    if self.acc_rejection_timer >= 10 {
+                        self.acc_rejection_timer -= 10;
+                    }
+                } else {
+                    self.acc_rejection_timer += 1;
+                }
             }
+
+            let mut half_mag_feedback = V3::zeros();
+            self.mag_ignored = true;
+            /// Calculate magnetometer feedback
+            if !(mag == V3::zeros()) {
+                self.mag_rejection_timeout = false;
+                /// Set to compass heading if magnetic rejection times out
+                if self.mag_rejection_timer >= self.cfg_rejection_timeout {
+                    self.set_heading(Self::compass_calc_heading(acc, mag));
+                    self.mag_rejection_timer = 0;
+                    self.mag_rejection_timeout = true;
+                }
+
+                /// Compute direction of west indicated by algorithm
+                let half_west = {
+                    let q = self.quat.coords;
+                    V3::new(
+                        q.x * q.y + q.w * q.z,
+                        q.w * q.w - 0.5 + q.y * q.y,
+                        q.y * q.z - q.w * q.x,
+                    )
+                };
+
+                // Calculate magnetometer feedback scaled by 0.5
+                self.half_mag_feedback =
+                    half_gravity.cross(&mag).normalize().cross(&half_west);
+
+                // Ignore magnetometer if magnetic distortion detected
+                if self.initializing
+                    || self.half_mag_feedback.norm_squared() <= self.cfg_mag_rejection
+                {
+                    half_mag_feedback = self.half_mag_feedback;
+                    self.mag_ignored = false;
+                    if self.mag_rejection_timer >= 10 {
+                        self.mag_rejection_timer -= 10;
+                    }
+                } else {
+                    self.mag_rejection_timer += 1;
+                }
+            }
+
+            /// XXX: ??
+            /// Convert gyroscope to radians per second scaled by 0.5
+            let half_gyro = gyro * deg_to_rad(0.5);
+
+            /// Apply feedback to gyroscope
+            let adjusted_half_gyro =
+                half_gyro + ((half_acc_feedback + half_mag_feedback) * self.ramped_gain);
+
+            /// Integrate rate of change of quaternion
+            /// Normalise quaternion
+            let v: V3 = adjusted_half_gyro * self.sample_period;
+            self.quat = UQuat::from_quaternion(*self.quat + quat_mult_vec(*self.quat, v));
+
+            Some(&self.quat)
         }
 
-        /// XXX: ??
-        /// Convert gyroscope to radians per second scaled by 0.5
-        let half_gyro = gyro * deg_to_rad(0.5);
+        pub fn set_heading(&mut self, heading: f32) {
+            use nalgebra::{ComplexField, RealField}; // for sin, atan2
 
-        /// Apply feedback to gyroscope
-        let adjusted_half_gyro =
-            half_gyro + ((half_acc_feedback + half_mag_feedback) * self.ramped_gain);
+            let q = self.quat.coords;
 
-        /// Integrate rate of change of quaternion
-        /// Normalise quaternion
-        let v: V3 = adjusted_half_gyro * self.sample_period;
-        self.quat = UQuat::from_quaternion(*self.quat + quat_mult_vec(*self.quat, v));
+            /// Euler angle of conjugate
+            let inv_heading =
+                f32::atan2(q.x * q.y + q.w * q.z, q.w * q.w - 0.5 + q.x * q.x);
 
-        Some(&self.quat)
-    }
-}
+            let half_inv_heading_minus_offset = 0.5 * (inv_heading - deg_to_rad(heading));
 
-/// set_heading, compass, reset
-impl AHRS {
-    pub fn set_heading(&mut self, heading: f32) {
-        use nalgebra::{ComplexField, RealField}; // for sin, atan2
+            let inv_heading_quat = Quaternion::from_parts(
+                half_inv_heading_minus_offset.cos(),
+                V3::new(0.0, 0.0, -1.0 * half_inv_heading_minus_offset.sin()),
+            );
 
-        let q = self.quat.coords;
+            self.quat = self.quat * UQuat::from_quaternion(inv_heading_quat);
+        }
 
-        /// Euler angle of conjugate
-        let inv_heading = f32::atan2(q.x * q.y + q.w * q.z, q.w * q.w - 0.5 + q.x * q.x);
+        pub fn compass_calc_heading(acc: V3, mag: V3) -> f32 {
+            use nalgebra::RealField; // for atan2
+            let magnetic_west = acc.cross(&mag).normalize();
+            let magnetic_north = magnetic_west.cross(&acc).normalize();
+            rad_to_deg(f32::atan2(magnetic_west.x, magnetic_north.x))
+        }
 
-        let half_inv_heading_minus_offset = 0.5 * (inv_heading - deg_to_rad(heading));
+        pub fn reset(&mut self) {
+            self.quat = UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0));
+            self.initializing = true;
+            self.ramped_gain = Self::INITIAL_GAIN;
 
-        let inv_heading_quat = Quaternion::from_parts(
-            half_inv_heading_minus_offset.cos(),
-            V3::new(0.0, 0.0, -1.0 * half_inv_heading_minus_offset.sin()),
-        );
+            self.half_acc_feedback = V3::zeros();
+            self.half_mag_feedback = V3::zeros();
 
-        self.quat = self.quat * UQuat::from_quaternion(inv_heading_quat);
-    }
-
-    pub fn compass_calc_heading(acc: V3, mag: V3) -> f32 {
-        use nalgebra::RealField; // for atan2
-        let magnetic_west = acc.cross(&mag).normalize();
-        let magnetic_north = magnetic_west.cross(&acc).normalize();
-        rad_to_deg(f32::atan2(magnetic_west.x, magnetic_north.x))
-    }
-
-    pub fn reset(&mut self) {
-        self.quat = UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0));
-        self.initializing = true;
-        self.ramped_gain = Self::INITIAL_GAIN;
-
-        self.half_acc_feedback = V3::zeros();
-        self.half_mag_feedback = V3::zeros();
-
-        self.acc_ignored = false;
-        self.acc_rejection_timer = 0;
-        self.acc_rejection_timeout = false;
-        self.mag_ignored = false;
-        self.mag_rejection_timer = 0;
-        self.mag_rejection_timeout = false;
-    }
-}
-
-/// get quat, accel
-impl AHRS {
-    pub fn get_quat(&self) -> UQuat {
-        self.quat
+            self.acc_ignored = false;
+            self.acc_rejection_timer = 0;
+            self.acc_rejection_timeout = false;
+            self.mag_ignored = false;
+            self.mag_rejection_timer = 0;
+            self.mag_rejection_timeout = false;
+        }
     }
 
-    /// Returns the linear acceleration measurement equal to the accelerometer
-    /// measurement with the 1 g of gravity removed.
-    pub fn get_linear_accel(&self) -> V3 {
-        let q = self.quat.coords;
-        let gravity = V3::new(
-            2.0 * (q.x * q.z - q.w * q.y),
-            2.0 * (q.w * q.x + q.y * q.z),
-            2.0 * (q.w * q.w - 0.5 + q.z * q.z),
-        );
-        self.prev_acc - gravity
+    /// get quat, accel
+    impl AHRS {
+        pub fn get_quat(&self) -> UQuat {
+            self.quat
+        }
+
+        /// Returns the linear acceleration measurement equal to the accelerometer
+        /// measurement with the 1 g of gravity removed.
+        pub fn get_linear_accel(&self) -> V3 {
+            let q = self.quat.coords;
+            let gravity = V3::new(
+                2.0 * (q.x * q.z - q.w * q.y),
+                2.0 * (q.w * q.x + q.y * q.z),
+                2.0 * (q.w * q.w - 0.5 + q.z * q.z),
+            );
+            self.prev_acc - gravity
+        }
+
+        /// Returns the Earth acceleration measurement equal to accelerometer
+        /// measurement in the Earth coordinate frame with the 1 g of gravity removed.
+        pub fn get_earth_accel(&self) -> V3 {
+            let q = self.quat.coords;
+            let qwqw = q.w * q.w; // calculate common terms to avoid repeated operations
+            let qwqx = q.w * q.x;
+            let qwqy = q.w * q.y;
+            let qwqz = q.w * q.z;
+            let qxqy = q.x * q.y;
+            let qxqz = q.x * q.z;
+            let qyqz = q.y * q.z;
+
+            let acc = &self.prev_acc;
+
+            /// transpose of a rotation matrix representation
+            /// multiplied with the accelerometer, with 1 g subtracted
+            V3::new(
+                2.0 * ((qwqw - 0.5 + q.x * q.x) * acc.x
+                    + (qxqy - qwqz) * acc.y
+                    + (qxqz + qwqy) * acc.z),
+                2.0 * ((qxqy + qwqz) * acc.x
+                    + (qwqw - 0.5 + q.y * q.y) * acc.y
+                    + (qyqz - qwqx) * acc.z),
+                (2.0 * ((qxqz - qwqy) * acc.x
+                    + (qyqz + qwqx) * acc.y
+                    + (qwqw - 0.5 + q.z * q.z) * acc.z))
+                    - 1.0,
+            )
+        }
     }
 
-    /// Returns the Earth acceleration measurement equal to accelerometer
-    /// measurement in the Earth coordinate frame with the 1 g of gravity removed.
-    pub fn get_earth_accel(&self) -> V3 {
-        let q = self.quat.coords;
-        let qwqw = q.w * q.w; // calculate common terms to avoid repeated operations
-        let qwqx = q.w * q.x;
-        let qwqy = q.w * q.y;
-        let qwqz = q.w * q.z;
-        let qxqy = q.x * q.y;
-        let qxqz = q.x * q.z;
-        let qyqz = q.y * q.z;
-
-        let acc = &self.prev_acc;
-
-        /// transpose of a rotation matrix representation
-        /// multiplied with the accelerometer, with 1 g subtracted
-        V3::new(
-            2.0 * ((qwqw - 0.5 + q.x * q.x) * acc.x
-                + (qxqy - qwqz) * acc.y
-                + (qxqz + qwqy) * acc.z),
-            2.0 * ((qxqy + qwqz) * acc.x
-                + (qwqw - 0.5 + q.y * q.y) * acc.y
-                + (qyqz - qwqx) * acc.z),
-            (2.0 * ((qxqz - qwqy) * acc.x
-                + (qyqz + qwqx) * acc.y
-                + (qwqw - 0.5 + q.z * q.z) * acc.z))
-                - 1.0,
-        )
-    }
-}
-
-impl Default for AHRS {
-    fn default() -> Self {
-        let sample_period = 1.0 / 256.0;
-        let beta = 0.1;
-        Self::new(sample_period, beta)
+    impl Default for AHRS {
+        fn default() -> Self {
+            let sample_period = 1.0 / 256.0;
+            let beta = 0.1;
+            Self::new(sample_period, beta)
+        }
     }
 }
 

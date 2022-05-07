@@ -153,8 +153,9 @@ mod app {
         let bt_buf = cx.local.bt_buf;
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
-        let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
+        // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
+        let sensor_period: stm32f4xx_hal::time::Hertz = 4.Hz();
 
         // let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
 
@@ -259,7 +260,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -290,6 +291,37 @@ mod app {
                 let gyro = sd.imu_gyro.read_and_reset();
                 let acc = sd.imu_acc.read_and_reset();
                 let mag = sd.magnetometer.read_and_reset();
+
+                use na::ComplexField;
+
+                fn r(x: f32) -> f32 {
+                    (x * 100.0).round() / 100.0
+                }
+
+                fn r2(x: f32) -> f32 {
+                    (x * 10_000.0).round() / 10.0
+                }
+
+                // rprintln!(
+                //     "gyro = {=f32:08}, {=f32:08}, {=f32:08}",
+                //     r(gyro.x),
+                //     r(gyro.y),
+                //     r(gyro.z)
+                // );
+
+                // rprintln!(
+                //     "acc = {=f32:08}, {=f32:08}, {=f32:08}",
+                //     r(acc.x),
+                //     r(acc.y),
+                //     r(acc.z)
+                // );
+
+                rprintln!(
+                    "mag = {=f32:08}, {=f32:08}, {=f32:08}",
+                    r2(mag.x),
+                    r2(mag.y),
+                    r2(mag.z)
+                );
 
                 ahrs.update(gyro, acc, mag);
 
@@ -379,12 +411,14 @@ mod app {
         priority = 3
     )]
     fn main_loop(mut cx: main_loop::Context) {
+        const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
+
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
                 *tim9_flag = false;
 
                 *cx.local.counter += 1;
-                if *cx.local.counter >= 10 {
+                if *cx.local.counter >= COUNTER_TIMES {
                     *cx.local.counter = 0;
                     (cx.shared.flight_data, cx.shared.bt, cx.shared.exti).lock(
                         |fd, bt, exti| {
