@@ -309,10 +309,7 @@ where
                 .map_err(BTError::Spi)
                 .map_err(nb::Error::Other)?;
 
-            // for word in header.iter_mut() {
-            //     block!(self.spi.send(*word)).unwrap();
-            //     *word = block!(self.spi.read()).unwrap();
-            // }
+            // cortex_m::asm::dsb();
 
             match parse_spi_header(&header) {
                 Ok(lens) => {

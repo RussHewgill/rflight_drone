@@ -30,7 +30,11 @@ pub struct Sensors {
     imu:          IMU<Pin<'A', 8, Output>>,
     magnetometer: Magnetometer<Pin<'B', 12, Output>>,
     barometer:    Barometer<Pin<'C', 13, Output>>,
+
     // pub data: SensorData,
+    pub offset_gyro: V3,
+    pub offset_acc:  V3,
+    pub offset_mag:  V3,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -45,13 +49,13 @@ pub struct DataVal {
 ///     +Y = Up
 ///     +Z = Normal
 /// Acc: +ve g means that axis is pointing up
-///     +X = Left ??
-///     +Y = Up
+///     +X = Up
+///     +Y = Left
 ///     +Z = Normal
 /// Gyro: (p,r,q)
-///     +p = rotation about x
-///     +r = rotation about y
-///     +z = rotation about z
+///     +p = CW rotation about x
+///     +r = CW rotation about y
+///     +y = CW rotation about z
 /// Mag: (x,y,z)
 ///     +X = Right
 ///     +Y = Down
@@ -93,7 +97,21 @@ impl Sensors {
             magnetometer,
             barometer,
             // data: SensorData::default(),
+            offset_gyro: V3::default(),
+            offset_acc: V3::default(),
+            offset_mag: V3::default(),
         }
+    }
+}
+
+/// set offsets
+impl Sensors {
+    pub fn set_offsets(&mut self) {
+        unimplemented!()
+    }
+
+    pub fn set_offset_gyro(&mut self) {
+        unimplemented!()
     }
 }
 
@@ -131,7 +149,18 @@ impl Sensors {
             imu.read_data(spi)
         }) {
             if !discard {
+                let data_gyro = [
+                    -data_gyro[1], // pitch
+                    data_gyro[0],  // roll
+                    data_gyro[2],  // yaw
+                ];
                 data.imu_gyro.update(data_gyro);
+
+                let data_acc = [
+                    data_acc[1], //
+                    data_acc[0],
+                    data_acc[2],
+                ];
                 data.imu_acc.update(data_acc);
             }
         } else {
@@ -147,6 +176,7 @@ impl Sensors {
                 Err(nb::Error::WouldBlock)
             }
         }) {
+            let mag_data = [mag_data[0], -mag_data[1], mag_data[2]];
             data.magnetometer.update(mag_data);
         } else {
             // unimplemented!()

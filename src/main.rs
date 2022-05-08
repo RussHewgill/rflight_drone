@@ -94,7 +94,7 @@ mod app {
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bt_control::BTState,
-        sensors::ahrs::{FlightData, AHRS},
+        sensors::ahrs::*,
         sensors::{SensorData, Sensors, UQuat},
         time::MonoTimer,
         utils::*,
@@ -115,18 +115,12 @@ mod app {
     #[shared]
     struct Shared {
         dwt:         Dwt,
-        // uart:        UART,
         exti:        EXTI,
-        ahrs:        AHRS,
+        // ahrs:        AhrsComplementary,
+        ahrs:        AhrsFusion,
         sens_data:   SensorData,
         flight_data: FlightData,
-        // bt_chan:  heapless::spsc::Queue<>
-        // bt:          BTController<'static>,
         bt:          BTController,
-        // bt_queue:    heapless::spsc::Queue<bluetooth_hci::Event<BlueNRGEvent>, 10>,
-        // delay_bt: DelayMs<TIM2>,
-        // delay_bt: TIM2,
-        // delay_bt:  CounterMs<TIM2>,
         tim9_flag:   bool,
     }
 
@@ -152,10 +146,10 @@ mod app {
 
         let bt_buf = cx.local.bt_buf;
 
-        // let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
+        let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
-        let sensor_period: stm32f4xx_hal::time::Hertz = 4.Hz();
+        // let sensor_period: stm32f4xx_hal::time::Hertz = 5.Hz();
 
         // let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
 
@@ -229,26 +223,28 @@ mod app {
         // let t = 1.0 / (sensor_period.raw() as f32);
         // uprintln!(uart, "t = {:?}", t);
 
-        let ahrs = AHRS::new(
-            // 1.0 / 800.0, // 1.25 ms
-            // 1.0 / 200.0, // 5 ms
+        /// Fusion
+        let mut ahrs = AhrsFusion::new(
             1.0 / (sensor_period.raw() as f32),
-            0.5,
+            // 0.5,
+            7.5,
         );
+        ahrs.cfg_acc_rejection = 10.0;
+        ahrs.cfg_mag_rejection = 20.0;
+
+        // /// complementary
+        // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32));
 
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
         let shared = Shared {
             dwt,
-            // uart,
             exti,
             ahrs,
             sens_data: SensorData::default(),
             flight_data: FlightData::default(),
             bt,
-            // bt_queue: Queue::new(),
-            // delay_bt,
             tim9_flag: false,
         };
 
@@ -260,7 +256,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -292,15 +288,17 @@ mod app {
                 let acc = sd.imu_acc.read_and_reset();
                 let mag = sd.magnetometer.read_and_reset();
 
+                ahrs.update(gyro, acc, mag);
+
                 use na::ComplexField;
 
-                fn r(x: f32) -> f32 {
-                    (x * 100.0).round() / 100.0
-                }
+                // fn r(x: f32) -> f32 {
+                //     (x * 100.0).round() / 100.0
+                // }
 
-                fn r2(x: f32) -> f32 {
-                    (x * 10_000.0).round() / 10.0
-                }
+                // fn r2(x: f32) -> f32 {
+                //     (x * 10_000.0).round() / 10.0
+                // }
 
                 // rprintln!(
                 //     "gyro = {=f32:08}, {=f32:08}, {=f32:08}",
@@ -316,17 +314,15 @@ mod app {
                 //     r(acc.z)
                 // );
 
-                rprintln!(
-                    "mag = {=f32:08}, {=f32:08}, {=f32:08}",
-                    r2(mag.x),
-                    r2(mag.y),
-                    r2(mag.z)
-                );
-
-                ahrs.update(gyro, acc, mag);
+                // rprintln!(
+                //     "mag = {=f32:08}, {=f32:08}, {=f32:08}",
+                //     r2(mag.x),
+                //     r2(mag.y),
+                //     r2(mag.z)
+                // );
 
                 /// update FlightData
-                fd.update(&ahrs);
+                fd.update(ahrs);
 
                 *tim9_flag = true;
             });
@@ -411,6 +407,7 @@ mod app {
         priority = 3
     )]
     fn main_loop(mut cx: main_loop::Context) {
+        // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
         const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
 
         cx.shared.tim9_flag.lock(|tim9_flag| {
@@ -431,7 +428,7 @@ mod app {
 
                             // uprint!(uart, "sending ({:?})...", *cx.local.counter);
                             // bt.clear_interrupt();
-                            rprintln!("0..");
+                            // rprintln!("0..");
                             bt.pause_interrupt(exti);
                             match bt.log_write(false, &cx.local.buf[..]) {
                                 Ok(true) => {
@@ -445,7 +442,7 @@ mod app {
                                 }
                             }
                             bt.unpause_interrupt(exti);
-                            rprintln!("1");
+                            // rprintln!("1");
 
                             // //
                             // unimplemented!()
@@ -593,60 +590,12 @@ mod app {
 
 #[cfg(feature = "nope")]
 // #[entry]
-fn main_clock_test() -> ! {
-    let mut cp = stm32f401::CorePeripherals::take().unwrap();
-    let mut dp = stm32f401::Peripherals::take().unwrap();
-
-    dp.RCC.ahb1enr.modify(|r, w| {
-        w.gpioaen()
-            .set_bit()
-            .gpioben()
-            .set_bit()
-            .gpiocen()
-            .set_bit()
-    });
-
-    /// Enable SPI1 clock
-    dp.RCC.apb2enr.modify(|r, w| w.spi1en().set_bit());
-
-    /// Enable SPI2 clock
-    dp.RCC.apb1enr.write(|w| w.spi2en().set_bit());
-
-    /// Enable SYSCFG clock
-    dp.RCC.apb2enr.modify(|r, w| w.syscfgen().set_bit());
-
-    rprintln!("wat 0");
-
-    let mut rcc = dp.RCC.constrain();
-
-    rprintln!("wat 1");
-
-    let clocks = rcc
-        .cfgr
-        //
-        .use_hse(16.MHz())
-        // .sysclk(32.MHz())
-        // .sysclk(64.MHz())
-        .sysclk(84.MHz())
-        // .require_pll48clk()
-        .freeze();
-
-    rprintln!("wat 2");
-
-    rprintln!("sysclk()   core = {:?}", clocks.sysclk());
-    rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
-
-    loop {}
-}
-
-#[cfg(feature = "nope")]
-// #[entry]
 fn main_bluetooth() -> ! {
     use crate::bluetooth::{AccessByte, BTError, BTServices};
     use crate::spi::{Spi4, SpiError};
     use stm32f4xx_hal::gpio::Pull;
 
-    rtt_init_print!();
+    // rtt_init_print!();
 
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
     let mut dp = stm32f401::Peripherals::take().unwrap();
