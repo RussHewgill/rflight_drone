@@ -118,6 +118,7 @@ mod app {
         exti:        EXTI,
         // ahrs:        AhrsComplementary,
         ahrs:        AhrsFusion,
+        // ahrs:        AhrsMadgwick,
         sens_data:   SensorData,
         flight_data: FlightData,
         bt:          BTController,
@@ -234,6 +235,9 @@ mod app {
 
         // /// complementary
         // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32));
+
+        // /// Madgwick
+        // let ahrs = AhrsMadgwick::new(1.0 / (sensor_period.raw() as f32), 40.0);
 
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);

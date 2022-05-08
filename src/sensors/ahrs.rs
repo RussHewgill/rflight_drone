@@ -6,9 +6,9 @@ use defmt::println as rprintln;
 
 use super::{UQuat, V3};
 
-// pub use self::madgwick_prev::*;
 pub use self::complementary::*;
 pub use self::fusion::*;
+pub use self::madgwick_prev::*;
 
 pub trait AHRS {
     fn update(&mut self, gyro: V3, acc: V3, mag: V3);
@@ -625,22 +625,21 @@ mod fusion {
     }
 }
 
-#[cfg(feature = "nope")]
+// #[cfg(feature = "nope")]
 mod madgwick_prev {
     use nalgebra::{Matrix6, Quaternion, UnitQuaternion, Vector2, Vector3, Vector6};
 
-    use crate::{uart::*, uprintln};
+    use super::{UQuat, AHRS, V3};
+    use defmt::println as rprintln;
 
-    use super::{UQuat, V3};
-
-    pub struct AHRS {
+    pub struct AhrsMadgwick {
         sample_period: f32,
         beta:          f32,
         quat:          UQuat,
     }
 
     /// new
-    impl AHRS {
+    impl AhrsMadgwick {
         pub fn new(sample_period: f32, beta: f32) -> Self {
             Self {
                 sample_period,
@@ -651,27 +650,21 @@ mod madgwick_prev {
     }
 
     /// update
-    impl AHRS {
+    impl AHRS for AhrsMadgwick {
         /// https://crates.io/crates/ahrs
-        pub fn update_uart(
-            &mut self,
-            uart: &mut UART,
-            gyro: V3,
-            acc: V3,
-            mag: V3,
-        ) -> Option<&UQuat> {
+        fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
             let acc = if let Some(acc) = acc.try_normalize(0.0) {
                 acc
             } else {
-                uprintln!(uart, "acc norm div by zero");
-                return None;
+                rprintln!("acc norm div by zero");
+                return;
             };
 
             let mag = if let Some(mag) = mag.try_normalize(0.0) {
                 mag
             } else {
-                uprintln!(uart, "mag norm div by zero");
-                return None;
+                rprintln!("mag norm div by zero");
+                return;
             };
 
             let q = self.quat.as_ref();
@@ -744,11 +737,15 @@ mod madgwick_prev {
             // Integrate to yield quaternion
             self.quat = UnitQuaternion::from_quaternion(q + q_dot * self.sample_period);
 
-            Some(&self.quat)
+            // Some(&self.quat)
+        }
+
+        fn get_quat(&self) -> &UQuat {
+            &self.quat
         }
     }
 
-    impl Default for AHRS {
+    impl Default for AhrsMadgwick {
         fn default() -> Self {
             let sample_period = 1.0 / 256.0;
             let beta = 0.1;
