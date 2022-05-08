@@ -8,7 +8,7 @@ use super::{UQuat, V3};
 
 pub use self::complementary::*;
 pub use self::fusion::*;
-pub use self::madgwick_prev::*;
+// pub use self::madgwick_prev::*;
 
 pub trait AHRS {
     fn update(&mut self, gyro: V3, acc: V3, mag: V3);
@@ -88,6 +88,8 @@ mod fusion {
         quat:       UQuat,
         delta_time: f32,
 
+        // offset: FusionOffset,
+
         // prev_acc: V3,
         pub cfg_gain:              f32,
         pub cfg_acc_rejection:     f32,
@@ -120,6 +122,7 @@ mod fusion {
                 quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
                 delta_time,
 
+                // offset: FusionOffset::default(),
                 cfg_gain: gain,
                 cfg_acc_rejection: 10.0,
                 cfg_mag_rejection: 20.0,
@@ -143,6 +146,7 @@ mod fusion {
         }
 
         pub fn reset(&mut self) {
+            // self.offset.reset();
             self.quat = UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0));
             self.initializing = true;
             self.ramped_gain = Self::INITIAL_GAIN;
@@ -169,6 +173,22 @@ mod fusion {
                     self.acc_rejection_timeout = false;
                 }
             }
+
+            // self.offset.update(self.delta_time, gyro, acc);
+            // let gyro = gyro - self.offset.gyro_offset;
+            // // let acc = acc - self.offset.acc_offset;
+            // let mut acc = acc;
+            // acc.x -= self.offset.acc_offset.x;
+            // acc.y -= self.offset.acc_offset.y;
+            // acc.z -= self.offset.acc_offset.z - 1000.0;
+            // rprintln!(
+            //     "self.offset.gyro_offset = {:?}",
+            //     defmt::Debug2Format(&self.offset.gyro_offset)
+            // );
+            // rprintln!(
+            //     "self.offset.acc_offset = {:?}",
+            //     defmt::Debug2Format(&self.offset.acc_offset)
+            // );
 
             /// Calculate direction of gravity indicated by algorithm
             let half_gravity = {
@@ -288,6 +308,7 @@ mod fusion {
         }
     }
 
+    /// set_heading, compass
     impl AhrsFusion {
         pub fn set_heading(&mut self, heading: f32) {
             use nalgebra::{ComplexField, RealField}; // for sin, atan2
@@ -313,6 +334,76 @@ mod fusion {
             let magnetic_west = acc.cross(&mag).normalize();
             let magnetic_north = magnetic_west.cross(&acc).normalize();
             rad_to_deg(f32::atan2(magnetic_west.x, magnetic_north.x))
+        }
+    }
+
+    impl AhrsFusion {
+        // pub fn calibrate_imu(uncalibrated: V3, misalignment: )
+    }
+
+    // #[derive(Debug, Default, Clone, Copy)]
+    // pub struct FusionOffset {
+    //     filter_coef: f32,
+    //     timeout:     u32,
+    //     timer:       u32,
+    //     gyro_offset: V3,
+    // }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct FusionOffset {
+        time:     f32,
+        t0:       f32,
+        t1:       f32,
+        finished: bool,
+
+        gyro_calc_offset: V3,
+        acc_calc_offset:  V3,
+
+        gyro_offset: V3,
+        acc_offset:  V3,
+    }
+
+    impl Default for FusionOffset {
+        fn default() -> Self {
+            Self {
+                time:             0.0,
+                t0:               1.0,
+                t1:               2.0,
+                finished:         false,
+                gyro_calc_offset: V3::default(),
+                acc_calc_offset:  V3::default(),
+                gyro_offset:      V3::default(),
+                acc_offset:       V3::default(),
+            }
+        }
+    }
+
+    impl FusionOffset {
+        pub fn reset(&mut self) {
+            self.time = 0.0;
+            self.finished = false;
+            self.gyro_calc_offset = V3::default();
+            self.acc_calc_offset = V3::default();
+            self.gyro_offset = V3::default();
+            self.acc_offset = V3::default();
+        }
+
+        pub fn update(&mut self, delta_time: f32, gyro: V3, acc: V3) {
+            if self.finished {
+                return;
+            }
+            self.time += delta_time;
+            if self.time > self.t0 {
+                self.gyro_calc_offset += gyro;
+                self.acc_calc_offset += acc;
+
+                if self.time > self.t1 {
+                    self.gyro_offset = self.gyro_calc_offset * 0.00125;
+                    self.acc_offset = self.acc_calc_offset * 0.00125;
+
+                    self.finished = true;
+                }
+            }
         }
     }
 }
@@ -625,7 +716,7 @@ mod fusion {
     }
 }
 
-// #[cfg(feature = "nope")]
+#[cfg(feature = "nope")]
 mod madgwick_prev {
     use nalgebra::{Matrix6, Quaternion, UnitQuaternion, Vector2, Vector3, Vector6};
 

@@ -147,8 +147,9 @@ mod app {
 
         let bt_buf = cx.local.bt_buf;
 
-        let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
+        // let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
+        let sensor_period: stm32f4xx_hal::time::Hertz = 100.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 5.Hz();
 
@@ -412,7 +413,8 @@ mod app {
     )]
     fn main_loop(mut cx: main_loop::Context) {
         // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
-        const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
+        // const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
+        const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
 
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {

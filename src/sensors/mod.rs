@@ -104,16 +104,15 @@ impl Sensors {
     }
 }
 
-/// set offsets
-impl Sensors {
-    pub fn set_offsets(&mut self) {
-        unimplemented!()
-    }
-
-    pub fn set_offset_gyro(&mut self) {
-        unimplemented!()
-    }
-}
+// /// set offsets
+// impl Sensors {
+//     pub fn set_offsets(&mut self) {
+//         unimplemented!()
+//     }
+//     pub fn set_offset_gyro(&mut self, gyro: V3) {
+//         unimplemented!()
+//     }
+// }
 
 /// with_spi
 impl Sensors {
