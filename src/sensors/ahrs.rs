@@ -4,11 +4,11 @@ use nalgebra::{Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 use crate::{math::*, uart::*, uprintln};
 use defmt::println as rprintln;
 
-use super::{UQuat, V3};
+use super::{Rot3, UQuat, V3};
 
 pub use self::complementary::*;
 pub use self::fusion::*;
-// pub use self::madgwick_prev::*;
+pub use self::madgwick_prev::*;
 
 pub trait AHRS {
     fn update(&mut self, gyro: V3, acc: V3, mag: V3);
@@ -77,9 +77,11 @@ mod complementary {
 }
 
 mod fusion {
-    use nalgebra::{Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
+    use core::f32::consts::PI;
 
-    use super::{UQuat, AHRS, V3};
+    use nalgebra::{self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
+
+    use super::{Rot3, UQuat, AHRS, V3};
     use crate::{math::*, uart::*, uprintln};
     use defmt::println as rprintln;
 
@@ -88,7 +90,8 @@ mod fusion {
         quat:       UQuat,
         delta_time: f32,
 
-        // offset: FusionOffset,
+        pub offset:      FusionOffset,
+        pub calibration: FusionCalibration,
 
         // prev_acc: V3,
         pub cfg_gain:              f32,
@@ -122,7 +125,9 @@ mod fusion {
                 quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
                 delta_time,
 
-                // offset: FusionOffset::default(),
+                offset: FusionOffset::default(),
+                calibration: FusionCalibration::default(),
+
                 cfg_gain: gain,
                 cfg_acc_rejection: 10.0,
                 cfg_mag_rejection: 20.0,
@@ -337,73 +342,109 @@ mod fusion {
         }
     }
 
-    impl AhrsFusion {
-        // pub fn calibrate_imu(uncalibrated: V3, misalignment: )
+    #[derive(Debug, Default, Clone, Copy)]
+    pub struct FusionCalibration {
+        /// gyro
+        pub gyro_misalignment: Rot3,
+        pub gyro_sens:         V3,
+        pub gyro_offset:       V3,
+        /// acc
+        pub acc_misalignment:  Rot3,
+        pub acc_sens:          V3,
+        pub acc_offset:        V3,
+        /// mag
+        pub soft_iron_rot:     Rot3,
+        pub hard_iron_offset:  V3,
     }
 
-    // #[derive(Debug, Default, Clone, Copy)]
-    // pub struct FusionOffset {
-    //     filter_coef: f32,
-    //     timeout:     u32,
-    //     timer:       u32,
-    //     gyro_offset: V3,
-    // }
-
-    #[derive(Debug, Clone, Copy)]
-    pub struct FusionOffset {
-        time:     f32,
-        t0:       f32,
-        t1:       f32,
-        finished: bool,
-
-        gyro_calc_offset: V3,
-        acc_calc_offset:  V3,
-
-        gyro_offset: V3,
-        acc_offset:  V3,
-    }
-
-    impl Default for FusionOffset {
-        fn default() -> Self {
-            Self {
-                time:             0.0,
-                t0:               1.0,
-                t1:               2.0,
-                finished:         false,
-                gyro_calc_offset: V3::default(),
-                acc_calc_offset:  V3::default(),
-                gyro_offset:      V3::default(),
-                acc_offset:       V3::default(),
-            }
+    /// calibrate
+    impl FusionCalibration {
+        pub fn calibrate_gyro(&self, uncalibrated: V3) -> V3 {
+            Self::_calibrate_imu(
+                uncalibrated,
+                self.gyro_misalignment,
+                self.gyro_sens,
+                self.gyro_offset,
+            )
         }
+        pub fn calibrate_acc(&self, uncalibrated: V3) -> V3 {
+            Self::_calibrate_imu(
+                uncalibrated,
+                self.acc_misalignment,
+                self.acc_sens,
+                self.acc_offset,
+            )
+        }
+        pub fn calibrate_mag(&self, uncalibrated: V3) -> V3 {
+            Self::_calibrate_mag(uncalibrated, self.soft_iron_rot, self.hard_iron_offset)
+        }
+
+        fn _calibrate_imu(
+            uncalibrated: V3,
+            misalignment: na::Rotation3<f32>,
+            sensitivity: V3,
+            offset: V3,
+        ) -> V3 {
+            let v: V3 = (uncalibrated - offset).component_mul(&sensitivity);
+            misalignment * v
+        }
+
+        fn _calibrate_mag(
+            uncalibrated: V3,
+            soft_iron_matrix: na::Rotation3<f32>,
+            hard_iron_offset: V3,
+        ) -> V3 {
+            (soft_iron_matrix * uncalibrated) - hard_iron_offset
+        }
+    }
+
+    #[derive(Debug, Default, Clone, Copy)]
+    pub struct FusionOffset {
+        filter_coef: f32,
+        timeout:     u32,
+        timer:       u32,
+        gyro_offset: V3,
     }
 
     impl FusionOffset {
-        pub fn reset(&mut self) {
-            self.time = 0.0;
-            self.finished = false;
-            self.gyro_calc_offset = V3::default();
-            self.acc_calc_offset = V3::default();
-            self.gyro_offset = V3::default();
-            self.acc_offset = V3::default();
+        /// Cutoff freq in Hz
+        const CUTOFF_FREQ: f32 = 0.02;
+
+        /// Timeout in seconds
+        const TIMEOUT: u32 = 5;
+
+        /// Threshold in degrees / second
+        const THRESHOLD: f32 = 3.0;
+
+        pub fn init(&mut self, sample_rate: u32) {
+            self.filter_coef = 2.0 * PI * Self::CUTOFF_FREQ * (1.0 / sample_rate as f32);
+            self.timeout = Self::TIMEOUT * sample_rate;
+            self.timer = 0;
+            self.gyro_offset = V3::zeros();
         }
 
-        pub fn update(&mut self, delta_time: f32, gyro: V3, acc: V3) {
-            if self.finished {
-                return;
-            }
-            self.time += delta_time;
-            if self.time > self.t0 {
-                self.gyro_calc_offset += gyro;
-                self.acc_calc_offset += acc;
+        pub fn update(&mut self, gyro: V3) -> V3 {
+            let gyro = gyro - self.gyro_offset;
 
-                if self.time > self.t1 {
-                    self.gyro_offset = self.gyro_calc_offset * 0.00125;
-                    self.acc_offset = self.acc_calc_offset * 0.00125;
-
-                    self.finished = true;
-                }
+            /// Reset timer if gyroscope not stationary
+            if gyro.x > Self::THRESHOLD
+                || gyro.y > Self::THRESHOLD
+                || gyro.z > Self::THRESHOLD
+            {
+                self.timer = 0;
+                return gyro;
             }
+
+            /// Increment timer while gyroscope stationary
+            if self.timer < self.timeout {
+                self.timer += 1;
+                return gyro;
+            }
+
+            // Adjust offset if timer has elapsed
+            self.gyro_offset += gyro * self.filter_coef;
+
+            gyro
         }
     }
 }
@@ -716,7 +757,7 @@ mod fusion {
     }
 }
 
-#[cfg(feature = "nope")]
+// #[cfg(feature = "nope")]
 mod madgwick_prev {
     use nalgebra::{Matrix6, Quaternion, UnitQuaternion, Vector2, Vector3, Vector6};
 

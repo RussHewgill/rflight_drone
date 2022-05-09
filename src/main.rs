@@ -234,6 +234,8 @@ mod app {
         ahrs.cfg_acc_rejection = 10.0;
         ahrs.cfg_mag_rejection = 20.0;
 
+        ahrs.offset.init(sensor_period.raw());
+
         // /// complementary
         // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32));
 
@@ -261,7 +263,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -289,41 +291,50 @@ mod app {
                 cx.local.sensors.read_data_imu(sd, false);
 
                 /// update AHRS
-                let gyro = sd.imu_gyro.read_and_reset();
-                let acc = sd.imu_acc.read_and_reset();
-                let mag = sd.magnetometer.read_and_reset();
+                let gyro0 = sd.imu_gyro.read_and_reset();
+                let acc0 = sd.imu_acc.read_and_reset();
+                let mag0 = sd.magnetometer.read_and_reset();
 
-                ahrs.update(gyro, acc, mag);
+                // let gyro = ahrs.calibration.calibrate_gyro(gyro0);
+                // let acc = ahrs.calibration.calibrate_acc(acc0);
+                // let mag = ahrs.calibration.calibrate_mag(mag0);
+                // ahrs.update(gyro, acc, mag);
+
+                // /// update AHRS
+                // let gyro = sd.imu_gyro.read_and_reset();
+                // let acc = sd.imu_acc.read_and_reset();
+                // let mag = sd.magnetometer.read_and_reset();
+                // ahrs.update(gyro, acc, mag);
 
                 use na::ComplexField;
 
-                // fn r(x: f32) -> f32 {
-                //     (x * 100.0).round() / 100.0
-                // }
+                fn r(x: f32) -> f32 {
+                    (x * 100.0).round() / 100.0
+                }
 
-                // fn r2(x: f32) -> f32 {
-                //     (x * 10_000.0).round() / 10.0
-                // }
+                fn r2(x: f32) -> f32 {
+                    (x * 10_000.0).round() / 10.0
+                }
 
-                // rprintln!(
-                //     "gyro = {=f32:08}, {=f32:08}, {=f32:08}",
-                //     r(gyro.x),
-                //     r(gyro.y),
-                //     r(gyro.z)
-                // );
+                rprintln!(
+                    "gyro = {=f32:08}, {=f32:08}, {=f32:08}",
+                    r(gyro0.x),
+                    r(gyro0.y),
+                    r(gyro0.z)
+                );
 
                 // rprintln!(
                 //     "acc = {=f32:08}, {=f32:08}, {=f32:08}",
-                //     r(acc.x),
-                //     r(acc.y),
-                //     r(acc.z)
+                //     r(acc0.x),
+                //     r(acc0.y),
+                //     r(acc0.z)
                 // );
 
                 // rprintln!(
                 //     "mag = {=f32:08}, {=f32:08}, {=f32:08}",
-                //     r2(mag.x),
-                //     r2(mag.y),
-                //     r2(mag.z)
+                //     r2(mag0.x),
+                //     r2(mag0.y),
+                //     r2(mag0.z)
                 // );
 
                 /// update FlightData

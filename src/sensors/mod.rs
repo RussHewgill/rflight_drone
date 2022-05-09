@@ -9,7 +9,7 @@ use stm32f4xx_hal::nb;
 
 use crate::spi::Spi3;
 
-use nalgebra::{UnitQuaternion, Vector3};
+use nalgebra::{self as na, UnitQuaternion, Vector3};
 
 use self::{barometer::Barometer, imu::IMU, magneto::Magnetometer};
 
@@ -22,6 +22,7 @@ use self::{barometer::Barometer, imu::IMU, magneto::Magnetometer};
 
 pub type V3 = Vector3<f32>;
 pub type UQuat = UnitQuaternion<f32>;
+pub type Rot3 = na::Rotation3<f32>;
 
 #[derive(Debug)]
 pub struct Sensors {
@@ -156,7 +157,7 @@ impl Sensors {
                 data.imu_gyro.update(data_gyro);
 
                 let data_acc = [
-                    data_acc[1], //
+                    -data_acc[1], //
                     data_acc[0],
                     data_acc[2],
                 ];
@@ -175,7 +176,11 @@ impl Sensors {
                 Err(nb::Error::WouldBlock)
             }
         }) {
-            let mag_data = [mag_data[0], -mag_data[1], mag_data[2]];
+            let mag_data = [
+                -mag_data[1], //
+                mag_data[0],
+                mag_data[2],
+            ];
             data.magnetometer.update(mag_data);
         } else {
             // unimplemented!()
@@ -190,5 +195,63 @@ impl Sensors {
         //     unimplemented!()
         // }
         unimplemented!()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SensorOffset {
+    time:     f32,
+    t0:       f32,
+    t1:       f32,
+    finished: bool,
+
+    gyro_calc_offset: V3,
+    acc_calc_offset:  V3,
+
+    gyro_offset: V3,
+    acc_offset:  V3,
+}
+
+impl Default for SensorOffset {
+    fn default() -> Self {
+        Self {
+            time:             0.0,
+            t0:               1.0,
+            t1:               2.0,
+            finished:         false,
+            gyro_calc_offset: V3::default(),
+            acc_calc_offset:  V3::default(),
+            gyro_offset:      V3::default(),
+            acc_offset:       V3::default(),
+        }
+    }
+}
+
+impl SensorOffset {
+    pub fn reset(&mut self) {
+        self.time = 0.0;
+        self.finished = false;
+        self.gyro_calc_offset = V3::default();
+        self.acc_calc_offset = V3::default();
+        self.gyro_offset = V3::default();
+        self.acc_offset = V3::default();
+    }
+
+    pub fn update(&mut self, delta_time: f32, gyro: V3, acc: V3) {
+        if self.finished {
+            return;
+        }
+        self.time += delta_time;
+        if self.time > self.t0 {
+            self.gyro_calc_offset += gyro;
+            self.acc_calc_offset += acc;
+
+            if self.time > self.t1 {
+                self.gyro_offset = self.gyro_calc_offset * 0.00125;
+                self.acc_offset = self.acc_calc_offset * 0.00125;
+
+                self.finished = true;
+            }
+        }
     }
 }
