@@ -128,7 +128,7 @@ where
         // uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         self.init_log_service()?;
-        self.init_sensor_service()?;
+        // self.init_sensor_service()?;
         Ok(())
     }
 

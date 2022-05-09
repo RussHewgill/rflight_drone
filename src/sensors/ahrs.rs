@@ -79,6 +79,7 @@ mod complementary {
 mod fusion {
     use core::f32::consts::PI;
 
+    use fugit::HertzU32;
     use nalgebra::{self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
     use super::{Rot3, UQuat, AHRS, V3};
@@ -114,18 +115,23 @@ mod fusion {
         mag_rejection_timeout: bool,
     }
 
-    /// new
+    /// new, reset
     impl AhrsFusion {
         pub const INIT_TIME: f32 = 3.0;
+
         pub const INITIAL_GAIN: f32 = 10.0;
 
-        pub fn new(delta_time: f32, gain: f32) -> Self {
+        // pub const INITIAL_GAIN: f32 = 20.0;
+
+        pub fn new(sample_rate: HertzU32, gain: f32) -> Self {
+            let delta_time = 1.0 / (sample_rate.to_Hz() as f32);
+            let mut offset = FusionOffset::default();
+            offset.init(sample_rate);
             Self {
-                // quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
                 quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
                 delta_time,
 
-                offset: FusionOffset::default(),
+                offset,
                 calibration: FusionCalibration::default(),
 
                 cfg_gain: gain,
@@ -166,10 +172,21 @@ mod fusion {
         }
     }
 
+    /// update_no_mag
+    impl AhrsFusion {
+        pub fn update_no_mag(&mut self, gyro: V3, acc: V3) {
+            self.update(gyro, acc, V3::zeros());
+            /// Zero heading during initialisation
+            if self.initializing && !self.acc_rejection_timeout {
+                self.set_heading(0.0);
+            }
+        }
+    }
+
     impl AHRS for AhrsFusion {
         fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
             if self.initializing {
-                rprintln!("initializing");
+                // rprintln!("initializing");
                 self.ramped_gain -= self.ramped_gain * self.delta_time;
                 if self.ramped_gain < self.cfg_gain {
                     rprintln!("initializing complete");
@@ -178,22 +195,6 @@ mod fusion {
                     self.acc_rejection_timeout = false;
                 }
             }
-
-            // self.offset.update(self.delta_time, gyro, acc);
-            // let gyro = gyro - self.offset.gyro_offset;
-            // // let acc = acc - self.offset.acc_offset;
-            // let mut acc = acc;
-            // acc.x -= self.offset.acc_offset.x;
-            // acc.y -= self.offset.acc_offset.y;
-            // acc.z -= self.offset.acc_offset.z - 1000.0;
-            // rprintln!(
-            //     "self.offset.gyro_offset = {:?}",
-            //     defmt::Debug2Format(&self.offset.gyro_offset)
-            // );
-            // rprintln!(
-            //     "self.offset.acc_offset = {:?}",
-            //     defmt::Debug2Format(&self.offset.acc_offset)
-            // );
 
             /// Calculate direction of gravity indicated by algorithm
             let half_gravity = {
@@ -416,10 +417,11 @@ mod fusion {
         /// Threshold in degrees / second
         const THRESHOLD: f32 = 3.0;
 
-        pub fn init(&mut self, sample_rate: u32) {
-            self.filter_coef = 2.0 * PI * Self::CUTOFF_FREQ * (1.0 / sample_rate as f32);
+        pub fn init(&mut self, sample_rate: HertzU32) {
+            self.filter_coef =
+                2.0 * PI * Self::CUTOFF_FREQ * (1.0 / sample_rate.raw() as f32);
             // rprintln!("self.filter_coef = {:?}", self.filter_coef);
-            self.timeout = Self::TIMEOUT * sample_rate;
+            self.timeout = Self::TIMEOUT * sample_rate.raw();
             // rprintln!("self.timeout = {:?}", self.timeout);
             self.timer = 0;
             self.gyro_offset = V3::zeros();
@@ -433,7 +435,7 @@ mod fusion {
                 || gyro.y > Self::THRESHOLD
                 || gyro.z > Self::THRESHOLD
             {
-                rprintln!("gyro not stationary, resetting timer");
+                // rprintln!("gyro not stationary, resetting timer");
                 self.timer = 0;
                 return gyro;
             }
@@ -441,20 +443,20 @@ mod fusion {
             /// Increment timer while gyroscope stationary
             if self.timer < self.timeout {
                 self.timer += 1;
-                rprintln!("gyro stationary, ticking: {:?}", self.timer);
+                // rprintln!("gyro stationary, ticking: {:?}", self.timer);
                 return gyro;
             }
 
-            rprintln!("Adjusting gyro offset");
+            // rprintln!("Adjusting gyro offset");
             // Adjust offset if timer has elapsed
             self.gyro_offset += gyro * self.filter_coef;
 
-            rprintln!(
-                "offset = {=f32:08}, {=f32:08}, {=f32:08}",
-                self.gyro_offset.x,
-                self.gyro_offset.y,
-                self.gyro_offset.z
-            );
+            // rprintln!(
+            //     "offset = {=f32:08}, {=f32:08}, {=f32:08}",
+            //     self.gyro_offset.x,
+            //     self.gyro_offset.y,
+            //     self.gyro_offset.z
+            // );
 
             gyro
         }

@@ -227,15 +227,14 @@ mod app {
 
         /// Fusion
         let mut ahrs = AhrsFusion::new(
-            1.0 / (sensor_period.raw() as f32),
+            sensor_period,
             // 0.5,
             7.5,
         );
         ahrs.cfg_acc_rejection = 10.0;
         ahrs.cfg_mag_rejection = 20.0;
 
-        rprintln!("sensor_period.raw() = {:?}", sensor_period.raw());
-        ahrs.offset.init(sensor_period.raw());
+        ahrs.offset.init(sensor_period);
 
         // /// complementary
         // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32));
@@ -264,7 +263,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -306,6 +305,8 @@ mod app {
                 let gyro = ahrs.offset.update(gyro0);
 
                 // ahrs.update(gyro, acc, mag);
+
+                ahrs.update_no_mag(gyro, acc);
 
                 // /// update AHRS
                 // let gyro = sd.imu_gyro.read_and_reset();
@@ -350,6 +351,23 @@ mod app {
 
                 /// update FlightData
                 fd.update(ahrs);
+
+                let (roll, pitch, yaw) = fd.get_euler_angles();
+
+                // let roll = deg_to_rad(0.0);
+                // let pitch = deg_to_rad(45.0);
+                // let yaw = deg_to_rad(0.0);
+
+                // fd.quat = UQuat::from_euler_angles(roll, pitch, yaw);
+
+                rprintln!(
+                    "(r,p,y) = {:?}, {:?}, {:?}",
+                    rad_to_deg(roll),
+                    rad_to_deg(pitch),
+                    rad_to_deg(yaw)
+                );
+
+                // rprintln!("(r,p,y) = {:?}, {:?}, {:?}", roll, pitch, yaw);
 
                 *tim9_flag = true;
             });
@@ -429,7 +447,7 @@ mod app {
 
     // #[cfg(feature = "nope")]
     #[task(
-        shared = [bt, exti, flight_data, sens_data, dwt, tim9_flag],
+        shared = [bt, exti, flight_data, dwt, tim9_flag],
         local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
         priority = 3
     )]
@@ -447,11 +465,11 @@ mod app {
                     *cx.local.counter = 0;
                     (
                         cx.shared.flight_data,
-                        cx.shared.sens_data,
+                        // cx.shared.sens_data,
                         cx.shared.bt,
                         cx.shared.exti,
                     )
-                        .lock(|fd, sd, bt, exti| {
+                        .lock(|fd, bt, exti| {
                             let qq = fd.quat.coords;
 
                             cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
