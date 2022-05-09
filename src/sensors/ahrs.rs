@@ -418,7 +418,9 @@ mod fusion {
 
         pub fn init(&mut self, sample_rate: u32) {
             self.filter_coef = 2.0 * PI * Self::CUTOFF_FREQ * (1.0 / sample_rate as f32);
+            // rprintln!("self.filter_coef = {:?}", self.filter_coef);
             self.timeout = Self::TIMEOUT * sample_rate;
+            // rprintln!("self.timeout = {:?}", self.timeout);
             self.timer = 0;
             self.gyro_offset = V3::zeros();
         }
@@ -431,6 +433,7 @@ mod fusion {
                 || gyro.y > Self::THRESHOLD
                 || gyro.z > Self::THRESHOLD
             {
+                rprintln!("gyro not stationary, resetting timer");
                 self.timer = 0;
                 return gyro;
             }
@@ -438,11 +441,20 @@ mod fusion {
             /// Increment timer while gyroscope stationary
             if self.timer < self.timeout {
                 self.timer += 1;
+                rprintln!("gyro stationary, ticking: {:?}", self.timer);
                 return gyro;
             }
 
+            rprintln!("Adjusting gyro offset");
             // Adjust offset if timer has elapsed
             self.gyro_offset += gyro * self.filter_coef;
+
+            rprintln!(
+                "offset = {=f32:08}, {=f32:08}, {=f32:08}",
+                self.gyro_offset.x,
+                self.gyro_offset.y,
+                self.gyro_offset.z
+            );
 
             gyro
         }

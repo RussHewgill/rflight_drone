@@ -234,6 +234,7 @@ mod app {
         ahrs.cfg_acc_rejection = 10.0;
         ahrs.cfg_mag_rejection = 20.0;
 
+        rprintln!("sensor_period.raw() = {:?}", sensor_period.raw());
         ahrs.offset.init(sensor_period.raw());
 
         // /// complementary
@@ -295,9 +296,15 @@ mod app {
                 let acc0 = sd.imu_acc.read_and_reset();
                 let mag0 = sd.magnetometer.read_and_reset();
 
-                // let gyro = ahrs.calibration.calibrate_gyro(gyro0);
-                // let acc = ahrs.calibration.calibrate_acc(acc0);
-                // let mag = ahrs.calibration.calibrate_mag(mag0);
+                let gyro = ahrs.calibration.calibrate_gyro(gyro0);
+                let acc = ahrs.calibration.calibrate_acc(acc0);
+                let mag = ahrs.calibration.calibrate_mag(mag0);
+
+                // rprintln!("gyro  = {:?}", defmt::Debug2Format(&gyro));
+                // rprintln!("gyro0 = {:?}", defmt::Debug2Format(&gyro0));
+
+                let gyro = ahrs.offset.update(gyro0);
+
                 // ahrs.update(gyro, acc, mag);
 
                 // /// update AHRS
@@ -306,7 +313,7 @@ mod app {
                 // let mag = sd.magnetometer.read_and_reset();
                 // ahrs.update(gyro, acc, mag);
 
-                use na::ComplexField;
+                use na::{ComplexField, RealField};
 
                 fn r(x: f32) -> f32 {
                     (x * 100.0).round() / 100.0
@@ -330,12 +337,16 @@ mod app {
                 //     r(acc0.z)
                 // );
 
-                rprintln!(
-                    "mag = {=f32:08}, {=f32:08}, {=f32:08}",
-                    r2(mag0.x),
-                    r2(mag0.y),
-                    r2(mag0.z)
-                );
+                // rprintln!(
+                //     "mag = {=f32:08}, {=f32:08}, {=f32:08}",
+                //     r2(mag0.x),
+                //     r2(mag0.y),
+                //     r2(mag0.z)
+                // );
+
+                // let yaw = 90.0 - rad_to_deg(f32::atan2(mag0.y, mag0.x));
+                // // let yaw = 90.0 - rad_to_deg(f32::atan(mag0.y / mag0.x));
+                // rprintln!("yaw = {=f32:08}", yaw);
 
                 /// update FlightData
                 fd.update(ahrs);
@@ -418,7 +429,7 @@ mod app {
 
     // #[cfg(feature = "nope")]
     #[task(
-        shared = [bt, exti, flight_data, dwt, tim9_flag],
+        shared = [bt, exti, flight_data, sens_data, dwt, tim9_flag],
         local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
         priority = 3
     )]
@@ -434,8 +445,13 @@ mod app {
                 *cx.local.counter += 1;
                 if *cx.local.counter >= COUNTER_TIMES {
                     *cx.local.counter = 0;
-                    (cx.shared.flight_data, cx.shared.bt, cx.shared.exti).lock(
-                        |fd, bt, exti| {
+                    (
+                        cx.shared.flight_data,
+                        cx.shared.sens_data,
+                        cx.shared.bt,
+                        cx.shared.exti,
+                    )
+                        .lock(|fd, sd, bt, exti| {
                             let qq = fd.quat.coords;
 
                             cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
@@ -443,8 +459,6 @@ mod app {
                             cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
                             cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
-                            // uprint!(uart, "sending ({:?})...", *cx.local.counter);
-                            // bt.clear_interrupt();
                             // rprintln!("0..");
                             bt.pause_interrupt(exti);
                             match bt.log_write(false, &cx.local.buf[..]) {
@@ -461,10 +475,23 @@ mod app {
                             bt.unpause_interrupt(exti);
                             // rprintln!("1");
 
+                            // let gyro0 = sd.imu_gyro.read_and_reset();
+                            // let acc0 = sd.imu_acc.read_and_reset();
+                            // let mag0 = sd.magnetometer.read_and_reset();
+                            // bt.pause_interrupt(exti);
+                            // match bt.update_sensors(gyro0, acc0, mag0) {
+                            //     Ok(_) => {
+                            //         // unimplemented!()
+                            //     }
+                            //     Err(e) => {
+                            //         unimplemented!()
+                            //     }
+                            // }
+                            // bt.unpause_interrupt(exti);
+
                             // //
                             // unimplemented!()
-                        },
-                    );
+                        });
                 }
             }
         });

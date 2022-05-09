@@ -101,10 +101,10 @@ mod uuids {
     }
 
     /// Logger
-    pub const UUID_CONSOLE_LOG_SERVICE: crate::bluetooth::gatt::Uuid =
+    pub const UUID_LOG_SERVICE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x3f44d56a86074db0945b6c285b73d48a);
 
-    pub const UUID_CONSOLE_LOG_CHAR: crate::bluetooth::gatt::Uuid =
+    pub const UUID_LOG_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x1450781d919c49f0a16c0ec28dfb83d5);
 
     /// Sensors
@@ -128,6 +128,7 @@ where
         // uart: &mut UART,
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         self.init_log_service()?;
+        self.init_sensor_service()?;
         Ok(())
     }
 

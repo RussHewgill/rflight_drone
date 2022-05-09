@@ -17,16 +17,14 @@ use stm32f4xx_hal::{
 };
 
 use crate::bluetooth::{ev_command::GattService, gap::Commands as GapCommands};
-use crate::bluetooth::{
-    gatt::{CharacteristicValue, UpdateCharacteristicValueParameters},
-    hal_bt::Commands as HalCommands,
-};
 use crate::{
     bluetooth::gatt::{
         AddCharacteristicParameters, CharacteristicEvent, CharacteristicPermission,
-        CharacteristicProperty, Commands as GattCommands, EncryptionKeySize,
+        CharacteristicProperty, CharacteristicValue, Commands as GattCommands,
+        EncryptionKeySize, UpdateCharacteristicValueParameters,
     },
-    bt_control::UUID_CONSOLE_LOG_CHAR,
+    bluetooth::hal_bt::Commands as HalCommands,
+    bt_control::UUID_LOG_CHAR,
     uprint, uprintln,
 };
 
@@ -36,7 +34,7 @@ use crate::{
         gatt::{AddServiceParameters, CharacteristicHandle, ServiceHandle},
         BTError, BluetoothSpi,
     },
-    bt_control::UUID_CONSOLE_LOG_SERVICE,
+    bt_control::UUID_LOG_SERVICE,
     uart::*,
 };
 
@@ -109,7 +107,7 @@ where
         // uart: &mut UART,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         let params = AddServiceParameters {
-            uuid:                  UUID_CONSOLE_LOG_SERVICE,
+            uuid:                  UUID_LOG_SERVICE,
             service_type:          crate::bluetooth::gatt::ServiceType::Primary,
             max_attribute_records: 8,
         };
@@ -148,7 +146,7 @@ where
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
-            characteristic_uuid:       UUID_CONSOLE_LOG_CHAR,
+            characteristic_uuid:       UUID_LOG_CHAR,
             characteristic_value_len:  18,
             characteristic_properties: CharacteristicProperty::NOTIFY,
             security_permissions:      CharacteristicPermission::NONE,
@@ -191,7 +189,7 @@ where
         let timeout = 1000.millis();
 
         let params = AddServiceParameters {
-            uuid:                  UUID_CONSOLE_LOG_SERVICE,
+            uuid:                  UUID_LOG_SERVICE,
             service_type:          crate::bluetooth::gatt::ServiceType::Primary,
             max_attribute_records: 8,
         };
@@ -230,7 +228,7 @@ where
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
-            characteristic_uuid:       UUID_CONSOLE_LOG_CHAR,
+            characteristic_uuid:       UUID_LOG_CHAR,
             characteristic_value_len:  18,
             characteristic_properties: CharacteristicProperty::NOTIFY,
             // characteristic_properties: CharacteristicProperty::NOTIFY
