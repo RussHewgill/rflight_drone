@@ -316,12 +316,12 @@ mod app {
                     (x * 10_000.0).round() / 10.0
                 }
 
-                rprintln!(
-                    "gyro = {=f32:08}, {=f32:08}, {=f32:08}",
-                    r(gyro0.x),
-                    r(gyro0.y),
-                    r(gyro0.z)
-                );
+                // rprintln!(
+                //     "gyro = {=f32:08}, {=f32:08}, {=f32:08}",
+                //     r(gyro0.x),
+                //     r(gyro0.y),
+                //     r(gyro0.z)
+                // );
 
                 // rprintln!(
                 //     "acc = {=f32:08}, {=f32:08}, {=f32:08}",
@@ -330,12 +330,12 @@ mod app {
                 //     r(acc0.z)
                 // );
 
-                // rprintln!(
-                //     "mag = {=f32:08}, {=f32:08}, {=f32:08}",
-                //     r2(mag0.x),
-                //     r2(mag0.y),
-                //     r2(mag0.z)
-                // );
+                rprintln!(
+                    "mag = {=f32:08}, {=f32:08}, {=f32:08}",
+                    r2(mag0.x),
+                    r2(mag0.y),
+                    r2(mag0.z)
+                );
 
                 /// update FlightData
                 fd.update(ahrs);
