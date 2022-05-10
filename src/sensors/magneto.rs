@@ -114,7 +114,12 @@ where
     // fn convert_raw_data(l: u8, h: u8, scale: u8) -> f32 {
     fn convert_raw_data(l: u8, h: u8) -> f32 {
         // fn convert_raw_data(l: u8, h: u8) -> i16 {
-        const SCALE: f32 = 1.5;
+
+        /// 1.5 milliGauss / LSB
+        /// = 150 nT / LSB
+        // const SCALE: f32 = 1.5;
+        const SCALE: f32 = 150.0;
+
         let v0 = l as i16 | ((h as i16) << 8);
         ((v0 as f32) / (i16::MAX as f32)) * SCALE
         // v0

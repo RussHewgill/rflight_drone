@@ -314,7 +314,7 @@ mod app {
 
                 // let gyro = V3::zeros();
                 // let acc = V3::new(0.0, 0.0, 1.0);
-                let mag = V3::zeros();
+                // let mag = V3::zeros();
 
                 // /// roll, pitch, yaw
                 // let rot = na::Rotation3::from_euler_angles(deg_to_rad(45.0), 0.0, 0.0);
@@ -339,12 +339,29 @@ mod app {
                 //     r(acc.z)
                 // );
 
-                // rprintln!(
-                //     "mag = {=f32:08}, {=f32:08}, {=f32:08}",
-                //     r2(mag0.x),
-                //     r2(mag0.y),
-                //     r2(mag0.z)
-                // );
+                // fn c(x: f32) -> f32 {
+                // }
+                // let mag = V3::new(c(mag.x), c(mag.y), c(mag.z));
+
+                /// expected magnetic field:
+                /// Declination (+E) = 15.9 deg
+                /// Inclination (+D) = 70.1 deg
+                /// total:      53_743 nT
+                /// +North:     17_611 nT
+                /// +East:      5_028  nT
+                /// +Vertical:  50_527 nT
+                let mag_strength = mag.norm();
+
+                rprintln!(
+                    "mag [{=f32:08}] = {=f32:08}, {=f32:08}, {=f32:08}",
+                    mag_strength,
+                    // r2(mag.x),
+                    // r2(mag.y),
+                    // r2(mag.z)
+                    r(mag.x),
+                    r(mag.y),
+                    r(mag.z)
+                );
 
                 // let yaw = 90.0 - rad_to_deg(f32::atan2(mag0.y, mag0.x));
                 // // let yaw = 90.0 - rad_to_deg(f32::atan(mag0.y / mag0.x));
@@ -361,12 +378,12 @@ mod app {
 
                 // fd.quat = UQuat::from_euler_angles(roll, pitch, yaw);
 
-                rprintln!(
-                    "(r,p,y) = {:?}, {:?}, {:?}",
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
-                );
+                // rprintln!(
+                //     "(r,p,y) = {:?}, {:?}, {:?}",
+                //     r(rad_to_deg(roll)),
+                //     r(rad_to_deg(pitch)),
+                //     r(rad_to_deg(yaw)),
+                // );
 
                 // rprintln!("(r,p,y) = {:?}, {:?}, {:?}", roll, pitch, yaw);
 
