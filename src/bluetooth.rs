@@ -318,8 +318,8 @@ where
                     /// which causes incorrect write length
                     /// // XXX: assuming that this will always cause write len > 127 is unsound
                     if header[2] == 0x02 {
-                        rprintln!("w -1");
-                        rprintln!(
+                        defmt::warn!("w -1");
+                        defmt::warn!(
                             "header = {:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
                             header[0],
                             header[1],
@@ -328,8 +328,8 @@ where
                             header[4],
                         );
                     } else if header[4] == 0x02 {
-                        rprintln!("w -2");
-                        rprintln!(
+                        defmt::warn!("w -2");
+                        defmt::warn!(
                             "header = {:#04x} {:#04x} {:#04x} {:#04x} {:#04x} ",
                             header[0],
                             header[1],
@@ -343,7 +343,7 @@ where
                         if lens.0 == 0 {
                             // rprintln!("w 0");
                         } else {
-                            rprintln!("w 1");
+                            defmt::warn!("w 1");
                         }
                         self.cs
                             .set_high()

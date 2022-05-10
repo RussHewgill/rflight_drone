@@ -1,19 +1,46 @@
 use stm32f4xx_hal::prelude::*;
 
-use crate::{sensors::V3, uart::*, uprintln};
+use defmt::println as rprintln;
 
-pub fn print_v3(uart: &mut UART, vec: V3, n: usize) {
-    match n {
-        1 => uprintln!(uart, "[{:>4.1},{:>4.1},{:>4.1}]", vec.x, vec.y, vec.z),
-        2 => uprintln!(uart, "[{:>5.2},{:>5.2},{:>5.2}]", vec.x, vec.y, vec.z),
-        3 => uprintln!(uart, "[{:>6.3},{:>6.3},{:>6.3}]", vec.x, vec.y, vec.z),
-        _ => unimplemented!(),
-    }
+use crate::sensors::V3;
+
+// pub fn print_v3(vec: V3, n: usize) {
+//     match n {
+//         1 => rprintln!("[{:>4.1},{:>4.1},{:>4.1}]", vec.x, vec.y, vec.z),
+//         2 => rprintln!("[{:>5.2},{:>5.2},{:>5.2}]", vec.x, vec.y, vec.z),
+//         3 => rprintln!("[{:>6.3},{:>6.3},{:>6.3}]", vec.x, vec.y, vec.z),
+//         _ => unimplemented!(),
+//     }
+// }
+
+pub fn r(x: f32) -> f32 {
+    use nalgebra::ComplexField;
+    (x * 100.0).round() / 100.0
 }
 
-pub fn uart_clear_screen(uart: &mut UART) {
-    uprintln!(uart, "\x1B\x5B\x32\x4A");
+pub fn r2(x: f32) -> f32 {
+    use nalgebra::ComplexField;
+    (x * 10_000.0).round() / 10.0
 }
+
+// pub fn round_float(f: f32, places: i32) -> f32 {
+//     use nalgebra::{ComplexField, RealField};
+//     let x: f32 = 10.0f32.powi(places);
+//     (f * x).round() / x
+// }
+
+// #[derive(Debug,Clone,Copy)]
+// #[repr(transparent)]
+// pub struct V3F(pub V3);
+
+// impl defmt::Format for V3F {
+//     fn format(&self, fmt: defmt::Formatter) {
+//     }
+// }
+
+// pub fn uart_clear_screen(uart: &mut UART) {
+//     uprintln!(uart, "\x1B\x5B\x32\x4A");
+// }
 
 // #[macro_export]
 // macro_rules! bt_command_timeout {

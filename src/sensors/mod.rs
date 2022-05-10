@@ -161,6 +161,13 @@ impl Sensors {
                     data_acc[0],
                     data_acc[2],
                 ];
+
+                // let data_acc = [
+                //     data_acc[0], //
+                //     data_acc[1],
+                //     data_acc[2],
+                // ];
+
                 data.imu_acc.update(data_acc);
             }
         } else {

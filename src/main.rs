@@ -94,7 +94,7 @@ mod app {
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bt_control::BTState,
-        sensors::ahrs::*,
+        sensors::{ahrs::*, V3},
         sensors::{SensorData, Sensors, UQuat},
         time::MonoTimer,
         utils::*,
@@ -116,8 +116,8 @@ mod app {
     struct Shared {
         dwt:         Dwt,
         exti:        EXTI,
-        // ahrs:        AhrsComplementary,
-        ahrs:        AhrsFusion,
+        ahrs:        AhrsComplementary,
+        // ahrs:        AhrsFusion,
         // ahrs:        AhrsMadgwick,
         sens_data:   SensorData,
         flight_data: FlightData,
@@ -212,10 +212,6 @@ mod app {
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
 
-        /// start timer
-        tim3.start(sensor_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
-
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
 
@@ -225,25 +221,29 @@ mod app {
         // let t = 1.0 / (sensor_period.raw() as f32);
         // uprintln!(uart, "t = {:?}", t);
 
-        /// Fusion
-        let mut ahrs = AhrsFusion::new(
-            sensor_period,
-            // 0.5,
-            7.5,
-        );
-        ahrs.cfg_acc_rejection = 10.0;
-        ahrs.cfg_mag_rejection = 20.0;
+        // /// Fusion
+        // let mut ahrs = AhrsFusion::new(
+        //     sensor_period,
+        //     // 0.5,
+        //     7.5,
+        // );
+        // ahrs.cfg_acc_rejection = 10.0;
+        // ahrs.cfg_mag_rejection = 20.0;
+        // ahrs.offset.init(sensor_period);
 
-        ahrs.offset.init(sensor_period);
-
-        // /// complementary
-        // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32));
+        /// complementary
+        let gain = 0.1;
+        let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32), gain);
 
         // /// Madgwick
         // let ahrs = AhrsMadgwick::new(1.0 / (sensor_period.raw() as f32), 40.0);
 
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
+
+        /// start timer
+        tim3.start(sensor_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -290,39 +290,40 @@ mod app {
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
 
-                /// update AHRS
-                let gyro0 = sd.imu_gyro.read_and_reset();
-                let acc0 = sd.imu_acc.read_and_reset();
-                let mag0 = sd.magnetometer.read_and_reset();
-
-                let gyro = ahrs.calibration.calibrate_gyro(gyro0);
-                let acc = ahrs.calibration.calibrate_acc(acc0);
-                let mag = ahrs.calibration.calibrate_mag(mag0);
-
-                // rprintln!("gyro  = {:?}", defmt::Debug2Format(&gyro));
-                // rprintln!("gyro0 = {:?}", defmt::Debug2Format(&gyro0));
-
-                let gyro = ahrs.offset.update(gyro0);
-
-                // ahrs.update(gyro, acc, mag);
-
-                ahrs.update_no_mag(gyro, acc);
-
                 // /// update AHRS
-                // let gyro = sd.imu_gyro.read_and_reset();
-                // let acc = sd.imu_acc.read_and_reset();
-                // let mag = sd.magnetometer.read_and_reset();
+                // let gyro0 = sd.imu_gyro.read_and_reset();
+                // let acc0 = sd.imu_acc.read_and_reset();
+                // let mag0 = sd.magnetometer.read_and_reset();
+
+                // let gyro = ahrs.calibration.calibrate_gyro(gyro0);
+                // let acc = ahrs.calibration.calibrate_acc(acc0);
+                // let mag = ahrs.calibration.calibrate_mag(mag0);
+                // let gyro = ahrs.offset.update(gyro0);
+
                 // ahrs.update(gyro, acc, mag);
 
+                // ahrs.update_no_mag(gyro, acc);
+
+                /// update AHRS
+                let gyro = sd.imu_gyro.read_and_reset();
+                let acc = sd.imu_acc.read_and_reset();
+                let mag = sd.magnetometer.read_and_reset();
+
+                // let gyro =
+                //     V3::new(deg_to_rad(gyro.x), deg_to_rad(gyro.y), deg_to_rad(gyro.z));
+
+                // let gyro = V3::zeros();
+                // let acc = V3::new(0.0, 0.0, 1.0);
+                // let mag = V3::zeros();
+
+                // /// roll, pitch, yaw
+                // let rot = na::Rotation3::from_euler_angles(deg_to_rad(45.0), 0.0, 0.0);
+                // let acc = rot * acc;
+
+                ahrs.update(gyro, acc, mag);
+
+                use crate::utils::{r, r2};
                 use na::{ComplexField, RealField};
-
-                fn r(x: f32) -> f32 {
-                    (x * 100.0).round() / 100.0
-                }
-
-                fn r2(x: f32) -> f32 {
-                    (x * 10_000.0).round() / 10.0
-                }
 
                 // rprintln!(
                 //     "gyro = {=f32:08}, {=f32:08}, {=f32:08}",
@@ -333,9 +334,9 @@ mod app {
 
                 // rprintln!(
                 //     "acc = {=f32:08}, {=f32:08}, {=f32:08}",
-                //     r(acc0.x),
-                //     r(acc0.y),
-                //     r(acc0.z)
+                //     r(acc.x),
+                //     r(acc.y),
+                //     r(acc.z)
                 // );
 
                 // rprintln!(
@@ -362,87 +363,15 @@ mod app {
 
                 rprintln!(
                     "(r,p,y) = {:?}, {:?}, {:?}",
-                    rad_to_deg(roll),
-                    rad_to_deg(pitch),
-                    rad_to_deg(yaw)
+                    r(rad_to_deg(roll)),
+                    r(rad_to_deg(pitch)),
+                    r(rad_to_deg(yaw)),
                 );
 
                 // rprintln!("(r,p,y) = {:?}, {:?}, {:?}", roll, pitch, yaw);
 
                 *tim9_flag = true;
             });
-    }
-
-    #[cfg(feature = "nope")]
-    // #[task(
-    // binds = TIM3,
-    // shared = [bt, exti, flight_data, dwt, tim9_flag, ahrs, sens_data],
-    // local = [counter: u32 = 0, buf: [u8; 16] = [0; 16], cnt: (u32,u32) = (0,0), sensors],
-    // priority = 3
-    // )]
-    fn main_loop(mut cx: main_loop::Context) {
-        *cx.local.counter += 1;
-        if *cx.local.counter >= 10 {
-            *cx.local.counter = 0;
-
-            (
-                cx.shared.ahrs,
-                cx.shared.sens_data,
-                cx.shared.flight_data,
-                cx.shared.bt,
-                cx.shared.exti,
-            )
-                .lock(|ahrs, sd, fd, bt, exti| {
-                    /// Read sensor data
-                    cx.local.sensors.read_data_mag(sd);
-                    cx.local.sensors.read_data_imu(sd, false);
-
-                    /// update AHRS
-                    let gyro = sd.imu_gyro.read_and_reset();
-                    let acc = sd.imu_acc.read_and_reset();
-                    let mag = sd.magnetometer.read_and_reset();
-
-                    ahrs.update(gyro, acc, mag);
-
-                    /// update FlightData
-                    fd.update(&ahrs);
-
-                    let qq = fd.quat.coords;
-
-                    cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                    cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                    cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                    cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
-
-                    // bt.clear_interrupt();
-                    rprintln!("0..");
-                    bt.pause_interrupt(exti);
-                    match bt.log_write(false, &cx.local.buf[..]) {
-                        Ok(true) => {
-                            // rprintln!("sent log write command");
-                            cx.local.cnt.0 += 1;
-                        }
-                        Ok(false) => {
-                            // rprintln!("failed to write");
-                            cx.local.cnt.1 += 1;
-                        }
-                        Err(e) => {
-                            // rprintln!("error 0 = {:?}", e);
-                        }
-                    }
-                    bt.unpause_interrupt(exti);
-                    rprintln!("1");
-
-                    rprintln!(
-                        "{:?}, {:?} = {=f32:?}",
-                        cx.local.cnt.0,
-                        cx.local.cnt.1,
-                        cx.local.cnt.0 as f32 / (cx.local.cnt.0 + cx.local.cnt.1) as f32,
-                    );
-                    // //
-                    // unimplemented!()
-                });
-        }
     }
 
     // #[cfg(feature = "nope")]
@@ -608,28 +537,25 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        let mut rcc = dp.RCC.constrain();
+        // let mut rcc = dp.RCC.constrain();
+        // rprintln!("wat 0");
+        // let clocks = rcc
+        //     .cfgr
+        //     //
+        //     .use_hse(16.MHz())
+        //     // .sysclk(32.MHz())
+        //     // .sysclk(64.MHz())
+        //     .sysclk(84.MHz())
+        //     // .require_pll48clk()
+        //     .freeze();
+        // rprintln!("wat 1");
+        // rprintln!("sysclk()   core = {:?}", clocks.sysclk());
+        // rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
 
-        rprintln!("wat 0");
-
-        let clocks = rcc
-            .cfgr
-            //
-            .use_hse(16.MHz())
-            // .sysclk(32.MHz())
-            // .sysclk(64.MHz())
-            .sysclk(84.MHz())
-            // .require_pll48clk()
-            .freeze();
-
-        rprintln!("wat 1");
-
-        rprintln!("sysclk()   core = {:?}", clocks.sysclk());
-        rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
-
-        let bt_delay = dp.TIM2.counter_us(&clocks);
-
-        rprintln!("wat 2");
+        let mut ahrs = crate::sensors::ahrs::AhrsComplementary::new(
+            0.1, //
+            0.1,
+        );
 
         (Shared {}, Local {}, init::Monotonics())
     }
