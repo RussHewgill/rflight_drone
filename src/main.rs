@@ -314,7 +314,7 @@ mod app {
 
                 // let gyro = V3::zeros();
                 // let acc = V3::new(0.0, 0.0, 1.0);
-                // let mag = V3::zeros();
+                let mag = V3::zeros();
 
                 // /// roll, pitch, yaw
                 // let rot = na::Rotation3::from_euler_angles(deg_to_rad(45.0), 0.0, 0.0);

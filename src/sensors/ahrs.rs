@@ -62,19 +62,34 @@ mod complementary {
 
     /// update
     impl AHRS for AhrsComplementary {
+        /// Attitude from gravity
+        #[cfg(feature = "nope")]
         fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
-            // let q_omega = self.attitude_propagation(gyro);
+            let roll = f32::atan2(acc.x, acc.z);
+            let pitch = f32::atan2(-acc.y, (acc.x.powi(2) + acc.z.powi(2)).sqrt());
+            self.quat = UQuat::from_euler_angles(roll, pitch, 0.0);
+        }
 
-            // /// XXX: maybe not needed?
-            // let acc = acc.normalize();
-
-            // let roll = f32::atan2(acc.y, acc.z);
-            // let pitch = f32::atan2(-acc.x, (acc.y.powi(2) + acc.z.powi(2)).sqrt());
+        fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+            let q_omega = self.attitude_propagation(gyro);
 
             let roll = f32::atan2(acc.x, acc.z);
             let pitch = f32::atan2(-acc.y, (acc.x.powi(2) + acc.z.powi(2)).sqrt());
 
-            self.quat = UQuat::from_euler_angles(roll, pitch, 0.0);
+            let (t, p) = (roll, pitch);
+            #[rustfmt::skip]
+            let b = na::Matrix3::<f32>::new(
+                t.cos(),  t.sin() * p.sin(), t.sin() * p.cos(),
+                0.0,      p.cos(),           -p.sin(),
+                -t.sin(), t.cos() * p.sin(), t.cos() * p.cos(),
+            );
+            let b: V3 = b * mag;
+
+            let yaw = f32::atan2(-b.y, b.x);
+
+            let q_am = UQuat::from_euler_angles(roll, pitch, yaw);
+
+            self.quat = q_omega.nlerp(&q_am, self.gain);
         }
 
         #[cfg(feature = "nope")]
@@ -82,6 +97,7 @@ mod complementary {
             let q_omega = self.attitude_propagation(gyro);
             // let q_am = self.am_estimation(acc, mag);
 
+            // XXX: pitch and roll reversed?
             let roll = f32::atan2(acc.y, acc.x);
             let pitch = f32::atan2(-acc.x, (acc.y.powi(2) + acc.z.powi(2)).sqrt());
 
