@@ -123,27 +123,19 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
-    fn init_services(
-        &mut self,
-        // uart: &mut UART,
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+    fn init_services(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
         self.init_log_service()?;
-        // self.init_sensor_service()?;
+        self.init_sensor_service()?;
         Ok(())
     }
 
-    pub fn init_bt(
-        &mut self,
-        // uart: &mut UART,
-    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+    pub fn init_bt(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
         // self.reset_with_delay(delay, 5u32).unwrap();
         self.reset().unwrap();
         self.read_event_uart()?;
 
-        // uart.unpause();
         // block!(self.get_firmware_revision())?;
         // self.read_event_uart()?;
-        // uart.pause();
 
         self.reset().unwrap();
         self.read_event_uart()?;

@@ -1,6 +1,8 @@
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
+use defmt::println as rprintln;
+
 use stm32f4::stm32f401::{EXTI, RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
     block,
@@ -20,29 +22,26 @@ use crate::{
         AddCharacteristicParameters, CharacteristicEvent, CharacteristicPermission,
         CharacteristicProperty, Commands as GattCommands, EncryptionKeySize,
     },
-    bt_control::UUID_LOG_CHAR,
     uprint, uprintln,
-};
-use crate::{
-    bluetooth::{ev_command::GattService, gap::Commands as GapCommands},
-    sensors::V3,
 };
 use bluetooth_hci::{event::command::ReturnParameters, Event};
 
 use crate::{
+    bluetooth::{ev_command::GattService, gap::Commands as GapCommands},
     bluetooth::{
         ev_command::ReturnParameters as VReturnParameters,
         gatt::{AddServiceParameters, CharacteristicHandle, ServiceHandle},
         BTError, BluetoothSpi,
     },
     bt_control::{UUID_SENSOR_CHAR, UUID_SENSOR_SERVICE},
+    sensors::V3,
     uart::*,
 };
 
 #[derive(Debug, Clone, Copy)]
 pub struct SvSensors {
-    service_handle: ServiceHandle,
-    char_handle:    CharacteristicHandle,
+    sens_service_handle: ServiceHandle,
+    sens_char_handle:    CharacteristicHandle,
 }
 
 impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
@@ -65,25 +64,26 @@ where
             panic!("no sensor service?");
         };
 
-        let mut data = [0u8; 40];
+        // let mut data = [0u8; 40];
+        let mut data = [0u8; 12];
 
         data[0..4].copy_from_slice(&gyro.x.to_be_bytes());
         data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
         data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
 
-        data[12..16].copy_from_slice(&acc.x.to_be_bytes());
-        data[16..20].copy_from_slice(&acc.y.to_be_bytes());
-        data[20..24].copy_from_slice(&acc.z.to_be_bytes());
+        // data[12..16].copy_from_slice(&acc.x.to_be_bytes());
+        // data[16..20].copy_from_slice(&acc.y.to_be_bytes());
+        // data[20..24].copy_from_slice(&acc.z.to_be_bytes());
 
-        data[24..28].copy_from_slice(&mag.x.to_be_bytes());
-        data[28..32].copy_from_slice(&mag.y.to_be_bytes());
-        data[32..36].copy_from_slice(&mag.z.to_be_bytes());
+        // data[24..28].copy_from_slice(&mag.x.to_be_bytes());
+        // data[28..32].copy_from_slice(&mag.y.to_be_bytes());
+        // data[32..36].copy_from_slice(&mag.z.to_be_bytes());
 
         // data[36..40].copy_from_slice(&baro.to_be_bytes());
 
         let val = UpdateCharacteristicValueParameters {
-            service_handle:        service.service_handle,
-            characteristic_handle: service.char_handle,
+            service_handle:        service.sens_service_handle,
+            characteristic_handle: service.sens_char_handle,
             offset:                0,
             value:                 &data,
         };
@@ -95,17 +95,14 @@ where
     }
 
     /// block
-    pub fn init_sensor_service(
-        &mut self,
-        // uart: &mut UART,
-    ) -> Result<(), BTError<SpiError, GpioError>> {
+    pub fn init_sensor_service(&mut self) -> Result<(), BTError<SpiError, GpioError>> {
         let params = AddServiceParameters {
             uuid:                  UUID_SENSOR_SERVICE,
             service_type:          crate::bluetooth::gatt::ServiceType::Primary,
             max_attribute_records: 8,
         };
         block!(self.add_service(&params))?;
-        // rprintln!("sent service");
+        rprintln!("sent sensor service");
 
         let service = match self._read_event()? {
             Event::CommandComplete(params) => match params.return_params {
@@ -123,11 +120,12 @@ where
                 panic!("event_params_vendor other 2 = {:?}", other);
             }
         };
-        // rprintln!("service = {:?}", defmt::Debug2Format(&service));
+        rprintln!("sensor service = {:?}", defmt::Debug2Format(&service));
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
-            characteristic_uuid:       UUID_LOG_CHAR,
+            characteristic_uuid:       UUID_SENSOR_CHAR,
+            // characteristic_value_len:  48,
             characteristic_value_len:  18,
             characteristic_properties: CharacteristicProperty::NOTIFY,
             security_permissions:      CharacteristicPermission::NONE,
@@ -139,17 +137,17 @@ where
 
         // self.wait_ms(50.millis());
         block!(self.add_characteristic(&params0))?;
-        // rprintln!("sent c");
+        rprintln!("sent sensor c");
 
         let c = match self.read_event_params_vendor()? {
             VReturnParameters::GattAddCharacteristic(c) => c,
             other => unimplemented!("other = {:?}", other),
         };
-        // rprintln!("c = {:?}", defmt::Debug2Format(&c));
+        rprintln!("sensor c = {:?}", defmt::Debug2Format(&c));
 
         let sensors = SvSensors {
-            service_handle: service.service_handle,
-            char_handle:    c.characteristic_handle,
+            sens_service_handle: service.service_handle,
+            sens_char_handle:    c.characteristic_handle,
         };
 
         self.services.sensors = Some(sensors);
