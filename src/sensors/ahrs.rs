@@ -76,48 +76,24 @@ mod complementary {
             let roll = f32::atan2(acc.x, acc.z);
             let pitch = f32::atan2(-acc.y, (acc.x.powi(2) + acc.z.powi(2)).sqrt());
 
-            let (t, p) = (roll, pitch);
-            #[rustfmt::skip]
-            let b = na::Matrix3::<f32>::new(
-                t.cos(),  t.sin() * p.sin(), t.sin() * p.cos(),
-                0.0,      p.cos(),           -p.sin(),
-                -t.sin(), t.cos() * p.sin(), t.cos() * p.cos(),
-            );
-            let b: V3 = b * mag;
-
-            let yaw = f32::atan2(-b.y, b.x);
-
-            let q_am = UQuat::from_euler_angles(roll, pitch, yaw);
-
-            self.quat = q_omega.nlerp(&q_am, self.gain);
-        }
-
-        #[cfg(feature = "nope")]
-        fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
-            let q_omega = self.attitude_propagation(gyro);
-            // let q_am = self.am_estimation(acc, mag);
-
-            // XXX: pitch and roll reversed?
-            let roll = f32::atan2(acc.y, acc.x);
-            let pitch = f32::atan2(-acc.x, (acc.y.powi(2) + acc.z.powi(2)).sqrt());
-
+            /// theta, phi
             let (t, p) = (roll, pitch);
 
-            #[rustfmt::skip]
-            let b = na::Matrix3::<f32>::new(
-                t.cos(),  t.sin() * p.sin(), t.sin() * p.cos(),
-                0.0,      p.cos(),           -p.sin(),
-                -t.sin(), t.cos() * p.sin(), t.cos() * p.cos(),
-            );
-            let b: V3 = b * mag;
+            // #[rustfmt::skip]
+            // let b = na::Matrix3::<f32>::new(
+            //     t.cos(),  t.sin() * p.sin(), t.sin() * p.cos(),
+            //     0.0,      p.cos(),           -p.sin(),
+            //     -t.sin(), t.cos() * p.sin(), t.cos() * p.cos(),
+            // );
+            // let b: V3 = b * mag;
+            // let yaw0 = f32::atan2(-b.y, b.x);
 
-            let yaw = f32::atan2(-b.y, b.x);
+            let yaw = f32::atan2(
+                mag.z * p.sin() - mag.y * p.cos(),
+                mag.x * t.cos() + mag.y * t.sin() * p.sin() + mag.z * t.sin() * p.cos(),
+            );
 
             let q_am = UQuat::from_euler_angles(roll, pitch, yaw);
-
-            // self.quat = (1.0 - self.gain) * q_omega + self.gain * q_am;
-
-            // self.quat = q_am * self.gain;
 
             self.quat = q_omega.nlerp(&q_am, self.gain);
         }
@@ -189,8 +165,10 @@ mod fusion {
     use nalgebra::{self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
     use super::{Rot3, UQuat, AHRS, V3};
-    use crate::{math::*, uart::*, uprintln};
+    use crate::{math::*, uart::*, uprintln, utils::print_v3};
     use defmt::println as rprintln;
+
+    pub use self::{calibration::*, offset::*};
 
     #[derive(Debug, Clone, Copy)]
     pub struct AhrsFusion {
@@ -233,12 +211,15 @@ mod fusion {
             let delta_time = 1.0 / (sample_rate.to_Hz() as f32);
             let mut offset = FusionOffset::default();
             offset.init(sample_rate);
+
+            let calibration = FusionCalibration::new(delta_time);
+
             Self {
                 quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
                 delta_time,
 
                 offset,
-                calibration: FusionCalibration::default(),
+                calibration,
 
                 cfg_gain: gain,
                 cfg_acc_rejection: 10.0,
@@ -312,6 +293,10 @@ mod fusion {
                 )
             };
             // rprintln!("half_gravity = {:?}", defmt::Debug2Format(&half_gravity));
+            // print_v3("half_gravity = ", half_gravity, 4);
+            // print_v3("acc          = ", acc * 0.5, 4);
+            // print_v3("diff         = ", acc * 0.5 - half_gravity, 4);
+            rprintln!("diff.mag = {:?}", (acc * 0.5 - half_gravity).magnitude());
 
             // /// equal to 3rd column of rotation matrix representation scaled by 0.5
             // let half_gravity2 = self.quat.to_rotation_matrix().matrix().column(2) * 0.5;
@@ -338,7 +323,6 @@ mod fusion {
                 if self.initializing
                     || half_acc_feedback.norm_squared() <= self.cfg_acc_rejection
                 {
-                    rprintln!("ignoring acc, distorted");
                     half_acc_feedback = self.half_acc_feedback;
                     self.acc_ignored = false;
 
@@ -351,6 +335,7 @@ mod fusion {
                     //     0
                     // };
                 } else {
+                    rprintln!("ignoring acc, distorted");
                     self.acc_rejection_timer += 1;
                 }
             }
@@ -377,7 +362,7 @@ mod fusion {
                         q.y * q.z - q.w * q.x,
                     )
                 };
-                // rprintln!("half_west = {:?}", defmt::Debug2Format(&half_west));
+                rprintln!("half_west = {:?}", defmt::Debug2Format(&half_west));
 
                 // /// equal to 2nd column of rotation matrix representation scaled by 0.5
                 // let half_west2 = self.quat.to_rotation_matrix().matrix().column(1) * 0.5;
@@ -391,13 +376,13 @@ mod fusion {
                 if self.initializing
                     || self.half_mag_feedback.norm_squared() <= self.cfg_mag_rejection
                 {
-                    rprintln!("ignoring mag, distorted");
                     half_mag_feedback = self.half_mag_feedback;
                     self.mag_ignored = false;
                     if self.mag_rejection_timer >= 10 {
                         self.mag_rejection_timer -= 10;
                     }
                 } else {
+                    rprintln!("ignoring mag, distorted");
                     self.mag_rejection_timer += 1;
                 }
             }
@@ -449,122 +434,201 @@ mod fusion {
         }
     }
 
-    #[derive(Debug, Default, Clone, Copy)]
-    pub struct FusionCalibration {
-        /// gyro
-        pub gyro_misalignment: Rot3,
-        pub gyro_sens:         V3,
-        pub gyro_offset:       V3,
-        /// acc
-        pub acc_misalignment:  Rot3,
-        pub acc_sens:          V3,
-        pub acc_offset:        V3,
-        /// mag
-        pub soft_iron_rot:     Rot3,
-        pub hard_iron_offset:  V3,
+    /// get flags
+    impl AhrsFusion {
+        pub fn is_acc_warning(&self) -> bool {
+            self.acc_rejection_timer > self.cfg_rejection_timeout / 4
+        }
+        pub fn is_mag_warning(&self) -> bool {
+            self.mag_rejection_timer > self.cfg_rejection_timeout / 4
+        }
+
+        pub fn is_acc_timeout(&self) -> bool {
+            self.acc_rejection_timeout
+        }
+        pub fn is_mag_timeout(&self) -> bool {
+            self.mag_rejection_timeout
+        }
+
+        // pub fn is_acc_ignored(&self) -> bool {
+        //     self.acc_ignored
+        // }
+        // pub fn is_mag_ignored(&self) -> bool {
+        //     self.mag_ignored
+        // }
     }
 
-    /// calibrate
-    impl FusionCalibration {
-        pub fn calibrate_gyro(&self, uncalibrated: V3) -> V3 {
-            Self::_calibrate_imu(
-                uncalibrated,
-                self.gyro_misalignment,
-                self.gyro_sens,
-                self.gyro_offset,
-            )
-        }
-        pub fn calibrate_acc(&self, uncalibrated: V3) -> V3 {
-            Self::_calibrate_imu(
-                uncalibrated,
-                self.acc_misalignment,
-                self.acc_sens,
-                self.acc_offset,
-            )
-        }
-        pub fn calibrate_mag(&self, uncalibrated: V3) -> V3 {
-            Self::_calibrate_mag(uncalibrated, self.soft_iron_rot, self.hard_iron_offset)
+    mod calibration {
+        use nalgebra::{
+            self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3,
+        };
+
+        use super::{Rot3, UQuat, AHRS, V3};
+        use defmt::println as rprintln;
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct FusionCalibration {
+            pub initializing: bool,
+            delta_time:       f32,
+
+            /// gyro
+            pub gyro_misalignment: Rot3,
+            pub gyro_sens:         V3,
+            pub gyro_offset:       V3,
+            /// acc
+            pub acc_misalignment:  Rot3,
+            pub acc_sens:          V3,
+            pub acc_offset:        V3,
+            /// mag
+            pub soft_iron_rot:     Rot3,
+            pub hard_iron_offset:  V3,
         }
 
-        fn _calibrate_imu(
-            uncalibrated: V3,
-            misalignment: na::Rotation3<f32>,
-            sensitivity: V3,
-            offset: V3,
-        ) -> V3 {
-            let v: V3 = (uncalibrated - offset).component_mul(&sensitivity);
-            misalignment * v
+        impl FusionCalibration {
+            pub fn new(delta_time: f32) -> Self {
+                Self {
+                    initializing: true,
+                    delta_time,
+
+                    /// gyro
+                    gyro_misalignment: Rot3::default(),
+                    gyro_sens: V3::default(),
+                    gyro_offset: V3::default(),
+                    /// acc
+                    acc_misalignment: Rot3::default(),
+                    acc_sens: V3::default(),
+                    acc_offset: V3::default(),
+                    /// mag
+                    soft_iron_rot: Rot3::default(),
+                    hard_iron_offset: V3::default(),
+                }
+            }
         }
 
-        fn _calibrate_mag(
-            uncalibrated: V3,
-            soft_iron_matrix: na::Rotation3<f32>,
-            hard_iron_offset: V3,
-        ) -> V3 {
-            (soft_iron_matrix * uncalibrated) - hard_iron_offset
+        /// calibrate
+        impl FusionCalibration {
+            pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+                if !self.initializing {
+                    return;
+                }
+            }
+
+            pub fn calibrate_gyro(&self, uncalibrated: V3) -> V3 {
+                Self::_calibrate_imu(
+                    uncalibrated,
+                    self.gyro_misalignment,
+                    self.gyro_sens,
+                    self.gyro_offset,
+                )
+            }
+            pub fn calibrate_acc(&self, uncalibrated: V3) -> V3 {
+                Self::_calibrate_imu(
+                    uncalibrated,
+                    self.acc_misalignment,
+                    self.acc_sens,
+                    self.acc_offset,
+                )
+            }
+            pub fn calibrate_mag(&self, uncalibrated: V3) -> V3 {
+                Self::_calibrate_mag(
+                    uncalibrated,
+                    self.soft_iron_rot,
+                    self.hard_iron_offset,
+                )
+            }
+
+            fn _calibrate_imu(
+                uncalibrated: V3,
+                misalignment: na::Rotation3<f32>,
+                sensitivity: V3,
+                offset: V3,
+            ) -> V3 {
+                let v: V3 = (uncalibrated - offset).component_mul(&sensitivity);
+                misalignment * v
+            }
+
+            fn _calibrate_mag(
+                uncalibrated: V3,
+                soft_iron_matrix: na::Rotation3<f32>,
+                hard_iron_offset: V3,
+            ) -> V3 {
+                (soft_iron_matrix * uncalibrated) - hard_iron_offset
+            }
         }
     }
 
-    #[derive(Debug, Default, Clone, Copy)]
-    pub struct FusionOffset {
-        filter_coef: f32,
-        timeout:     u32,
-        timer:       u32,
-        gyro_offset: V3,
-    }
+    mod offset {
+        use core::f32::consts::PI;
 
-    impl FusionOffset {
-        /// Cutoff freq in Hz
-        const CUTOFF_FREQ: f32 = 0.02;
+        use fugit::HertzU32;
+        use nalgebra::{
+            self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3,
+        };
 
-        /// Timeout in seconds
-        const TIMEOUT: u32 = 5;
+        use super::{Rot3, UQuat, AHRS, V3};
+        use defmt::println as rprintln;
 
-        /// Threshold in degrees / second
-        const THRESHOLD: f32 = 3.0;
-
-        pub fn init(&mut self, sample_rate: HertzU32) {
-            self.filter_coef =
-                2.0 * PI * Self::CUTOFF_FREQ * (1.0 / sample_rate.raw() as f32);
-            // rprintln!("self.filter_coef = {:?}", self.filter_coef);
-            self.timeout = Self::TIMEOUT * sample_rate.raw();
-            // rprintln!("self.timeout = {:?}", self.timeout);
-            self.timer = 0;
-            self.gyro_offset = V3::zeros();
+        #[derive(Debug, Default, Clone, Copy)]
+        pub struct FusionOffset {
+            filter_coef: f32,
+            timeout:     u32,
+            timer:       u32,
+            gyro_offset: V3,
         }
 
-        pub fn update(&mut self, gyro: V3) -> V3 {
-            let gyro = gyro - self.gyro_offset;
+        impl FusionOffset {
+            /// Cutoff freq in Hz
+            const CUTOFF_FREQ: f32 = 0.02;
 
-            /// Reset timer if gyroscope not stationary
-            if gyro.x > Self::THRESHOLD
-                || gyro.y > Self::THRESHOLD
-                || gyro.z > Self::THRESHOLD
-            {
-                // rprintln!("gyro not stationary, resetting timer");
+            /// Timeout in seconds
+            const TIMEOUT: u32 = 5;
+
+            /// Threshold in degrees / second
+            const THRESHOLD: f32 = 3.0;
+
+            pub fn init(&mut self, sample_rate: HertzU32) {
+                self.filter_coef =
+                    2.0 * PI * Self::CUTOFF_FREQ * (1.0 / sample_rate.raw() as f32);
+                // rprintln!("self.filter_coef = {:?}", self.filter_coef);
+                self.timeout = Self::TIMEOUT * sample_rate.raw();
+                // rprintln!("self.timeout = {:?}", self.timeout);
                 self.timer = 0;
-                return gyro;
+                self.gyro_offset = V3::zeros();
             }
 
-            /// Increment timer while gyroscope stationary
-            if self.timer < self.timeout {
-                self.timer += 1;
-                // rprintln!("gyro stationary, ticking: {:?}", self.timer);
-                return gyro;
+            pub fn update(&mut self, gyro: V3) -> V3 {
+                let gyro = gyro - self.gyro_offset;
+
+                /// Reset timer if gyroscope not stationary
+                if gyro.x > Self::THRESHOLD
+                    || gyro.y > Self::THRESHOLD
+                    || gyro.z > Self::THRESHOLD
+                {
+                    // rprintln!("gyro not stationary, resetting timer");
+                    self.timer = 0;
+                    return gyro;
+                }
+
+                /// Increment timer while gyroscope stationary
+                if self.timer < self.timeout {
+                    self.timer += 1;
+                    // rprintln!("gyro stationary, ticking: {:?}", self.timer);
+                    return gyro;
+                }
+
+                // rprintln!("Adjusting gyro offset");
+                // Adjust offset if timer has elapsed
+                self.gyro_offset += gyro * self.filter_coef;
+
+                // rprintln!(
+                //     "offset = {=f32:08}, {=f32:08}, {=f32:08}",
+                //     self.gyro_offset.x,
+                //     self.gyro_offset.y,
+                //     self.gyro_offset.z
+                // );
+
+                gyro
             }
-
-            // rprintln!("Adjusting gyro offset");
-            // Adjust offset if timer has elapsed
-            self.gyro_offset += gyro * self.filter_coef;
-
-            // rprintln!(
-            //     "offset = {=f32:08}, {=f32:08}, {=f32:08}",
-            //     self.gyro_offset.x,
-            //     self.gyro_offset.y,
-            //     self.gyro_offset.z
-            // );
-
-            gyro
         }
     }
 }

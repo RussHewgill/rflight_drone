@@ -116,8 +116,8 @@ mod app {
     struct Shared {
         dwt:         Dwt,
         exti:        EXTI,
-        ahrs:        AhrsComplementary,
-        // ahrs:        AhrsFusion,
+        // ahrs:        AhrsComplementary,
+        ahrs:        AhrsFusion,
         // ahrs:        AhrsMadgwick,
         sens_data:   SensorData,
         flight_data: FlightData,
@@ -221,19 +221,18 @@ mod app {
         // let t = 1.0 / (sensor_period.raw() as f32);
         // uprintln!(uart, "t = {:?}", t);
 
-        // /// Fusion
-        // let mut ahrs = AhrsFusion::new(
-        //     sensor_period,
-        //     // 0.5,
-        //     7.5,
-        // );
-        // ahrs.cfg_acc_rejection = 10.0;
-        // ahrs.cfg_mag_rejection = 20.0;
-        // ahrs.offset.init(sensor_period);
+        /// Fusion
+        let mut ahrs = AhrsFusion::new(
+            sensor_period,
+            // 0.5,
+            7.5,
+        );
+        ahrs.cfg_acc_rejection = 10.0;
+        ahrs.cfg_mag_rejection = 20.0;
 
-        /// complementary
-        let gain = 0.1;
-        let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32), gain);
+        // /// complementary
+        // let gain = 0.1;
+        // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32), gain);
 
         // /// Madgwick
         // let ahrs = AhrsMadgwick::new(1.0 / (sensor_period.raw() as f32), 40.0);
@@ -290,58 +289,55 @@ mod app {
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
 
-                // /// update AHRS
-                // let gyro0 = sd.imu_gyro.read_and_reset();
-                // let acc0 = sd.imu_acc.read_and_reset();
-                // let mag0 = sd.magnetometer.read_and_reset();
+                /// update AHRS
+                let gyro0 = sd.imu_gyro.read_and_reset();
+                let acc0 = sd.imu_acc.read_and_reset();
+                let mag0 = sd.magnetometer.read_and_reset();
+
+                // if ahrs.calibration.initializing {
+                //     ahrs.calibration.update(gyro0, acc0, mag0);
+                // }
 
                 // let gyro = ahrs.calibration.calibrate_gyro(gyro0);
                 // let acc = ahrs.calibration.calibrate_acc(acc0);
                 // let mag = ahrs.calibration.calibrate_mag(mag0);
-                // let gyro = ahrs.offset.update(gyro0);
+
+                let gyro = gyro0;
+                let acc = acc0;
+                let mag = mag0;
+
+                let gyro = ahrs.offset.update(gyro0);
 
                 // ahrs.update(gyro, acc, mag);
 
-                // ahrs.update_no_mag(gyro, acc);
+                ahrs.update_no_mag(gyro, acc);
 
-                /// update AHRS
-                let gyro = sd.imu_gyro.read_and_reset();
-                let acc = sd.imu_acc.read_and_reset();
-                let mag = sd.magnetometer.read_and_reset();
+                // /// update AHRS
+                // let gyro = sd.imu_gyro.read_and_reset();
+                // let acc = sd.imu_acc.read_and_reset();
+                // let mag = sd.magnetometer.read_and_reset();
+                // ahrs.update(gyro, acc, mag);
 
-                // let gyro =
-                //     V3::new(deg_to_rad(gyro.x), deg_to_rad(gyro.y), deg_to_rad(gyro.z));
+                if ahrs.is_acc_warning() {
+                    rprintln!("acc warning");
+                }
+                if ahrs.is_acc_timeout() {
+                    rprintln!("acc timeout");
+                }
 
-                // let gyro = V3::zeros();
-                // let acc = V3::new(0.0, 0.0, 1.0);
-                // let mag = V3::zeros();
-
-                // /// roll, pitch, yaw
-                // let rot = na::Rotation3::from_euler_angles(deg_to_rad(45.0), 0.0, 0.0);
-                // let acc = rot * acc;
-
-                ahrs.update(gyro, acc, mag);
+                if ahrs.is_mag_warning() {
+                    rprintln!("mag warning");
+                }
+                if ahrs.is_mag_timeout() {
+                    rprintln!("mag timeout");
+                }
 
                 use crate::utils::{r, r2};
                 use na::{ComplexField, RealField};
 
-                // rprintln!(
-                //     "gyro = {=f32:08}, {=f32:08}, {=f32:08}",
-                //     r(gyro0.x),
-                //     r(gyro0.y),
-                //     r(gyro0.z)
-                // );
-
-                // rprintln!(
-                //     "acc = {=f32:08}, {=f32:08}, {=f32:08}",
-                //     r(acc.x),
-                //     r(acc.y),
-                //     r(acc.z)
-                // );
-
-                // fn c(x: f32) -> f32 {
-                // }
-                // let mag = V3::new(c(mag.x), c(mag.y), c(mag.z));
+                // print_v3("gyro = ", acc, 2);
+                // print_v3("acc  = ", acc * 0.5, 4);
+                // print_v3("mag  = ", acc, 5);
 
                 /// expected magnetic field:
                 /// Declination (+E) = 15.9 deg
@@ -350,18 +346,20 @@ mod app {
                 /// +North:     17_611 nT
                 /// +East:      5_028  nT
                 /// +Vertical:  50_527 nT
-                let mag_strength = mag.norm();
+                let mag_strength = mag.magnitude();
+                let mag_horiz = {
+                    let v = V3::new(mag.x, mag.y, 0.0);
+                    v.magnitude()
+                };
 
-                rprintln!(
-                    "mag [{=f32:08}] = {=f32:08}, {=f32:08}, {=f32:08}",
-                    mag_strength,
-                    // r2(mag.x),
-                    // r2(mag.y),
-                    // r2(mag.z)
-                    r(mag.x),
-                    r(mag.y),
-                    r(mag.z)
-                );
+                // rprintln!(
+                //     "mag total: [{=f32:08}]\nhorizontal = {=f32:08}\n{=f32:08}, {=f32:08}, {=f32:08}",
+                //     mag_strength,
+                //     mag_horiz,
+                //     r(mag.x),
+                //     r(mag.y),
+                //     r(mag.z)
+                // );
 
                 // let yaw = 90.0 - rad_to_deg(f32::atan2(mag0.y, mag0.x));
                 // // let yaw = 90.0 - rad_to_deg(f32::atan(mag0.y / mag0.x));
@@ -372,20 +370,12 @@ mod app {
 
                 let (roll, pitch, yaw) = fd.get_euler_angles();
 
-                // let roll = deg_to_rad(0.0);
-                // let pitch = deg_to_rad(45.0);
-                // let yaw = deg_to_rad(0.0);
-
-                // fd.quat = UQuat::from_euler_angles(roll, pitch, yaw);
-
                 // rprintln!(
                 //     "(r,p,y) = {:?}, {:?}, {:?}",
                 //     r(rad_to_deg(roll)),
                 //     r(rad_to_deg(pitch)),
                 //     r(rad_to_deg(yaw)),
                 // );
-
-                // rprintln!("(r,p,y) = {:?}, {:?}, {:?}", roll, pitch, yaw);
 
                 *tim9_flag = true;
             });

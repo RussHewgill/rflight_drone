@@ -13,6 +13,22 @@ use crate::sensors::V3;
 //     }
 // }
 
+pub fn print_v3(label: &str, vec: V3, n: i32) {
+    rprintln!(
+        "{} {=f32:08}, {=f32:08}, {=f32:08}",
+        label,
+        round_to(vec.x, n),
+        round_to(vec.y, n),
+        round_to(vec.z, n),
+    );
+}
+
+pub fn round_to(f: f32, places: i32) -> f32 {
+    use nalgebra::{ComplexField, RealField};
+    let x: f32 = 10.0f32.powi(places);
+    (f * x).round() / x
+}
+
 pub fn r(x: f32) -> f32 {
     use nalgebra::ComplexField;
     (x * 100.0).round() / 100.0
@@ -22,12 +38,6 @@ pub fn r2(x: f32) -> f32 {
     use nalgebra::ComplexField;
     (x * 10_000.0).round() / 10.0
 }
-
-// pub fn round_float(f: f32, places: i32) -> f32 {
-//     use nalgebra::{ComplexField, RealField};
-//     let x: f32 = 10.0f32.powi(places);
-//     (f * x).round() / x
-// }
 
 // #[derive(Debug,Clone,Copy)]
 // #[repr(transparent)]

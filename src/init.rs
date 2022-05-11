@@ -232,23 +232,23 @@ pub fn init_sensors(sensors: &mut Sensors) {
     let mut imu_cfg = ImuConfig::default();
     imu_cfg.block_data_update = true;
 
-    // imu_cfg.acc_power = AccelPowerModes::Normal104;
-    imu_cfg.acc_power = AccelPowerModes::Normal208;
+    imu_cfg.acc_power = AccelPowerModes::Normal104;
+    // imu_cfg.acc_power = AccelPowerModes::Normal208;
     // imu_cfg.acc_power = AccelPowerModes::High1660; // default in ST firmware
     imu_cfg.acc_scale = AccelScaleFactor::S4;
 
-    // imu_cfg.acc_analog_lp_bandwidth = AccelAnalogBandwidth::BW1500;
-    // imu_cfg.acc_filter_input_composite = AccelInputComposite::LowLatency;
-    // imu_cfg.acc_digital_filter_config = AccelDigFilterConfig::OdrLowPass400;
+    imu_cfg.acc_analog_lp_bandwidth = AccelAnalogBandwidth::BW1500;
+    imu_cfg.acc_filter_input_composite = AccelInputComposite::LowLatency;
+    imu_cfg.acc_digital_filter_config = AccelDigFilterConfig::OdrLowPass400;
 
-    // imu_cfg.gyro_power = GyroPowerModes::Normal104;
-    imu_cfg.gyro_power = GyroPowerModes::Normal208;
+    imu_cfg.gyro_power = GyroPowerModes::Normal104;
+    // imu_cfg.gyro_power = GyroPowerModes::Normal208;
     // imu_cfg.gyro_power = GyroPowerModes::High416; // default in ST firmware
     imu_cfg.gyro_scale = GyroScaleFactor::S2000;
 
-    // // gyro low-pass filter
-    // imu_cfg.gyro_lp_filter_enable = true;
-    // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
+    // gyro low-pass filter
+    imu_cfg.gyro_lp_filter_enable = true;
+    imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
 
     sensors.with_spi_imu(|spi, imu| {
         imu.init(spi, imu_cfg).unwrap();
