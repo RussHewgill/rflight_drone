@@ -292,11 +292,11 @@ mod fusion {
                     q.w * q.w - 0.5 + q.z * q.z,
                 )
             };
-            // rprintln!("half_gravity = {:?}", defmt::Debug2Format(&half_gravity));
+
             // print_v3("half_gravity = ", half_gravity, 4);
             // print_v3("acc          = ", acc * 0.5, 4);
             // print_v3("diff         = ", acc * 0.5 - half_gravity, 4);
-            rprintln!("diff.mag = {:?}", (acc * 0.5 - half_gravity).magnitude());
+            // rprintln!("diff.mag = {:?}", (acc * 0.5 - half_gravity).magnitude());
 
             // /// equal to 3rd column of rotation matrix representation scaled by 0.5
             // let half_gravity2 = self.quat.to_rotation_matrix().matrix().column(2) * 0.5;
@@ -362,7 +362,7 @@ mod fusion {
                         q.y * q.z - q.w * q.x,
                     )
                 };
-                rprintln!("half_west = {:?}", defmt::Debug2Format(&half_west));
+                // print_v3("half_west = ", half_west, 4);
 
                 // /// equal to 2nd column of rotation matrix representation scaled by 0.5
                 // let half_west2 = self.quat.to_rotation_matrix().matrix().column(1) * 0.5;
