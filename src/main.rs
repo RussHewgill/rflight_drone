@@ -324,13 +324,13 @@ mod app {
                 // let mag = sd.magnetometer.read_and_reset();
                 // ahrs.update(gyro, acc, mag);
 
-                let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-                rprintln!(
-                    "heading = {:?}, mag(x,y) = ({:?}, {:?})",
-                    round_to(heading, 1),
-                    round_to(mag.x, 6),
-                    round_to(mag.y, 6),
-                );
+                // let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+                // rprintln!(
+                //     "heading = {:?}, mag(x,y) = ({:?}, {:?})",
+                //     round_to(heading, 1),
+                //     round_to(mag.x, 6),
+                //     round_to(mag.y, 6),
+                // );
 
                 if ahrs.is_acc_warning() {
                     rprintln!("acc warning");

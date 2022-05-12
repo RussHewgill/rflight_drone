@@ -493,11 +493,11 @@ mod fusion {
 
                     /// gyro
                     gyro_misalignment: Rot3::default(),
-                    gyro_sens: V3::default(),
+                    gyro_sens: V3::new(1.0, 1.0, 1.0),
                     gyro_offset: V3::default(),
                     /// acc
                     acc_misalignment: Rot3::default(),
-                    acc_sens: V3::default(),
+                    acc_sens: V3::new(1.0, 1.0, 1.0),
                     acc_offset: V3::default(),
                     /// mag
                     soft_iron_rot: Rot3::default(),
