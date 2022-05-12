@@ -107,6 +107,9 @@ mod uuids {
     pub const UUID_LOG_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x1450781d919c49f0a16c0ec28dfb83d5);
 
+    pub const UUID_LOG_SENS_CHAR: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x5724d4c76ed5402cbf0d3765bf4b9c5c);
+
     /// Sensors
     pub const UUID_SENSOR_SERVICE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x639d0157e75a4eb9835298b676f51912);
@@ -125,7 +128,7 @@ where
 {
     fn init_services(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
         self.init_log_service()?;
-        self.init_sensor_service()?;
+        // self.init_sensor_service()?;
         Ok(())
     }
 
@@ -551,6 +554,15 @@ where
                 match params.return_params {
                     ReturnParameters::Vendor(
                         VReturnParameters::GattUpdateCharacteristicValue(status),
+                    ) => {
+                        if status != bluetooth_hci::Status::Success {
+                            rprintln!("status 0 = {:?}", defmt::Debug2Format(&status));
+                        } else {
+                            // rprintln!("status 1 = {:?}", defmt::Debug2Format(&status));
+                        }
+                    }
+                    ReturnParameters::Vendor(
+                        VReturnParameters::GattUpdateLongCharacteristicValue(status),
                     ) => {
                         if status != bluetooth_hci::Status::Success {
                             rprintln!("status 0 = {:?}", defmt::Debug2Format(&status));

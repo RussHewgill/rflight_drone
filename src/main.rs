@@ -406,13 +406,11 @@ mod app {
                         cx.shared.exti,
                     )
                         .lock(|fd, sd, bt, exti| {
-                            let qq = fd.quat.coords;
-
-                            cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                            cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                            cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                            cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
-
+                            // let qq = fd.quat.coords;
+                            // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                            // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                            // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                            // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
                             // // rprintln!("0..");
                             // bt.pause_interrupt(exti);
                             // match bt.log_write(false, &cx.local.buf[..]) {
@@ -429,12 +427,16 @@ mod app {
                             // bt.unpause_interrupt(exti);
                             // // rprintln!("1");
 
+                            bt.pause_interrupt(exti);
+                            bt.log_write_quat(&fd.quat).unwrap();
+                            bt.unpause_interrupt(exti);
+
                             let gyro0 = sd.imu_gyro.read_and_reset();
                             let acc0 = sd.imu_acc.read_and_reset();
                             let mag0 = sd.magnetometer.read_and_reset();
 
                             bt.pause_interrupt(exti);
-                            match bt.update_sensors(gyro0, acc0, mag0) {
+                            match bt.log_write_sens(gyro0, acc0, mag0) {
                                 Ok(_) => {
                                     // unimplemented!()
                                 }
