@@ -436,14 +436,7 @@ mod app {
                             let mag0 = sd.magnetometer.read_and_reset();
 
                             bt.pause_interrupt(exti);
-                            match bt.log_write_sens(gyro0, acc0, mag0) {
-                                Ok(_) => {
-                                    // unimplemented!()
-                                }
-                                Err(e) => {
-                                    unimplemented!()
-                                }
-                            }
+                            bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                             bt.unpause_interrupt(exti);
 
                             // //

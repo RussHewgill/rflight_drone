@@ -48,9 +48,6 @@ use super::TimeoutResult;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SvLogger {
-    // service_handle: ServiceHandle,
-    // char_handle:    CharacteristicHandle,
-    // XXX:
     pub service_handle:   ServiceHandle,
     pub char_handle_quat: CharacteristicHandle,
     pub char_handle_sens: CharacteristicHandle,
@@ -80,32 +77,20 @@ where
         let mut data = [0u8; 40];
         // let mut data = [0u8; 24];
 
-        // /// gyro
-        // data[0..4].copy_from_slice(&gyro.x.to_be_bytes());
-        // data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
-        // data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
-        // /// acc
-        // data[12..16].copy_from_slice(&acc.x.to_be_bytes());
-        // data[16..20].copy_from_slice(&acc.y.to_be_bytes());
-        // data[20..24].copy_from_slice(&acc.z.to_be_bytes());
-        // /// mag
-        // data[24..28].copy_from_slice(&mag.x.to_be_bytes());
-        // data[28..32].copy_from_slice(&mag.y.to_be_bytes());
-        // data[32..36].copy_from_slice(&mag.z.to_be_bytes());
-
-        for (n, mut x) in data.iter_mut().enumerate() {
-            *x = n as u8;
-        }
+        /// gyro
+        data[0..4].copy_from_slice(&gyro.x.to_be_bytes());
+        data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
+        data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
+        /// acc
+        data[12..16].copy_from_slice(&acc.x.to_be_bytes());
+        data[16..20].copy_from_slice(&acc.y.to_be_bytes());
+        data[20..24].copy_from_slice(&acc.z.to_be_bytes());
+        /// mag
+        data[24..28].copy_from_slice(&mag.x.to_be_bytes());
+        data[28..32].copy_from_slice(&mag.y.to_be_bytes());
+        data[32..36].copy_from_slice(&mag.z.to_be_bytes());
 
         // data[36..40].copy_from_slice(&baro.to_be_bytes());
-
-        // let val = UpdateCharacteristicValueParameters {
-        //     service_handle:        logger.service_handle,
-        //     characteristic_handle: logger.char_handle_sens,
-        //     offset:                0,
-        //     value:                 &data,
-        // };
-        // block!(self.update_characteristic_value(&val)).unwrap();
 
         let val = UpdateLongCharacteristicValueParameters {
             service_handle:        logger.service_handle,

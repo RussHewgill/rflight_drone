@@ -199,8 +199,6 @@ impl<CS, Reset, Input> BluetoothSpi<CS, Reset, Input> {
 // impl<'buf, SPI, CS, Reset, GpioError> BluetoothSpi<'buf, SPI, CS, Reset, PA4>
 impl<CS, Reset, GpioError> BluetoothSpi<CS, Reset, PA4>
 where
-    // SPI: hal::blocking::spi::Transfer<u8, Error = SpiError>
-    //     + hal::blocking::spi::Write<u8, Error = SpiError>,
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
 {
