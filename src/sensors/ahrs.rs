@@ -276,7 +276,7 @@ mod fusion {
                 // rprintln!("initializing");
                 self.ramped_gain -= self.ramped_gain * self.delta_time;
                 if self.ramped_gain < self.cfg_gain {
-                    rprintln!("initializing complete");
+                    rprintln!("AhrsFusion: initializing complete");
                     self.ramped_gain = self.cfg_gain;
                     self.initializing = false;
                     self.acc_rejection_timeout = false;
@@ -484,6 +484,7 @@ mod fusion {
             pub hard_iron_offset:  V3,
         }
 
+        /// new
         impl FusionCalibration {
             pub fn new(delta_time: f32) -> Self {
                 Self {
@@ -505,12 +506,70 @@ mod fusion {
             }
         }
 
+        #[derive(Debug, Clone, Copy)]
+        pub struct GeoMagField {
+            pub declination:   f32,
+            pub inclination:   f32,
+            pub horizontal_nt: f32,
+            pub north_nt:      f32,
+            pub east_nt:       f32,
+            pub vertical_nt:   f32,
+            pub total_nt:      f32,
+        }
+
         /// calibrate
         impl FusionCalibration {
+            pub fn calc_calibration_mag(
+                &mut self,
+                geo: GeoMagField,
+                mags: &[V3],
+                accs: &[V3],
+            ) {
+                let mag_min_x: f32 = mags
+                    .iter()
+                    .map(|v| v.x)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap();
+                let mag_min_y: f32 = mags
+                    .iter()
+                    .map(|v| v.y)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap();
+                let mag_min_z: f32 = mags
+                    .iter()
+                    .map(|v| v.z)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap();
+
+                let mag_max_x: f32 = mags
+                    .iter()
+                    .map(|v| v.x)
+                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap();
+                let mag_max_y: f32 = mags
+                    .iter()
+                    .map(|v| v.y)
+                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap();
+                let mag_max_z: f32 = mags
+                    .iter()
+                    .map(|v| v.z)
+                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap();
+
+                self.hard_iron_offset = V3::new(
+                    (mag_min_x + mag_max_x) / 2.0,
+                    (mag_min_y + mag_max_y) / 2.0,
+                    // (mag_min_z + mag_max_z) / 2.0,
+                    0.0,
+                );
+            }
+
             pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
                 if !self.initializing {
                     return;
                 }
+                rprintln!("updating calibration");
             }
 
             pub fn calibrate_gyro(&self, uncalibrated: V3) -> V3 {

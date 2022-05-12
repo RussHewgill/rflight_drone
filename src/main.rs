@@ -108,8 +108,7 @@ mod app {
         bt_control::{BTController, BTEvent},
         init::*,
         math::*,
-        uart::*,
-        uprint, uprintln,
+        utils::round_to,
     };
 
     #[shared]
@@ -230,6 +229,13 @@ mod app {
         ahrs.cfg_acc_rejection = 10.0;
         ahrs.cfg_mag_rejection = 20.0;
 
+        ahrs.calibration.hard_iron_offset = V3::new(
+            -0.206,  //
+            -0.4349, //
+            1.1902,
+            // 0.0,
+        );
+
         // /// complementary
         // let gain = 0.1;
         // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32), gain);
@@ -298,25 +304,33 @@ mod app {
                 //     ahrs.calibration.update(gyro0, acc0, mag0);
                 // }
 
-                // let gyro = ahrs.calibration.calibrate_gyro(gyro0);
-                // let acc = ahrs.calibration.calibrate_acc(acc0);
-                // let mag = ahrs.calibration.calibrate_mag(mag0);
+                let gyro = ahrs.calibration.calibrate_gyro(gyro0);
+                let acc = ahrs.calibration.calibrate_acc(acc0);
+                let mag = ahrs.calibration.calibrate_mag(mag0);
 
-                let gyro = gyro0;
-                let acc = acc0;
-                let mag = mag0;
+                // let gyro = gyro0;
+                // let acc = acc0;
+                // let mag = mag0;
 
                 let gyro = ahrs.offset.update(gyro0);
 
-                // ahrs.update(gyro, acc, mag);
+                ahrs.update(gyro, acc, mag);
 
-                ahrs.update_no_mag(gyro, acc);
+                // ahrs.update_no_mag(gyro, acc);
 
                 // /// update AHRS
                 // let gyro = sd.imu_gyro.read_and_reset();
                 // let acc = sd.imu_acc.read_and_reset();
                 // let mag = sd.magnetometer.read_and_reset();
                 // ahrs.update(gyro, acc, mag);
+
+                let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+                rprintln!(
+                    "heading = {:?}, mag(x,y) = ({:?}, {:?})",
+                    round_to(heading, 1),
+                    round_to(mag.x, 6),
+                    round_to(mag.y, 6),
+                );
 
                 if ahrs.is_acc_warning() {
                     rprintln!("acc warning");
@@ -332,7 +346,6 @@ mod app {
                     rprintln!("mag timeout");
                 }
 
-                use crate::utils::{r, r2};
                 use na::{ComplexField, RealField};
 
                 // print_v3("gyro = ", acc, 2);
@@ -370,12 +383,12 @@ mod app {
 
                 let (roll, pitch, yaw) = fd.get_euler_angles();
 
-                // rprintln!(
-                //     "(r,p,y) = {:?}, {:?}, {:?}",
-                //     r(rad_to_deg(roll)),
-                //     r(rad_to_deg(pitch)),
-                //     r(rad_to_deg(yaw)),
-                // );
+                rprintln!(
+                    "(r,p,y) = {:?}, {:?}, {:?}",
+                    r(rad_to_deg(roll)),
+                    r(rad_to_deg(pitch)),
+                    r(rad_to_deg(yaw)),
+                );
 
                 *tim9_flag = true;
             });
