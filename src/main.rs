@@ -8,12 +8,12 @@
 
 pub mod battery;
 pub mod bluetooth;
-pub mod bluetooth2;
 pub mod bt_control;
 pub mod flight_control;
 pub mod init;
 pub mod leds;
 pub mod math;
+pub mod motors;
 pub mod pid;
 pub mod sensors;
 pub mod spi;
@@ -22,9 +22,9 @@ pub mod uart;
 pub mod utils;
 
 use crate::{
-    battery::*, bluetooth::*, bluetooth2::*, bt_control::*, flight_control::*,
-    init::init_all_pre, math::*, sensors::barometer::*, sensors::imu::*,
-    sensors::magneto::*, sensors::*, spi::*, time::*, uart::*, utils::*,
+    battery::*, bluetooth::*, bt_control::*, flight_control::*, init::init_all_pre,
+    math::*, sensors::barometer::*, sensors::imu::*, sensors::magneto::*, sensors::*,
+    spi::*, time::*, uart::*, utils::*,
 };
 
 use byteorder::ByteOrder;
@@ -70,8 +70,8 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-#[cfg(feature = "nope")]
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+// #[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -231,12 +231,12 @@ mod app {
         ahrs.cfg_acc_rejection = 10.0;
         ahrs.cfg_mag_rejection = 20.0;
 
-        ahrs.calibration.hard_iron_offset = V3::new(
-            -0.206,  //
-            -0.4349, //
-            1.1902,
-            // 0.0,
-        );
+        // ahrs.calibration.hard_iron_offset = V3::new(
+        //     -0.206,  //
+        //     -0.4349, //
+        //     1.1902,
+        //     // 0.0,
+        // );
 
         // /// complementary
         // let gain = 0.1;
@@ -317,9 +317,9 @@ mod app {
 
                 let gyro = ahrs.offset.update(gyro0);
 
-                ahrs.update(gyro, acc, mag);
+                // ahrs.update(gyro, acc, mag);
 
-                // ahrs.update_no_mag(gyro, acc);
+                ahrs.update_no_mag(gyro, acc);
 
                 // /// update AHRS
                 // let gyro = sd.imu_gyro.read_and_reset();
@@ -351,22 +351,22 @@ mod app {
 
                 use na::{ComplexField, RealField};
 
-                // print_v3("gyro = ", acc, 2);
+                // print_v3("gyro = ", gyro, 2);
                 // print_v3("acc  = ", acc * 0.5, 4);
-                // print_v3("mag  = ", acc, 5);
+                // print_v3("mag  = ", mag, 5);
 
-                /// expected magnetic field:
-                /// Declination (+E) = 15.9 deg
-                /// Inclination (+D) = 70.1 deg
-                /// total:      53_743 nT
-                /// +North:     17_611 nT
-                /// +East:      5_028  nT
-                /// +Vertical:  50_527 nT
-                let mag_strength = mag.magnitude();
-                let mag_horiz = {
-                    let v = V3::new(mag.x, mag.y, 0.0);
-                    v.magnitude()
-                };
+                // /// expected magnetic field:
+                // /// Declination (+E) = 15.9 deg
+                // /// Inclination (+D) = 70.1 deg
+                // /// total:      53_743 nT
+                // /// +North:     17_611 nT
+                // /// +East:      5_028  nT
+                // /// +Vertical:  50_527 nT
+                // let mag_strength = mag.magnitude();
+                // let mag_horiz = {
+                //     let v = V3::new(mag.x, mag.y, 0.0);
+                //     v.magnitude()
+                // };
 
                 // rprintln!(
                 //     "mag total: [{=f32:08}]\nhorizontal = {=f32:08}\n{=f32:08}, {=f32:08}, {=f32:08}",
@@ -513,8 +513,8 @@ mod app {
     }
 }
 
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-// #[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
@@ -564,55 +564,27 @@ mod app {
         let mut dp: stm32f401::Peripherals = cx.device;
 
         let mut rcc = dp.RCC.constrain();
-        rprintln!("wat 0");
-        let clocks = rcc
-            .cfgr
-            //
-            .use_hse(16.MHz())
-            // .sysclk(32.MHz())
-            // .sysclk(64.MHz())
-            .sysclk(84.MHz())
-            // .require_pll48clk()
-            .freeze();
+        let clocks = rcc.cfgr.use_hse(16.MHz()).sysclk(84.MHz()).freeze();
         rprintln!("sysclk()   core = {:?}", clocks.sysclk());
         rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
 
-        use stm32f4xx_hal::adc::config::*;
-        use stm32f4xx_hal::adc::*;
+        use crate::motors::*;
 
-        let gpiob = dp.GPIOB.split();
+        let gb = dp.GPIOB.split();
 
-        let voltage = gpiob.pb1.into_analog();
+        // let mut motors = MotorsPWM::new(dp.TIM4, gb.pb6, gb.pb7, gb.pb8, gb.pb9, &clocks);
 
-        // let adc_cfg = AdcConfig::default()
-        //     .clock(Clock::Pclk2_div_4)
-        //     .resolution(Resolution::Twelve)
-        //     .align(Align::Right)
-        //     .scan(Scan::Disabled)
-        //     // .external_trigger(TriggerMode::Disabled, Exte)
-        //     .continuous(Continuous::Single);
+        let channels = (gb.pb6.into_alternate::<2>(), gb.pb7.into_alternate::<2>());
 
-        let adc_cfg = AdcConfig::default().resolution(Resolution::Twelve);
+        let pwm = dp.TIM4.pwm_hz(channels, 494.Hz(), &clocks);
 
-        let mut adc = Adc::adc1(dp.ADC1, true, adc_cfg);
+        let (mut pin1, mut pin2) = pwm.split();
 
-        let mut bat = BatteryAdc::new(adc, voltage);
+        let k1 = pin1.get_max_duty();
+        rprintln!("k1 = {:?}", k1);
 
-        let v0 = bat.sample();
-        rprintln!("v0 = {:?}", v0);
-
-        let v1 = bat.sample();
-        rprintln!("v1 = {:?}", v1);
-
-        // let sample = adc.current_sample();
-
-        // let sample = adc.convert(&voltage, SampleTime::Cycles_3);
-        // let v_ref = 3.3;
-        // let r_up = 10_000.0;
-        // let r_down = 20_000.0;
-        // let v_bat: f32 = (sample as f32 * v_ref) / 2u32.pow(12) as f32;
-        // let v_bat: f32 = v_bat * ((r_up + r_down) / r_down);
-        // rprintln!("v_bat = {:?}", v_bat);
+        let k2 = pin1.get_max_duty();
+        rprintln!("k2 = {:?}", k2);
 
         // let mut ahrs = crate::sensors::ahrs::AhrsComplementary::new(
         //     0.1, //

@@ -389,10 +389,12 @@ mod fusion {
 
             /// Convert gyroscope to radians per second scaled by 0.5
             let half_gyro = gyro * deg_to_rad(0.5);
+            // print_v3("half_gyro  = ", half_gyro, 3);
 
             /// Apply feedback to gyroscope
             let adjusted_half_gyro =
                 half_gyro + ((half_acc_feedback + half_mag_feedback) * self.ramped_gain);
+            // print_v3("adjusted_half_gyro  = ", adjusted_half_gyro, 3);
 
             /// Integrate rate of change of quaternion
             /// Normalise quaternion

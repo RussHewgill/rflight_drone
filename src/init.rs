@@ -58,22 +58,19 @@ pub fn init_all_pre(rcc: &mut RCC) {
 }
 
 pub struct InitStruct {
+    /// peripherals
     pub dwt:     Dwt,
-    // pub uart:    UART,
     pub exti:    EXTI,
-    // pub tim3:     CounterHz<TIM3>,
-    pub tim3:    TIM3,
+    /// clocks and timers
     pub clocks:  Clocks,
-    // pub mono:     Systick<1_000>,
-    pub mono:    MonoTimer<TIM5, 1_000_000>,
-    pub sensors: Sensors,
-    // pub sensors:  (SensSpi, Pin<'B', 12, Output>),
-    // pub bt:      BTController<'static>,
-    pub bt:      BTController,
-    // pub delay_bt: DelayMs<TIM2>,
+    pub tim3:    TIM3,
     pub tim9:    TIM9,
-    // pub adc:     Adc<ADC1>,
+    pub mono:    MonoTimer<TIM5, 1_000_000>,
+    /// wrappers
+    pub sensors: Sensors,
+    pub bt:      BTController,
     pub adc:     BatteryAdc,
+    // pub leds:    LEDs,
 }
 
 pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
@@ -115,17 +112,19 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
 
     let adc = init_adc(dp.ADC1, gpiob.pb1);
 
+    // let leds = init_leds(gpiob.pb4, gpiob.pb5);
+
     InitStruct {
         dwt,
-        // uart,
         exti: dp.EXTI,
-        tim3,
         clocks,
+        tim3,
+        tim9: dp.TIM9,
         mono,
         sensors,
         bt,
-        tim9: dp.TIM9,
         adc,
+        // leds,
     }
 }
 
@@ -316,7 +315,7 @@ fn init_bt(
     bt
 }
 
-fn init_led(pb4: PB4, pb5: PB5) -> LEDs {
+fn init_leds(pb4: Pin<'B', 4, Alternate<0>>, pb5: PB5) -> LEDs {
     let mut led1_pin = pb5
         .into_push_pull_output()
         .speed(Speed::High)
