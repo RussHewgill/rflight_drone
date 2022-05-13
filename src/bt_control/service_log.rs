@@ -74,7 +74,8 @@ where
             panic!("no logger?");
         };
 
-        let mut data = [0u8; 40];
+        // let mut data = [0u8; 40];
+        let mut data = [0u8; 36];
         // let mut data = [0u8; 24];
 
         /// gyro

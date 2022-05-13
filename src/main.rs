@@ -298,7 +298,7 @@ mod app {
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
 
-                // #[cfg(feature = "nope")]
+                #[cfg(feature = "nope")]
                 {
                     /// update AHRS
                     let gyro0 = sd.imu_gyro.read_and_reset();
@@ -324,9 +324,9 @@ mod app {
                     // print_v3("acc  = ", acc, 4);
                     // print_v3("mag  = ", mag, 6);
 
-                    // ahrs.update(gyro, acc, mag);
+                    ahrs.update(gyro, acc, mag);
 
-                    ahrs.update_no_mag(gyro, acc);
+                    // ahrs.update_no_mag(gyro, acc);
 
                     if ahrs.is_acc_warning() {
                         rprintln!("acc warning");
@@ -388,17 +388,17 @@ mod app {
                 // // let yaw = 90.0 - rad_to_deg(f32::atan(mag0.y / mag0.x));
                 // rprintln!("yaw = {=f32:08}", yaw);
 
-                /// update FlightData
-                fd.update(ahrs);
+                // /// update FlightData
+                // fd.update(ahrs);
 
-                let (roll, pitch, yaw) = fd.get_euler_angles();
+                // let (roll, pitch, yaw) = fd.get_euler_angles();
 
-                rprintln!(
-                    "(r,p,y) = {:?}, {:?}, {:?}",
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
-                );
+                // rprintln!(
+                //     "(r,p,y) = {:?}, {:?}, {:?}",
+                //     r(rad_to_deg(roll)),
+                //     r(rad_to_deg(pitch)),
+                //     r(rad_to_deg(yaw)),
+                // );
 
                 *tim9_flag = true;
             });
@@ -453,17 +453,19 @@ mod app {
                             // bt.unpause_interrupt(exti);
                             // // rprintln!("1");
 
-                            bt.pause_interrupt(exti);
-                            bt.log_write_quat(&fd.quat).unwrap();
-                            bt.unpause_interrupt(exti);
+                            // bt.pause_interrupt(exti);
+                            // bt.log_write_quat(&fd.quat).unwrap();
+                            // bt.unpause_interrupt(exti);
 
                             let gyro0 = sd.imu_gyro.read_and_reset();
                             let acc0 = sd.imu_acc.read_and_reset();
                             let mag0 = sd.magnetometer.read_and_reset();
 
+                            // rprintln!("0");
                             bt.pause_interrupt(exti);
                             bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                             bt.unpause_interrupt(exti);
+                            // rprintln!("1");
 
                             // //
                             // unimplemented!()
