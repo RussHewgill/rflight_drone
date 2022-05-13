@@ -1,11 +1,14 @@
 use cortex_m::peripheral::NVIC;
 use embedded_hal::spi::MODE_3;
 // use dwt_systick_monotonic::DwtSystick;
-use stm32f4::stm32f401::{self, EXTI, RCC, SPI1, SPI2, TIM10, TIM2, TIM3, TIM5, TIM9};
+use stm32f4::stm32f401::{
+    self, ADC1, EXTI, RCC, SPI1, SPI2, TIM10, TIM2, TIM3, TIM5, TIM9,
+};
 use stm32f401::{CorePeripherals, Peripherals};
+use stm32f4xx_hal::adc::Adc;
 use stm32f4xx_hal::dwt::{Dwt, DwtExt};
 use stm32f4xx_hal::gpio::{
-    Alternate, Input, Output, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PA8, PB12, PB13,
+    Alternate, Input, Output, Pin, Pull, Speed, PA4, PA5, PA6, PA7, PA8, PB1, PB12, PB13,
     PB15, PB2, PB4, PB5, PC13,
 };
 use stm32f4xx_hal::rcc::Clocks;
@@ -16,6 +19,7 @@ use stm32f4xx_hal::timer::{
 };
 use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
+use crate::battery::BatteryAdc;
 use crate::bluetooth::BluetoothSpi;
 use crate::leds::LEDs;
 use crate::sensors::barometer::Barometer;
@@ -68,6 +72,8 @@ pub struct InitStruct {
     pub bt:      BTController,
     // pub delay_bt: DelayMs<TIM2>,
     pub tim9:    TIM9,
+    // pub adc:     Adc<ADC1>,
+    pub adc:     BatteryAdc,
 }
 
 pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
@@ -82,60 +88,16 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
 
     // let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
-    // let mono = DwtSystick::<1_000>::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.sysclk().raw());
-    // let mono = DwtSystick::<1_000>::new(&mut cp.DCB, cp.DWT, cp.SYST, clocks.hclk().raw());
-
-    // let mono = Systick::new(cp.SYST, clocks.sysclk().raw());
-
     let mono = MonoTimer::<TIM5, 1_000_000>::new(dp.TIM5, &clocks);
 
-    // let mut tim9 = Timer::new(dp.TIM9, &clocks);
-    // tim9.sta
-    // tim9.listen(stm32f4xx_hal::timer::Event::Update);
-
-    /// TIM9: periodic sensor polling
-    // let mut tim9: stm32f4xx_hal::timer::CounterHz<TIM9> = dp.TIM9.counter_hz(&clocks);
-    // let mut tim10: stm32f4xx_hal::timer::CounterHz<TIM10> = dp.TIM10.counter_hz(&clocks);
-
-    // let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> = dp.TIM3.counter_hz(&clocks);
     let mut tim3 = dp.TIM3;
 
-    // tim9.start(1.secs()).unwrap();
-    // tim9.start(200.Hz()).unwrap();
-
-    // tim9.start(main_period).unwrap();
-    // tim9.listen(stm32f4xx_hal::timer::Event::Update);
-
-    // (uart, clocks, mono)
     let mut syscfg = dp.SYSCFG.constrain();
 
     // // let _rtc = hal::rtc::Rtc::rtc(dp.RTC, &mut rcc);
     // let _rtc = stm32f4xx_hal::rtc::Rtc::new(dp.RTC, &mut dp.PWR);
 
-    // // let mut bt_delay = cp.SYST.delay(&clocks);
-    // // let bt_delay = dp.TIM2.delay_ms(&clocks);
-
     let bt_delay = dp.TIM2.counter_us(&clocks);
-    // let bt_delay = FTimerMs::new(dp.TIM2, &clocks);
-
-    // {
-    //     use stm32f4xx_hal::rcc::BusClock;
-    //     let freq: fugit::HertzU32 = 8.MHz();
-    //     let clock: fugit::HertzU32 = SPI1::clock(&clocks);
-    //     /// 64 MHz, 4 MHz = 0b011
-    //     let br = match clock.raw() / freq.raw() {
-    //         0 => unreachable!(),
-    //         1..=2 => 0b000,
-    //         3..=5 => 0b001,
-    //         6..=11 => 0b010,
-    //         12..=23 => 0b011,
-    //         24..=47 => 0b100,
-    //         48..=95 => 0b101,
-    //         96..=191 => 0b110,
-    //         _ => 0b111,
-    //     };
-    //     uprintln!(uart, "br = {:#05b}", br);
-    // }
 
     let bt_irq = init_bt_interrupt(&mut dp.EXTI, &mut syscfg, gpioa.pa4);
 
@@ -151,6 +113,8 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
 
     let dwt = cp.DWT.constrain(cp.DCB, &clocks);
 
+    let adc = init_adc(dp.ADC1, gpiob.pb1);
+
     InitStruct {
         dwt,
         // uart,
@@ -161,7 +125,21 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
         sensors,
         bt,
         tim9: dp.TIM9,
+        adc,
     }
+}
+
+fn init_adc(adc1: ADC1, pb1: PB1) -> BatteryAdc {
+    use stm32f4xx_hal::adc::config::*;
+    use stm32f4xx_hal::adc::*;
+
+    let voltage = pb1.into_analog();
+
+    let adc_cfg = AdcConfig::default().resolution(Resolution::Twelve);
+
+    let mut adc = Adc::adc1(adc1, true, adc_cfg);
+
+    BatteryAdc::new(adc, voltage)
 }
 
 fn init_sensors_spi(

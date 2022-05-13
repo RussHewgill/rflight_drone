@@ -6,7 +6,7 @@
 #![no_std]
 #![no_main]
 
-pub mod adc;
+pub mod battery;
 pub mod bluetooth;
 pub mod bluetooth2;
 pub mod bt_control;
@@ -22,7 +22,7 @@ pub mod uart;
 pub mod utils;
 
 use crate::{
-    adc::*, bluetooth::*, bluetooth2::*, bt_control::*, flight_control::*,
+    battery::*, bluetooth::*, bluetooth2::*, bt_control::*, flight_control::*,
     init::init_all_pre, math::*, sensors::barometer::*, sensors::imu::*,
     sensors::magneto::*, sensors::*, spi::*, time::*, uart::*, utils::*,
 };
@@ -70,8 +70,8 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-// #[cfg(feature = "nope")]
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -90,6 +90,7 @@ mod app {
     };
 
     use crate::{
+        battery::BatteryAdc,
         bluetooth::gap::Commands as GapCommands,
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
@@ -122,6 +123,7 @@ mod app {
         flight_data: FlightData,
         bt:          BTController,
         tim9_flag:   bool,
+        adc:         BatteryAdc,
     }
 
     #[local]
@@ -258,6 +260,7 @@ mod app {
             flight_data: FlightData::default(),
             bt,
             tim9_flag: false,
+            adc: init_struct.adc,
         };
 
         let local = Local {
@@ -396,14 +399,17 @@ mod app {
 
     // #[cfg(feature = "nope")]
     #[task(
-        shared = [bt, exti, flight_data, sens_data, dwt, tim9_flag],
-        local = [counter: u32 = 0, buf: [u8; 16] = [0; 16]],
+        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag],
+        local = [counter: u32 = 0, bat_counter: u32 = 0, buf: [u8; 16] = [0; 16]],
         priority = 3
     )]
     fn main_loop(mut cx: main_loop::Context) {
         // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
         // const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
         const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
+
+        // *cx.local.bat_counter += 1;
+        // if *cx.local.bat_counter
 
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
@@ -507,8 +513,8 @@ mod app {
     }
 }
 
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-#[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+// #[cfg(feature = "nope")]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
@@ -518,6 +524,7 @@ mod app {
     use defmt::println as rprintln;
 
     use stm32f4xx_hal::{
+        adc::{config::AdcConfig, Adc},
         block,
         dwt::Dwt,
         gpio::{Output, Pin},
@@ -541,7 +548,9 @@ mod app {
     use nalgebra as na;
 
     #[shared]
-    struct Shared {}
+    struct Shared {
+        // adc:
+    }
 
     #[local]
     struct Local {}
@@ -553,36 +562,68 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        // let mut rcc = dp.RCC.constrain();
-        // rprintln!("wat 0");
-        // let clocks = rcc
-        //     .cfgr
-        //     //
-        //     .use_hse(16.MHz())
-        //     // .sysclk(32.MHz())
-        //     // .sysclk(64.MHz())
-        //     .sysclk(84.MHz())
-        //     // .require_pll48clk()
-        //     .freeze();
-        // rprintln!("wat 1");
-        // rprintln!("sysclk()   core = {:?}", clocks.sysclk());
-        // rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
+        let mut rcc = dp.RCC.constrain();
+        rprintln!("wat 0");
+        let clocks = rcc
+            .cfgr
+            //
+            .use_hse(16.MHz())
+            // .sysclk(32.MHz())
+            // .sysclk(64.MHz())
+            .sysclk(84.MHz())
+            // .require_pll48clk()
+            .freeze();
+        rprintln!("sysclk()   core = {:?}", clocks.sysclk());
+        rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
 
-        let mut ahrs = crate::sensors::ahrs::AhrsComplementary::new(
-            0.1, //
-            0.1,
-        );
+        use stm32f4xx_hal::adc::config::*;
+        use stm32f4xx_hal::adc::*;
+
+        let gpiob = dp.GPIOB.split();
+
+        let voltage = gpiob.pb1.into_analog();
+
+        // let adc_cfg = AdcConfig::default()
+        //     .clock(Clock::Pclk2_div_4)
+        //     .resolution(Resolution::Twelve)
+        //     .align(Align::Right)
+        //     .scan(Scan::Disabled)
+        //     // .external_trigger(TriggerMode::Disabled, Exte)
+        //     .continuous(Continuous::Single);
+
+        let adc_cfg = AdcConfig::default().resolution(Resolution::Twelve);
+
+        let mut adc = Adc::adc1(dp.ADC1, true, adc_cfg);
+
+        // let sample = adc.current_sample();
+
+        let sample = adc.convert(&voltage, SampleTime::Cycles_3);
+
+        let v_ref = 3.3;
+        let r_up = 10_000.0;
+        let r_down = 20_000.0;
+
+        let v_bat: f32 = (sample as f32 * v_ref) / 2u32.pow(12) as f32;
+        let v_bat: f32 = v_bat * ((r_up + r_down) / r_down);
+
+        // let v_bat = v_bat * 1_000;
+
+        rprintln!("v_bat = {:?}", v_bat);
+
+        // let mut ahrs = crate::sensors::ahrs::AhrsComplementary::new(
+        //     0.1, //
+        //     0.1,
+        // );
+
+        // foo::spawn().unwrap();
 
         (Shared {}, Local {}, init::Monotonics())
     }
 
-    // #[task(shared = [], local = [x: u32 = 0])]
-    // fn foo(cx: foo::Context) {
-    //     *cx.local.x += 1;
-    //     rprintln!("wat {:?}", *cx.local.x);
-    //     // defmt::error!("wat {:?}", *cx.local.x);
-    //     foo::spawn().unwrap();
-    // }
+    #[task(shared = [], local = [])]
+    fn foo(cx: foo::Context) {
+        foo::spawn().unwrap();
+    }
 
     #[idle]
     fn idle(_: idle::Context) -> ! {
