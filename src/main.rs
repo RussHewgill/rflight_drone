@@ -533,6 +533,7 @@ mod app {
     };
 
     use crate::{
+        battery::BatteryAdc,
         bluetooth::gap::Commands as GapCommands,
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
@@ -595,20 +596,23 @@ mod app {
 
         let mut adc = Adc::adc1(dp.ADC1, true, adc_cfg);
 
+        let mut bat = BatteryAdc::new(adc, voltage);
+
+        let v0 = bat.sample();
+        rprintln!("v0 = {:?}", v0);
+
+        let v1 = bat.sample();
+        rprintln!("v1 = {:?}", v1);
+
         // let sample = adc.current_sample();
 
-        let sample = adc.convert(&voltage, SampleTime::Cycles_3);
-
-        let v_ref = 3.3;
-        let r_up = 10_000.0;
-        let r_down = 20_000.0;
-
-        let v_bat: f32 = (sample as f32 * v_ref) / 2u32.pow(12) as f32;
-        let v_bat: f32 = v_bat * ((r_up + r_down) / r_down);
-
-        // let v_bat = v_bat * 1_000;
-
-        rprintln!("v_bat = {:?}", v_bat);
+        // let sample = adc.convert(&voltage, SampleTime::Cycles_3);
+        // let v_ref = 3.3;
+        // let r_up = 10_000.0;
+        // let r_down = 20_000.0;
+        // let v_bat: f32 = (sample as f32 * v_ref) / 2u32.pow(12) as f32;
+        // let v_bat: f32 = v_bat * ((r_up + r_down) / r_down);
+        // rprintln!("v_bat = {:?}", v_bat);
 
         // let mut ahrs = crate::sensors::ahrs::AhrsComplementary::new(
         //     0.1, //
