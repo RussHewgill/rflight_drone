@@ -44,9 +44,10 @@ mod complementary {
 
     #[derive(Debug, Clone, Copy)]
     pub struct AhrsComplementary {
-        quat:       UQuat,
-        delta_time: f32,
-        gain:       f32,
+        quat:           UQuat,
+        // delta_time: f32,
+        pub delta_time: f32,
+        gain:           f32,
     }
 
     /// new
@@ -95,7 +96,8 @@ mod complementary {
 
             let q_am = UQuat::from_euler_angles(roll, pitch, yaw);
 
-            self.quat = q_omega.nlerp(&q_am, self.gain);
+            // self.quat = q_omega.nlerp(&q_am, self.gain);
+            self.quat = q_omega;
         }
 
         fn get_quat(&self) -> &UQuat {
@@ -105,7 +107,7 @@ mod complementary {
 
     impl AhrsComplementary {
         pub fn attitude_propagation(&self, gyro: V3) -> UQuat {
-            let w = -0.5 * self.delta_time * gyro;
+            let w: V3 = -0.5 * self.delta_time * gyro;
 
             #[rustfmt::skip]
             let a = na::Matrix4::<f32>::new(
@@ -399,7 +401,13 @@ mod fusion {
             /// Integrate rate of change of quaternion
             /// Normalise quaternion
             let v: V3 = adjusted_half_gyro * self.delta_time;
-            self.quat = UQuat::from_quaternion(*self.quat + quat_mult_vec(*self.quat, v));
+
+            let v = Quaternion::from_parts(0.0, v);
+            self.quat = UQuat::from_quaternion(*self.quat + (*self.quat * v));
+
+            // self.quat = UQuat::from_quaternion(*self.quat + quat_mult_vec(*self.quat, v));
+
+            //
         }
 
         fn get_quat(&self) -> &UQuat {

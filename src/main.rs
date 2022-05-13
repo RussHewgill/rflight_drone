@@ -298,28 +298,49 @@ mod app {
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
 
-                /// update AHRS
-                let gyro0 = sd.imu_gyro.read_and_reset();
-                let acc0 = sd.imu_acc.read_and_reset();
-                let mag0 = sd.magnetometer.read_and_reset();
+                // #[cfg(feature = "nope")]
+                {
+                    /// update AHRS
+                    let gyro0 = sd.imu_gyro.read_and_reset();
+                    let acc0 = sd.imu_acc.read_and_reset();
+                    let mag0 = sd.magnetometer.read_and_reset();
 
-                // if ahrs.calibration.initializing {
-                //     ahrs.calibration.update(gyro0, acc0, mag0);
-                // }
+                    // if ahrs.calibration.initializing {
+                    //     ahrs.calibration.update(gyro0, acc0, mag0);
+                    // }
 
-                let gyro = ahrs.calibration.calibrate_gyro(gyro0);
-                let acc = ahrs.calibration.calibrate_acc(acc0);
-                let mag = ahrs.calibration.calibrate_mag(mag0);
+                    let gyro1 = ahrs.calibration.calibrate_gyro(gyro0);
+                    let acc = ahrs.calibration.calibrate_acc(acc0);
+                    let mag = ahrs.calibration.calibrate_mag(mag0);
 
-                // let gyro = gyro0;
-                // let acc = acc0;
-                // let mag = mag0;
+                    // let gyro = gyro0;
+                    // let acc = acc0;
+                    // let mag = mag0;
 
-                let gyro = ahrs.offset.update(gyro0);
+                    let gyro = ahrs.offset.update(gyro1);
+                    // let gyro = gyro1;
 
-                // ahrs.update(gyro, acc, mag);
+                    // print_v3("gyro = ", gyro, 4);
+                    // print_v3("acc  = ", acc, 4);
+                    // print_v3("mag  = ", mag, 6);
 
-                ahrs.update_no_mag(gyro, acc);
+                    // ahrs.update(gyro, acc, mag);
+
+                    ahrs.update_no_mag(gyro, acc);
+
+                    if ahrs.is_acc_warning() {
+                        rprintln!("acc warning");
+                    }
+                    if ahrs.is_acc_timeout() {
+                        rprintln!("acc timeout");
+                    }
+                    if ahrs.is_mag_warning() {
+                        rprintln!("mag warning");
+                    }
+                    if ahrs.is_mag_timeout() {
+                        rprintln!("mag timeout");
+                    }
+                }
 
                 // /// update AHRS
                 // let gyro = sd.imu_gyro.read_and_reset();
@@ -334,20 +355,6 @@ mod app {
                 //     round_to(mag.x, 6),
                 //     round_to(mag.y, 6),
                 // );
-
-                if ahrs.is_acc_warning() {
-                    rprintln!("acc warning");
-                }
-                if ahrs.is_acc_timeout() {
-                    rprintln!("acc timeout");
-                }
-
-                if ahrs.is_mag_warning() {
-                    rprintln!("mag warning");
-                }
-                if ahrs.is_mag_timeout() {
-                    rprintln!("mag timeout");
-                }
 
                 use na::{ComplexField, RealField};
 
@@ -518,7 +525,7 @@ mod app {
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
-    use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM5, TIM9};
+    use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM4, TIM5, TIM9};
 
     // use rtt_target::{rprint, rprintln, rtt_init_print};
     use defmt::println as rprintln;
@@ -580,11 +587,13 @@ mod app {
 
         let (mut pin1, mut pin2) = pwm.split();
 
-        let k1 = pin1.get_max_duty();
-        rprintln!("k1 = {:?}", k1);
+        // let k1 = pin1.get_max_duty();
+        // rprintln!("k1 = {:?}", k1);
 
-        let k2 = pin1.get_max_duty();
-        rprintln!("k2 = {:?}", k2);
+        // let k2 = pin1.get_max_duty();
+        // rprintln!("k2 = {:?}", k2);
+
+        // let tim4 = unsafe { &(*TIM4::ptr()) };
 
         // let mut ahrs = crate::sensors::ahrs::AhrsComplementary::new(
         //     0.1, //

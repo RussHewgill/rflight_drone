@@ -139,7 +139,7 @@ impl Sensors {
     }
 }
 
-/// read data
+/// read data, and swap axes
 impl Sensors {
     pub fn read_data_imu(&mut self, data: &mut SensorData, discard: bool) {
         if let Ok((data_gyro, data_acc)) = self.with_spi_imu(|spi, imu| {
@@ -156,17 +156,19 @@ impl Sensors {
                 ];
                 data.imu_gyro.update(data_gyro);
 
-                let data_acc = [
-                    -data_acc[1], //
-                    data_acc[0],
-                    data_acc[2],
-                ];
-
+                // /// rot about x,y,z
                 // let data_acc = [
-                //     data_acc[0], //
-                //     data_acc[1],
+                //     -data_acc[1], //
+                //     data_acc[0],
                 //     data_acc[2],
                 // ];
+
+                /// roll, pitch, yaw to match na::Quat
+                let data_acc = [
+                    -data_acc[0], //
+                    data_acc[1],
+                    data_acc[2],
+                ];
 
                 data.imu_acc.update(data_acc);
             }
