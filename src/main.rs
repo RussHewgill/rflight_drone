@@ -248,9 +248,9 @@ mod app {
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
-        /// start timer
-        tim3.start(sensor_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start timer
+        // tim3.start(sensor_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -271,7 +271,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -581,13 +581,25 @@ mod app {
 
         let gb = dp.GPIOB.split();
 
-        // let mut motors = MotorsPWM::new(dp.TIM4, gb.pb6, gb.pb7, gb.pb8, gb.pb9, &clocks);
+        let mut motors = MotorsPWM::new(dp.TIM4, gb.pb6, gb.pb7, gb.pb8, gb.pb9, &clocks);
 
-        let channels = (gb.pb6.into_alternate::<2>(), gb.pb7.into_alternate::<2>());
+        let mut delay = cp.SYST.delay(&clocks);
 
-        let pwm = dp.TIM4.pwm_hz(channels, 494.Hz(), &clocks);
+        let m = MotorSelect::Motor3;
 
-        let (mut pin1, mut pin2) = pwm.split();
+        motors.set_motor(m, 0.01);
+        motors.enable_motor(m);
+
+        rprintln!("wat 0");
+        delay.delay(1000.millis());
+
+        motors.disable_motor(m);
+        rprintln!("wat 1");
+
+        // let channels = (gb.pb6.into_alternate::<2>(), gb.pb7.into_alternate::<2>());
+        // let pwm = dp.TIM4.pwm_hz(channels, 494.Hz(), &clocks);
+        // let (mut pin1, mut pin2) = pwm.split();
+        // let pin1: stm32f4xx_hal::timer::PwmChannel<TIM4, 0> = pin1;
 
         // let k1 = pin1.get_max_duty();
         // rprintln!("k1 = {:?}", k1);

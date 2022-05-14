@@ -1,3 +1,4 @@
+pub mod service_input;
 pub mod service_log;
 pub mod service_sensors;
 
@@ -116,6 +117,13 @@ mod uuids {
 
     pub const UUID_SENSOR_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x4f1f7252db544d4faa8f208d48637b3f);
+
+    /// Sensors
+    pub const UUID_INPUT_SERVICE: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0xa7a2eafd569442debf3bee79d621779c);
+
+    pub const UUID_INPUT_CHAR_THROTTLE: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x0d2d404bff6d4e8a97b15bc440288423);
 }
 
 /// init
@@ -129,6 +137,7 @@ where
     fn init_services(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
         self.init_log_service()?;
         // self.init_sensor_service()?;
+        // self.init_input_service()?;
         Ok(())
     }
 
