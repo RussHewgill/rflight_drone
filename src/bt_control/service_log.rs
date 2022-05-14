@@ -192,8 +192,6 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
-    // #[cfg(feature = "nope")]
-    /// block
     pub fn init_log_service(&mut self) -> Result<(), BTError<SpiError, GpioError>> {
         let params = AddServiceParameters {
             uuid:                  UUID_LOG_SERVICE,
