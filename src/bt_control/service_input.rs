@@ -126,13 +126,12 @@ where
         // };
         // rprintln!("c 1 = {:?}", defmt::Debug2Format(&c1));
 
-        // let logger = SvLogger {
-        //     service_handle:   service.service_handle,
-        //     char_handle_quat: c0.characteristic_handle,
-        //     char_handle_sens: c1.characteristic_handle,
-        // };
+        let input = SvInput {
+            input_service: service.service_handle,
+            throttle_char: c0.characteristic_handle,
+        };
 
-        // self.services.logger = Some(logger);
+        self.services.input = Some(input);
 
         Ok(())
     }

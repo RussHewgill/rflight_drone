@@ -273,6 +273,8 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
+        bt_test::spawn_after(100.millis()).unwrap();
+
         (shared, local, init::Monotonics(mono))
     }
 
@@ -476,6 +478,31 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
         main_loop::spawn().unwrap();
+    }
+
+    #[task(shared = [bt, exti], local = [], priority = 3)]
+    fn bt_test(mut cx: bt_test::Context) {
+        (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
+            if let BTState::Connected(conn) = bt.state {
+                bt.pause_interrupt(exti);
+
+                let handle = match bt.services.input {
+                    Some(i) => i.throttle_char,
+                    _ => panic!("no throttle handle"),
+                };
+
+                // block!(bt.read_characteristic_using_uuid(
+                block!(bt.read_characteristic_value(conn, handle)).unwrap();
+                rprintln!("send read req");
+
+                bt.read_event_uart().unwrap();
+                rprintln!("finished read");
+
+                bt.unpause_interrupt(exti);
+            }
+        });
+
+        bt_test::spawn_after(100.millis()).unwrap();
     }
 
     // #[cfg(feature = "nope")]
