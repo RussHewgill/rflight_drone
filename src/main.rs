@@ -516,7 +516,10 @@ mod app {
             bt.pause_interrupt(exti);
 
             let event: BTEvent = match bt._read_event() {
-                Ok(ev) => ev,
+                Ok(ev) => {
+                    rprintln!("ev = {:?}", defmt::Debug2Format(&ev));
+                    ev
+                }
                 Err(e) => {
                     rprintln!("read event error = {:?}", defmt::Debug2Format(&e));
                     unimplemented!()

@@ -96,6 +96,7 @@ where
                 | CharacteristicProperty::READ,
             security_permissions:      CharacteristicPermission::NONE,
             gatt_event_mask:           CharacteristicEvent::NONE,
+            // gatt_event_mask:           CharacteristicEvent::ATTRIBUTE_WRITE,
             // gatt_event_mask:           CharacteristicEvent::ATTRIBUTE_WRITE
             //     | CharacteristicEvent::CONFIRM_READ
             //     | CharacteristicEvent::CONFIRM_WRITE,

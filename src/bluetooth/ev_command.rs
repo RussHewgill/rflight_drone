@@ -247,9 +247,11 @@ impl hci::event::VendorReturnParameters for ReturnParameters {
         check_len_at_least(bytes, 3)?;
 
         match hci::Opcode(LittleEndian::read_u16(&bytes[1..])) {
-            crate::bluetooth::opcode::HAL_GET_FIRMWARE_REVISION => Ok(
-                ReturnParameters::HalGetFirmwareRevision(to_hal_firmware_revision(&bytes[3..])?),
-            ),
+            crate::bluetooth::opcode::HAL_GET_FIRMWARE_REVISION => {
+                Ok(ReturnParameters::HalGetFirmwareRevision(
+                    to_hal_firmware_revision(&bytes[3..])?,
+                ))
+            }
             crate::bluetooth::opcode::HAL_WRITE_CONFIG_DATA => Ok(
                 ReturnParameters::HalWriteConfigData(to_status(&bytes[3..])?),
             ),
@@ -291,9 +293,11 @@ impl hci::event::VendorReturnParameters for ReturnParameters {
             crate::bluetooth::opcode::GAP_SET_IO_CAPABILITY => Ok(
                 ReturnParameters::GapSetIoCapability(to_status(&bytes[3..])?),
             ),
-            crate::bluetooth::opcode::GAP_SET_AUTHENTICATION_REQUIREMENT => Ok(
-                ReturnParameters::GapSetAuthenticationRequirement(to_status(&bytes[3..])?),
-            ),
+            crate::bluetooth::opcode::GAP_SET_AUTHENTICATION_REQUIREMENT => {
+                Ok(ReturnParameters::GapSetAuthenticationRequirement(
+                    to_status(&bytes[3..])?,
+                ))
+            }
             crate::bluetooth::opcode::GAP_SET_AUTHORIZATION_REQUIREMENT => Ok(
                 ReturnParameters::GapSetAuthorizationRequirement(to_status(&bytes[3..])?),
             ),
@@ -318,9 +322,11 @@ impl hci::event::VendorReturnParameters for ReturnParameters {
             crate::bluetooth::opcode::GAP_DELETE_AD_TYPE => {
                 Ok(ReturnParameters::GapDeleteAdType(to_status(&bytes[3..])?))
             }
-            crate::bluetooth::opcode::GAP_GET_SECURITY_LEVEL => Ok(
-                ReturnParameters::GapGetSecurityLevel(to_gap_security_level(&bytes[3..])?),
-            ),
+            crate::bluetooth::opcode::GAP_GET_SECURITY_LEVEL => {
+                Ok(ReturnParameters::GapGetSecurityLevel(
+                    to_gap_security_level(&bytes[3..])?,
+                ))
+            }
             crate::bluetooth::opcode::GAP_SET_EVENT_MASK => {
                 Ok(ReturnParameters::GapSetEventMask(to_status(&bytes[3..])?))
             }
@@ -351,9 +357,11 @@ impl hci::event::VendorReturnParameters for ReturnParameters {
                     ))
                 }
             }
-            crate::bluetooth::opcode::GAP_GET_BONDED_DEVICES => Ok(
-                ReturnParameters::GapGetBondedDevices(to_gap_bonded_devices(&bytes[3..])?),
-            ),
+            crate::bluetooth::opcode::GAP_GET_BONDED_DEVICES => {
+                Ok(ReturnParameters::GapGetBondedDevices(
+                    to_gap_bonded_devices(&bytes[3..])?,
+                ))
+            }
             crate::bluetooth::opcode::GAP_SET_BROADCAST_MODE => {
                 #[cfg(feature = "ms")]
                 {
@@ -390,15 +398,17 @@ impl hci::event::VendorReturnParameters for ReturnParameters {
             crate::bluetooth::opcode::GATT_INIT => {
                 Ok(ReturnParameters::GattInit(to_status(&bytes[3..])?))
             }
-            crate::bluetooth::opcode::GATT_ADD_SERVICE => Ok(ReturnParameters::GattAddService(
-                to_gatt_service(&bytes[3..])?,
-            )),
+            crate::bluetooth::opcode::GATT_ADD_SERVICE => Ok(
+                ReturnParameters::GattAddService(to_gatt_service(&bytes[3..])?),
+            ),
             crate::bluetooth::opcode::GATT_INCLUDE_SERVICE => Ok(
                 ReturnParameters::GattIncludeService(to_gatt_service(&bytes[3..])?),
             ),
-            crate::bluetooth::opcode::GATT_ADD_CHARACTERISTIC => Ok(
-                ReturnParameters::GattAddCharacteristic(to_gatt_characteristic(&bytes[3..])?),
-            ),
+            crate::bluetooth::opcode::GATT_ADD_CHARACTERISTIC => {
+                Ok(ReturnParameters::GattAddCharacteristic(
+                    to_gatt_characteristic(&bytes[3..])?,
+                ))
+            }
             crate::bluetooth::opcode::GATT_ADD_CHARACTERISTIC_DESCRIPTOR => {
                 Ok(ReturnParameters::GattAddCharacteristicDescriptor(
                     to_gatt_characteristic_descriptor(&bytes[3..])?,
@@ -473,9 +483,11 @@ impl hci::event::VendorReturnParameters for ReturnParameters {
                     ))
                 }
             }
-            crate::bluetooth::opcode::L2CAP_CONN_PARAM_UPDATE_RESP => Ok(
-                ReturnParameters::L2CapConnectionParameterUpdateResponse(to_status(&bytes[3..])?),
-            ),
+            crate::bluetooth::opcode::L2CAP_CONN_PARAM_UPDATE_RESP => {
+                Ok(ReturnParameters::L2CapConnectionParameterUpdateResponse(
+                    to_status(&bytes[3..])?,
+                ))
+            }
             other => Err(hci::event::Error::UnknownOpcode(other)),
         }
     }
@@ -515,11 +527,12 @@ pub struct HalFirmwareRevision {
 
 fn to_hal_firmware_revision(
     bytes: &[u8],
-) -> Result<HalFirmwareRevision, hci::event::Error<crate::bluetooth::events::BlueNRGError>> {
+) -> Result<HalFirmwareRevision, hci::event::Error<crate::bluetooth::events::BlueNRGError>>
+{
     require_len!(bytes, 3);
 
     Ok(HalFirmwareRevision {
-        status: to_status(bytes)?,
+        status:   to_status(bytes)?,
         revision: LittleEndian::read_u16(&bytes[1..]),
     })
 }
@@ -571,13 +584,14 @@ fn to_hal_config_data(
     require_len_at_least!(bytes, 2);
     Ok(HalConfigData {
         status: to_status(bytes)?,
-        value: to_hal_config_parameter(&bytes[1..])?,
+        value:  to_hal_config_parameter(&bytes[1..])?,
     })
 }
 
 fn to_hal_config_parameter(
     bytes: &[u8],
-) -> Result<HalConfigParameter, hci::event::Error<crate::bluetooth::events::BlueNRGError>> {
+) -> Result<HalConfigParameter, hci::event::Error<crate::bluetooth::events::BlueNRGError>>
+{
     match bytes.len() {
         6 => {
             let mut buf = [0; 6];
@@ -616,10 +630,11 @@ pub struct HalTxTestPacketCount {
 
 fn to_hal_tx_test_packet_count(
     bytes: &[u8],
-) -> Result<HalTxTestPacketCount, hci::event::Error<crate::bluetooth::events::BlueNRGError>> {
+) -> Result<HalTxTestPacketCount, hci::event::Error<crate::bluetooth::events::BlueNRGError>>
+{
     require_len!(bytes, 5);
     Ok(HalTxTestPacketCount {
-        status: to_status(bytes)?,
+        status:       to_status(bytes)?,
         packet_count: LittleEndian::read_u32(&bytes[1..]),
     })
 }
@@ -691,9 +706,9 @@ fn to_hal_link_status(
     require_len!(bytes, 25);
 
     let mut status = HalLinkStatus {
-        status: to_status(&bytes[0..])?,
+        status:  to_status(&bytes[0..])?,
         clients: [ClientStatus {
-            state: LinkState::Idle,
+            state:       LinkState::Idle,
             conn_handle: hci::ConnectionHandle(0),
         }; 8],
     };
@@ -702,9 +717,9 @@ fn to_hal_link_status(
         status.clients[client].state = bytes[1 + client]
             .try_into()
             .map_err(hci::event::Error::Vendor)?;
-        status.clients[client].conn_handle = hci::ConnectionHandle(LittleEndian::read_u16(
-            &bytes[9 + 2 * client..9 + 2 * (client + 1)],
-        ));
+        status.clients[client].conn_handle = hci::ConnectionHandle(
+            LittleEndian::read_u16(&bytes[9 + 2 * client..9 + 2 * (client + 1)]),
+        );
     }
 
     Ok(status)
@@ -730,11 +745,13 @@ fn to_hal_anchor_period(
     require_len!(bytes, 9);
 
     Ok(HalAnchorPeriod {
-        status: to_status(bytes)?,
+        status:          to_status(bytes)?,
         anchor_interval: Duration::from_micros(
             625 * u64::from(LittleEndian::read_u32(&bytes[1..5])),
         ),
-        max_slot: Duration::from_micros(625 * u64::from(LittleEndian::read_u32(&bytes[5..9]))),
+        max_slot:        Duration::from_micros(
+            625 * u64::from(LittleEndian::read_u32(&bytes[5..9])),
+        ),
     })
 }
 
@@ -764,10 +781,16 @@ fn to_gap_init(
     require_len!(bytes, 7);
 
     Ok(GapInit {
-        status: to_status(bytes)?,
-        service_handle: crate::gatt::ServiceHandle(LittleEndian::read_u16(&bytes[1..])),
-        dev_name_handle: crate::gatt::CharacteristicHandle(LittleEndian::read_u16(&bytes[3..])),
-        appearance_handle: crate::gatt::CharacteristicHandle(LittleEndian::read_u16(&bytes[5..])),
+        status:            to_status(bytes)?,
+        service_handle:    crate::gatt::ServiceHandle(LittleEndian::read_u16(
+            &bytes[1..],
+        )),
+        dev_name_handle:   crate::gatt::CharacteristicHandle(LittleEndian::read_u16(
+            &bytes[3..],
+        )),
+        appearance_handle: crate::gatt::CharacteristicHandle(LittleEndian::read_u16(
+            &bytes[5..],
+        )),
     })
 }
 
@@ -810,7 +833,9 @@ impl TryFrom<u8> for PassKeyRequirement {
             0x00 => Ok(PassKeyRequirement::NotRequired),
             0x01 => Ok(PassKeyRequirement::FixedPin),
             0x02 => Ok(PassKeyRequirement::Generated),
-            _ => Err(crate::bluetooth::events::BlueNRGError::BadPassKeyRequirement(value)),
+            _ => {
+                Err(crate::bluetooth::events::BlueNRGError::BadPassKeyRequirement(value))
+            }
         }
     }
 }
@@ -831,11 +856,16 @@ fn to_gap_security_level(
     require_len!(bytes, 5);
 
     Ok(GapSecurityLevel {
-        status: to_status(&bytes[0..])?,
-        mitm_protection_required: to_boolean(bytes[1]).map_err(hci::event::Error::Vendor)?,
-        bonding_required: to_boolean(bytes[2]).map_err(hci::event::Error::Vendor)?,
-        out_of_band_data_present: to_boolean(bytes[3]).map_err(hci::event::Error::Vendor)?,
-        pass_key_required: bytes[4].try_into().map_err(hci::event::Error::Vendor)?,
+        status:                   to_status(&bytes[0..])?,
+        mitm_protection_required: to_boolean(bytes[1])
+            .map_err(hci::event::Error::Vendor)?,
+        bonding_required:         to_boolean(bytes[2])
+            .map_err(hci::event::Error::Vendor)?,
+        out_of_band_data_present: to_boolean(bytes[3])
+            .map_err(hci::event::Error::Vendor)?,
+        pass_key_required:        bytes[4]
+            .try_into()
+            .map_err(hci::event::Error::Vendor)?,
     })
 }
 
@@ -855,7 +885,10 @@ pub struct GapResolvePrivateAddress {
 #[cfg(feature = "ms")]
 fn to_gap_resolve_private_address(
     bytes: &[u8],
-) -> Result<GapResolvePrivateAddress, hci::event::Error<crate::bluetooth::events::BlueNRGError>> {
+) -> Result<
+    GapResolvePrivateAddress,
+    hci::event::Error<crate::bluetooth::events::BlueNRGError>,
+> {
     let status = to_status(bytes)?;
     if status == hci::Status::Success {
         require_len!(bytes, 7);
@@ -883,7 +916,7 @@ pub struct GapBondedDevices {
     pub status: hci::Status<crate::bluetooth::events::Status>,
 
     // Number of peer addresses in the event, and a buffer that can hold all of the addresses.
-    address_count: usize,
+    address_count:  usize,
     address_buffer: [hci::BdAddrType; MAX_ADDRESSES],
 }
 
@@ -924,16 +957,19 @@ fn to_gap_bonded_devices(
                 ));
             }
 
-            let mut address_buffer = [hci::BdAddrType::Public(hci::BdAddr([0; 6])); MAX_ADDRESSES];
+            let mut address_buffer =
+                [hci::BdAddrType::Public(hci::BdAddr([0; 6])); MAX_ADDRESSES];
             for (i, byte) in address_buffer.iter_mut().enumerate().take(address_count) {
                 let index = HEADER_LEN + i * ADDR_LEN;
                 let mut addr = [0; 6];
                 addr.copy_from_slice(&bytes[(1 + index)..(7 + index)]);
-                *byte = hci::to_bd_addr_type(bytes[index], hci::BdAddr(addr)).map_err(|e| {
-                    hci::event::Error::Vendor(
-                        crate::bluetooth::events::BlueNRGError::BadBdAddrType(e.0),
-                    )
-                })?;
+                *byte = hci::to_bd_addr_type(bytes[index], hci::BdAddr(addr)).map_err(
+                    |e| {
+                        hci::event::Error::Vendor(
+                            crate::bluetooth::events::BlueNRGError::BadBdAddrType(e.0),
+                        )
+                    },
+                )?;
             }
 
             Ok(GapBondedDevices {
@@ -972,7 +1008,7 @@ fn to_gatt_service(
     require_len!(bytes, 3);
 
     Ok(GattService {
-        status: to_status(bytes)?,
+        status:         to_status(bytes)?,
         service_handle: crate::gatt::ServiceHandle(LittleEndian::read_u16(&bytes[1..3])),
     })
 }
@@ -990,11 +1026,12 @@ pub struct GattCharacteristic {
 
 fn to_gatt_characteristic(
     bytes: &[u8],
-) -> Result<GattCharacteristic, hci::event::Error<crate::bluetooth::events::BlueNRGError>> {
+) -> Result<GattCharacteristic, hci::event::Error<crate::bluetooth::events::BlueNRGError>>
+{
     require_len!(bytes, 3);
 
     Ok(GattCharacteristic {
-        status: to_status(bytes)?,
+        status:                to_status(bytes)?,
         characteristic_handle: crate::gatt::CharacteristicHandle(LittleEndian::read_u16(
             &bytes[1..3],
         )),
@@ -1014,13 +1051,17 @@ pub struct GattCharacteristicDescriptor {
 
 fn to_gatt_characteristic_descriptor(
     bytes: &[u8],
-) -> Result<GattCharacteristicDescriptor, hci::event::Error<crate::bluetooth::events::BlueNRGError>>
-{
+) -> Result<
+    GattCharacteristicDescriptor,
+    hci::event::Error<crate::bluetooth::events::BlueNRGError>,
+> {
     require_len!(bytes, 3);
 
     Ok(GattCharacteristicDescriptor {
-        status: to_status(bytes)?,
-        descriptor_handle: crate::gatt::DescriptorHandle(LittleEndian::read_u16(&bytes[1..3])),
+        status:            to_status(bytes)?,
+        descriptor_handle: crate::gatt::DescriptorHandle(LittleEndian::read_u16(
+            &bytes[1..3],
+        )),
     })
 }
 

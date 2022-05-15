@@ -427,9 +427,6 @@ where
 
     pub fn _read_event(
         &mut self,
-        // timeout: Option<fugit::MillisDurationU32>,
-        // uart: &mut UART,
-        // ) -> nb::Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>>
     ) -> Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>> {
         //
 
