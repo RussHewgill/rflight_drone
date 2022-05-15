@@ -273,7 +273,7 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        bt_test::spawn_after(100.millis()).unwrap();
+        // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -522,7 +522,10 @@ mod app {
                     unimplemented!()
                 }
             };
-            bt.state.handle_event(event);
+
+            // bt.allow_read_write(&event);
+
+            bt.state.handle_event(&event);
 
             // if !bt.data_ready().unwrap() {
             //     break;

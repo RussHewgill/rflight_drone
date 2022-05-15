@@ -727,6 +727,15 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
+    pub fn allow_read_write(&mut self, event: &BTEvent) {
+        match event {
+            Event::Vendor(BlueNRGEvent::AttReadPermitRequest(req)) => {
+                // unimplemented!()
+            }
+            _ => {}
+        }
+    }
+
     fn handle_event_command_complete(
         // uart: &mut UART,
         return_params: ReturnParameters<BlueNRGEvent>,
@@ -844,7 +853,7 @@ impl BTState {
     //     Self::Connected(st.conn_handle)
     // }
 
-    pub fn handle_event(&mut self, event: BTEvent) {
+    pub fn handle_event(&mut self, event: &BTEvent) {
         match event {
             Event::LeConnectionComplete(status) => {
                 if status.status == bluetooth_hci::Status::Success {
@@ -868,9 +877,7 @@ impl BTState {
                     );
                 }
             }
-            Event::Vendor(crate::bluetooth::events::BlueNRGEvent::HalInitialized(
-                reason,
-            )) => {
+            Event::Vendor(BlueNRGEvent::HalInitialized(reason)) => {
                 rprintln!("bt restarted, reason = {:?}", defmt::Debug2Format(&reason));
             }
             Event::CommandComplete(params) => {

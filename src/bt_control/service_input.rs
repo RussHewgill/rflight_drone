@@ -89,9 +89,16 @@ where
             service_handle:            service.service_handle,
             characteristic_uuid:       UUID_INPUT_CHAR_THROTTLE,
             characteristic_value_len:  18,
-            characteristic_properties: CharacteristicProperty::WRITE,
+            characteristic_properties: CharacteristicProperty::empty()
+                // | CharacteristicProperty::WRITE
+                | CharacteristicProperty::WRITE_WITHOUT_RESPONSE
+            // | CharacteristicProperty::NOTIFY
+                | CharacteristicProperty::READ,
             security_permissions:      CharacteristicPermission::NONE,
             gatt_event_mask:           CharacteristicEvent::NONE,
+            // gatt_event_mask:           CharacteristicEvent::ATTRIBUTE_WRITE
+            //     | CharacteristicEvent::CONFIRM_READ
+            //     | CharacteristicEvent::CONFIRM_WRITE,
             encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
             is_variable:               true,
             fw_version_before_v72:     false,
