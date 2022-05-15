@@ -205,7 +205,7 @@ where
             mitm_protection_required:  true,
             out_of_band_auth:          gap::OutOfBandAuthentication::Disabled,
             encryption_key_size_range: (7, 16),
-            fixed_pin:                 super::gap::Pin::Fixed(1),
+            fixed_pin:                 super::gap::Pin::Fixed(0),
             bonding_required:          true,
         };
         block!(self.set_authentication_requirement(&requirements)).unwrap();
@@ -265,7 +265,19 @@ where
         block!(self.set_discoverable(&d_params)).unwrap();
         self.read_event_uart()?;
 
+        let gatt_event_mask = crate::bluetooth::gatt::Event::all();
+        block!(self.set_gatt_event_mask(gatt_event_mask))?;
+        self.read_event_uart()?;
+
         self.init_services()?;
+
+        // let event_mask = bluetooth_hci::host::EventFlags::all();
+        // block!(self.set_event_mask(event_mask))?;
+        // self.read_event_uart()?;
+
+        // let gap_event_mask = crate::bluetooth::gap::EventFlags::all();
+        // block!(self.set_gap_event_mask(gap_event_mask))?;
+        // self.read_event_uart()?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
