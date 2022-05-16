@@ -170,8 +170,9 @@ where
         block!(self.init_gap(role, false, 7))?;
         let gap: GapInit = self.read_event_gap_init()?;
 
-        // block!(self.clear_security_database())?;
-        // self.read_event_uart()?;
+        /// XXX: clear paired devices
+        block!(self.clear_security_database())?;
+        self.read_event_uart()?;
 
         static BLE_NAME: &'static str = "DRN1120";
 
@@ -188,10 +189,11 @@ where
         // self.read_event_uart()?;
 
         let requirements = AuthenticationRequirements {
-            mitm_protection_required:  true,
+            mitm_protection_required:  false,
             out_of_band_auth:          gap::OutOfBandAuthentication::Disabled,
             encryption_key_size_range: (7, 16),
-            fixed_pin:                 super::gap::Pin::Fixed(0),
+            // fixed_pin:                 super::gap::Pin::Fixed(1),
+            fixed_pin:                 super::gap::Pin::Requested,
             bonding_required:          true,
             // bonding_required:          false,
         };
@@ -232,11 +234,11 @@ where
         let d_params = DiscoverableParameters {
             advertising_type:
                 bluetooth_hci::host::AdvertisingType::ConnectableUndirected,
-            advertising_interval: None,
-            // advertising_interval: Some((
-            //     core::time::Duration::from_millis(200),
-            //     core::time::Duration::from_millis(200),
-            // )),
+            // advertising_interval: None,
+            advertising_interval: Some((
+                core::time::Duration::from_millis(200),
+                core::time::Duration::from_millis(200),
+            )),
             address_type:         bluetooth_hci::host::OwnAddressType::Random,
             filter_policy:
                 bluetooth_hci::host::AdvertisingFilterPolicy::AllowConnectionAndScan,
