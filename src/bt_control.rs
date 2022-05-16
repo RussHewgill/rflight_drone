@@ -118,12 +118,15 @@ mod uuids {
     pub const UUID_SENSOR_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x4f1f7252db544d4faa8f208d48637b3f);
 
-    /// Sensors
+    /// Input
     pub const UUID_INPUT_SERVICE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0xa7a2eafd569442debf3bee79d621779c);
 
     pub const UUID_INPUT_CHAR_THROTTLE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x0d2d404bff6d4e8a97b15bc440288423);
+
+    pub const UUID_INPUT_DESC_THROTTLE: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x7e6c30a33bb241ef838e15912c120dd0);
 }
 
 /// init
@@ -143,7 +146,6 @@ where
     }
 
     pub fn init_bt(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        // self.reset_with_delay(delay, 5u32).unwrap();
         self.reset().unwrap();
         self.read_event_uart()?;
 
@@ -161,19 +163,15 @@ where
         block!(self.le_set_random_address(addr)).unwrap();
         self.read_event_uart()?;
 
-        // uart.unpause();
         block!(self.init_gatt()).unwrap();
         self.read_event_uart()?;
-        // uart.pause();
 
         let role = crate::bluetooth::gap::Role::PERIPHERAL;
         block!(self.init_gap(role, false, 7))?;
         let gap: GapInit = self.read_event_gap_init()?;
 
         // block!(self.clear_security_database())?;
-        // block!(self.read_event(uart))?;
-
-        // uprintln!(uart, "gap = {:?}", gap);
+        // self.read_event_uart()?;
 
         static BLE_NAME: &'static str = "DRN1120";
 
@@ -189,24 +187,13 @@ where
         // block!(self.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1))?;
         // self.read_event_uart()?;
 
-        // block!(self.read_bd_addr()).unwrap();
-        // block!(self.read_event(uart))?;
-
-        // let addr = BdAddr([
-        //     0x43 | 0b1100_0000,
-        //     0xc6,
-        //     0x3d,
-        //     0xd9,
-        //     0x74,
-        //     0x4f | 0b1100_0000,
-        // ]);
-
         let requirements = AuthenticationRequirements {
             mitm_protection_required:  true,
             out_of_band_auth:          gap::OutOfBandAuthentication::Disabled,
             encryption_key_size_range: (7, 16),
             fixed_pin:                 super::gap::Pin::Fixed(0),
             bonding_required:          true,
+            // bonding_required:          false,
         };
         block!(self.set_authentication_requirement(&requirements)).unwrap();
         self.read_event_uart()?;
@@ -255,7 +242,8 @@ where
                 bluetooth_hci::host::AdvertisingFilterPolicy::AllowConnectionAndScan,
             local_name:           Some(LocalName::Complete(&dev_name[..])),
             advertising_data:     &[],
-            conn_interval:        (Some(core::time::Duration::from_millis(5000)), None),
+            // conn_interval:        (Some(core::time::Duration::from_millis(5000)), None),
+            conn_interval:        (None, None),
         };
 
         block!(self.set_nondiscoverable()).unwrap();
@@ -269,15 +257,15 @@ where
         block!(self.set_gatt_event_mask(gatt_event_mask))?;
         self.read_event_uart()?;
 
+        let event_mask = bluetooth_hci::host::EventFlags::all();
+        block!(bluetooth_hci::host::Hci::set_event_mask(self, event_mask))?;
+        self.read_event_uart()?;
+
+        let gap_event_mask = crate::bluetooth::gap::EventFlags::all();
+        block!(self.set_gap_event_mask(gap_event_mask))?;
+        self.read_event_uart()?;
+
         self.init_services()?;
-
-        // let event_mask = bluetooth_hci::host::EventFlags::all();
-        // block!(self.set_event_mask(event_mask))?;
-        // self.read_event_uart()?;
-
-        // let gap_event_mask = crate::bluetooth::gap::EventFlags::all();
-        // block!(self.set_gap_event_mask(gap_event_mask))?;
-        // self.read_event_uart()?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;

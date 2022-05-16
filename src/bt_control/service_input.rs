@@ -23,9 +23,13 @@ use crate::{
         EncryptionKeySize, UpdateCharacteristicValueParameters,
     },
     bluetooth::{
-        gatt::UpdateLongCharacteristicValueParameters, hal_bt::Commands as HalCommands,
+        gatt::{
+            AccessPermission, AddDescriptorParameters, DescriptorPermission,
+            UpdateLongCharacteristicValueParameters,
+        },
+        hal_bt::Commands as HalCommands,
     },
-    bt_control::{UUID_LOG_CHAR, UUID_LOG_SENS_CHAR},
+    bt_control::{UUID_INPUT_DESC_THROTTLE, UUID_LOG_CHAR, UUID_LOG_SENS_CHAR},
     sensors::V3,
     uprint, uprintln,
 };
@@ -112,6 +116,25 @@ where
             other => unimplemented!("other = {:?}", other),
         };
         rprintln!("input c 0 = {:?}", defmt::Debug2Format(&c0));
+
+        // let desc = "input";
+        // let params1 = AddDescriptorParameters {
+        //     service_handle:           service.service_handle,
+        //     characteristic_handle:    c0.characteristic_handle,
+        //     descriptor_uuid:          UUID_INPUT_DESC_THROTTLE,
+        //     descriptor_value_max_len: desc.len(),
+        //     descriptor_value:         desc.as_bytes(),
+        //     security_permissions:     DescriptorPermission::empty(),
+        //     access_permissions:       AccessPermission::all(),
+        //     // gatt_event_mask: CharacteristicEvent::NONE,
+        //     gatt_event_mask:          CharacteristicEvent::ATTRIBUTE_WRITE
+        //         | CharacteristicEvent::CONFIRM_READ
+        //         | CharacteristicEvent::CONFIRM_WRITE,
+        //     encryption_key_size:      EncryptionKeySize::with_value(7).unwrap(),
+        //     is_variable:              true,
+        // };
+        // block!(self.add_characteristic_descriptor(&params1)).unwrap();
+        // self.read_event_uart()?;
 
         // let params1 = AddCharacteristicParameters {
         //     service_handle:            service.service_handle,
