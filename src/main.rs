@@ -94,7 +94,7 @@ mod app {
         bluetooth::gap::Commands as GapCommands,
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
-        bt_control::BTState,
+        bt_control::{BTState, ConnectionChange},
         sensors::{ahrs::*, V3},
         sensors::{SensorData, Sensors, UQuat},
         time::MonoTimer,
@@ -528,7 +528,16 @@ mod app {
 
             // bt.allow_read_write(&event);
 
-            bt.state.handle_event(&event);
+            /// TODO: update connection params
+            match bt.state.handle_connect_disconnect(&event) {
+                Some(ConnectionChange::NewConnection(handle)) => {
+                    // let params = ConnectionUpdatePa
+                    // // block!(bt.le_connection_update(params)).unwrap();
+                    // block!(bt.(params)).unwrap();
+                    // bt.read_event_uart().unwrap();
+                }
+                _ => {}
+            }
 
             // if !bt.data_ready().unwrap() {
             //     break;

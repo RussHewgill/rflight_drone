@@ -170,9 +170,9 @@ where
         block!(self.init_gap(role, false, 7))?;
         let gap: GapInit = self.read_event_gap_init()?;
 
-        /// XXX: clear paired devices
-        block!(self.clear_security_database())?;
-        self.read_event_uart()?;
+        // /// XXX: clear paired devices
+        // block!(self.clear_security_database())?;
+        // self.read_event_uart()?;
 
         static BLE_NAME: &'static str = "DRN1120";
 
@@ -189,13 +189,14 @@ where
         // self.read_event_uart()?;
 
         let requirements = AuthenticationRequirements {
+            // mitm_protection_required:  true,
             mitm_protection_required:  false,
             out_of_band_auth:          gap::OutOfBandAuthentication::Disabled,
             encryption_key_size_range: (7, 16),
-            // fixed_pin:                 super::gap::Pin::Fixed(1),
-            fixed_pin:                 super::gap::Pin::Requested,
-            bonding_required:          true,
-            // bonding_required:          false,
+            fixed_pin:                 super::gap::Pin::Fixed(0),
+            // fixed_pin:                 super::gap::Pin::Requested,
+            // bonding_required:          true,
+            bonding_required:          false,
         };
         block!(self.set_authentication_requirement(&requirements)).unwrap();
         self.read_event_uart()?;
@@ -268,6 +269,9 @@ where
         self.read_event_uart()?;
 
         self.init_services()?;
+
+        block!(self.get_security_level())?;
+        self.read_event_uart()?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
@@ -840,6 +844,12 @@ pub enum BTState {
     Connected(ConnectionHandle),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ConnectionChange {
+    NewConnection(ConnectionHandle),
+    Disconnect,
+}
+
 impl BTState {
     pub fn is_connected(&self) -> bool {
         match self {
@@ -852,29 +862,39 @@ impl BTState {
     //     Self::Connected(st.conn_handle)
     // }
 
-    pub fn handle_event(&mut self, event: &BTEvent) {
+    pub fn handle_connect_disconnect(
+        &mut self,
+        event: &BTEvent,
+    ) -> Option<ConnectionChange> {
         match event {
             Event::LeConnectionComplete(status) => {
                 if status.status == bluetooth_hci::Status::Success {
                     rprintln!("new connection established 0");
                     *self = Self::Connected(status.conn_handle);
+                    return Some(ConnectionChange::NewConnection(status.conn_handle));
                 } else {
                     rprintln!(
                         "Connection Complete, but status = {:?}",
                         defmt::Debug2Format(&status.status)
                     );
+                    return None;
                 }
             }
             Event::ConnectionComplete(status) => {
                 if status.status == bluetooth_hci::Status::Success {
                     rprintln!("new connection established 1");
                     *self = Self::Connected(status.conn_handle);
+                    return Some(ConnectionChange::NewConnection(status.conn_handle));
                 } else {
                     rprintln!(
                         "Connection Complete, but status = {:?}",
                         defmt::Debug2Format(&status.status)
                     );
+                    return None;
                 }
+            }
+            Event::DisconnectionComplete(status) => {
+                *self = Self::Disconnected;
             }
             Event::Vendor(BlueNRGEvent::HalInitialized(reason)) => {
                 rprintln!("bt restarted, reason = {:?}", defmt::Debug2Format(&reason));
@@ -886,6 +906,7 @@ impl BTState {
                 rprintln!("unhandled event = {:?}", defmt::Debug2Format(&event));
             }
         }
+        None
     }
 }
 
