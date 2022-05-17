@@ -189,14 +189,14 @@ where
         // self.read_event_uart()?;
 
         let requirements = AuthenticationRequirements {
-            // mitm_protection_required:  true,
-            mitm_protection_required:  false,
+            mitm_protection_required:  true,
+            // mitm_protection_required:  false,
             out_of_band_auth:          gap::OutOfBandAuthentication::Disabled,
             encryption_key_size_range: (7, 16),
             fixed_pin:                 super::gap::Pin::Fixed(0),
             // fixed_pin:                 super::gap::Pin::Requested,
-            // bonding_required:          true,
-            bonding_required:          false,
+            bonding_required:          true,
+            // bonding_required:          false,
         };
         block!(self.set_authentication_requirement(&requirements)).unwrap();
         self.read_event_uart()?;
@@ -270,8 +270,8 @@ where
 
         self.init_services()?;
 
-        block!(self.get_security_level())?;
-        self.read_event_uart()?;
+        // block!(self.get_security_level())?;
+        // self.read_event_uart()?;
 
         // block!(self.read_bd_addr()).unwrap();
         // block!(self.read_event(uart))?;
