@@ -137,7 +137,7 @@ mod app {
     #[monotonic(binds = TIM5, default = true)]
     type MonoTick = MonoTimer<TIM5, 1_000_000>; // 1 MHz
 
-    #[init(local = [bt_buf: [u8; 512] = [0u8; 512]])]
+    #[init(local = [])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         // debug::exit(debug::EXIT_SUCCESS); // Exit QEMU simulator
 
@@ -145,8 +145,6 @@ mod app {
 
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
-
-        let bt_buf = cx.local.bt_buf;
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
@@ -273,7 +271,7 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        // bt_test::spawn_after(100.millis()).unwrap();
+        bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -486,17 +484,21 @@ mod app {
             if let BTState::Connected(conn) = bt.state {
                 bt.pause_interrupt(exti);
 
-                let handle = match bt.services.input {
-                    Some(i) => i.throttle_char,
-                    _ => panic!("no throttle handle"),
-                };
+                // let handle = match bt.services.input {
+                //     Some(i) => i.throttle_char,
+                //     _ => panic!("no throttle handle"),
+                // };
 
-                // block!(bt.read_characteristic_using_uuid(
-                block!(bt.read_characteristic_value(conn, handle)).unwrap();
-                rprintln!("send read req");
+                rprintln!("sending");
+                let quat = UQuat::default();
+                bt.log_write_quat(&quat).unwrap();
 
-                bt.read_event_uart().unwrap();
-                rprintln!("finished read");
+                // // block!(bt.read_characteristic_using_uuid(
+                // block!(bt.read_characteristic_value(conn, handle)).unwrap();
+                // rprintln!("send read req");
+
+                // bt.read_event_uart().unwrap();
+                // rprintln!("finished read");
 
                 bt.unpause_interrupt(exti);
             }

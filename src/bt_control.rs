@@ -138,7 +138,7 @@ where
     GpioError: core::fmt::Debug,
 {
     fn init_services(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
-        // self.init_log_service()?;
+        self.init_log_service()?;
         self.init_input_service()?;
 
         // self.init_sensor_service()?;
