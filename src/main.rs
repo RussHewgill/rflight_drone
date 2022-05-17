@@ -504,7 +504,7 @@ mod app {
             }
         });
 
-        bt_test::spawn_after(100.millis()).unwrap();
+        bt_test::spawn_after(1000.millis()).unwrap();
     }
 
     // #[cfg(feature = "nope")]
