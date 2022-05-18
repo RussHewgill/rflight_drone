@@ -239,7 +239,7 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        // bt_test::spawn_after(100.millis()).unwrap();
+        bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -446,7 +446,7 @@ mod app {
         main_loop::spawn().unwrap();
     }
 
-    #[task(shared = [bt, exti], local = [], priority = 3)]
+    #[task(shared = [bt, exti], local = [x: f32 = 0.0], priority = 3)]
     fn bt_test(mut cx: bt_test::Context) {
         (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
             if let BTState::Connected(conn) = bt.state {
@@ -457,8 +457,13 @@ mod app {
                 //     _ => panic!("no throttle handle"),
                 // };
 
-                rprintln!("sending");
-                let quat = UQuat::default();
+                // let quat = UQuat::default();
+                let quat = UQuat::from_euler_angles(deg_to_rad(*cx.local.x), 0.0, 0.0);
+                *cx.local.x += 1.0;
+
+                rprintln!("cx.local.x = {:?}", *cx.local.x);
+
+                // rprintln!("sending");
                 bt.log_write_quat(&quat).unwrap();
 
                 // // block!(bt.read_characteristic_using_uuid(
@@ -472,7 +477,7 @@ mod app {
             }
         });
 
-        bt_test::spawn_after(1000.millis()).unwrap();
+        bt_test::spawn_after(250.millis()).unwrap();
     }
 
     #[task(binds = EXTI4, shared = [bt, exti], priority = 8)]
@@ -510,50 +515,6 @@ mod app {
                     break;
                 }
             }
-
-            bt.unpause_interrupt(exti);
-        });
-    }
-
-    #[cfg(feature = "nope")]
-    // #[task(binds = EXTI4, shared = [bt, exti], priority = 8)]
-    fn bt_irq(mut cx: bt_irq::Context) {
-        // cortex_m_semihosting::hprint!("b");
-        (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
-            rprintln!("bt_irq");
-
-            bt.clear_interrupt();
-            bt.pause_interrupt(exti);
-
-            let event: BTEvent = match bt._read_event() {
-                Ok(ev) => {
-                    rprintln!("ev = {:?}", defmt::Debug2Format(&ev));
-                    ev
-                }
-                Err(e) => {
-                    rprintln!("read event error = {:?}", defmt::Debug2Format(&e));
-                    unimplemented!()
-                }
-            };
-
-            // bt.allow_read_write(&event);
-
-            /// TODO: update connection params
-            match bt.state.handle_connect_disconnect(&event) {
-                Some(ConnectionChange::NewConnection(handle)) => {
-                    // let params = ConnectionUpdatePa
-                    // // block!(bt.le_connection_update(params)).unwrap();
-                    // block!(bt.(params)).unwrap();
-                    // bt.read_event_uart().unwrap();
-                }
-                _ => {}
-            }
-
-            rprintln!("bt.data_ready() = {:?}", bt.data_ready());
-
-            // if !bt.data_ready().unwrap() {
-            //     break;
-            // }
 
             bt.unpause_interrupt(exti);
         });
