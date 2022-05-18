@@ -139,16 +139,12 @@ mod app {
 
     #[init(local = [])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
-        // debug::exit(debug::EXIT_SUCCESS); // Exit QEMU simulator
-
-        // rtt_init_print!();
-
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        // let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
+        let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
-        let sensor_period: stm32f4xx_hal::time::Hertz = 100.Hz();
+        // let sensor_period: stm32f4xx_hal::time::Hertz = 100.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 5.Hz();
 
@@ -157,7 +153,6 @@ mod app {
         // let mut init_struct = init_all(cp, dp, &mut bt_buf[..]);
         let mut init_struct = init_all(cp, dp);
 
-        // let mut uart = init_struct.uart;
         let clocks = init_struct.clocks;
         let mono = init_struct.mono;
         let mut exti = init_struct.exti;
@@ -165,36 +160,15 @@ mod app {
         let mut bt = init_struct.bt;
         let mut dwt = init_struct.dwt;
 
-        // uprintln!(uart, "hclk()     = {:?}", clocks.hclk());
-        // uprintln!(uart, "sysclk()   = {:?}", clocks.sysclk());
-        // uprintln!(uart, "pclk1()    = {:?}", clocks.pclk1());
-        // uprintln!(uart, "pclk2()    = {:?}", clocks.pclk2());
-        // uprintln!(uart, "pll48clk() = {:?}", clocks.pll48clk());
-        // uprintln!(uart, "i2s_clk()  = {:?}", clocks.i2s_clk());
-
-        // uprintln!(uart, "main_period = {:?}", main_period.to_Hz());
         rprintln!("sensor_period = {:?}", sensor_period.to_Hz());
 
-        // uprintln!(uart, "wat 0");
-        // bt.pause_interrupt(&mut exti);
-        // uprintln!(uart, "wat 1");
-        // block!(bt.read_local_version_information()).unwrap();
-        // uprintln!(uart, "wat 2");
-        // bt.read_event_uart(&mut uart).unwrap();
-        // uprintln!(uart, "wat 3");
-        // bt.unpause_interrupt(&mut exti);
-        // uprintln!(uart, "wat 4");
-
-        // uart.pause();
         bt.pause_interrupt(&mut exti);
-        // match bt.init_bt(&mut uart, &mut delay_bt) {
         match bt.init_bt() {
             Ok(()) => {}
             e => {
                 rprintln!("init_bt error = {:?}", defmt::Debug2Format(&e));
             }
         }
-        // uart.unpause();
         // bt.unpause_interrupt(&mut exti);
         loop {
             if !bt.data_ready().unwrap() {
@@ -213,12 +187,6 @@ mod app {
 
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
-
-        // /// No debug
-        // uart.pause();
-
-        // let t = 1.0 / (sensor_period.raw() as f32);
-        // uprintln!(uart, "t = {:?}", t);
 
         /// Fusion
         let mut ahrs = AhrsFusion::new(
@@ -271,7 +239,7 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        bt_test::spawn_after(100.millis()).unwrap();
+        // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -507,8 +475,48 @@ mod app {
         bt_test::spawn_after(1000.millis()).unwrap();
     }
 
-    // #[cfg(feature = "nope")]
     #[task(binds = EXTI4, shared = [bt, exti], priority = 8)]
+    fn bt_irq(mut cx: bt_irq::Context) {
+        (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
+            rprintln!("bt_irq");
+
+            bt.clear_interrupt();
+            bt.pause_interrupt(exti);
+
+            loop {
+                let event: BTEvent = match bt._read_event() {
+                    Ok(ev) => {
+                        rprintln!("ev = {:?}", defmt::Debug2Format(&ev));
+                        ev
+                    }
+                    Err(e) => {
+                        rprintln!("read event error = {:?}", defmt::Debug2Format(&e));
+                        unimplemented!()
+                    }
+                };
+
+                /// TODO: update connection params
+                match bt.state.handle_connect_disconnect(&event) {
+                    Some(ConnectionChange::NewConnection(handle)) => {
+                        // let params = ConnectionUpdatePa
+                        // // block!(bt.le_connection_update(params)).unwrap();
+                        // block!(bt.(params)).unwrap();
+                        // bt.read_event_uart().unwrap();
+                    }
+                    _ => {}
+                }
+
+                if !bt.data_ready().unwrap() {
+                    break;
+                }
+            }
+
+            bt.unpause_interrupt(exti);
+        });
+    }
+
+    #[cfg(feature = "nope")]
+    // #[task(binds = EXTI4, shared = [bt, exti], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
         // cortex_m_semihosting::hprint!("b");
         (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
@@ -541,20 +549,13 @@ mod app {
                 _ => {}
             }
 
+            rprintln!("bt.data_ready() = {:?}", bt.data_ready());
+
             // if !bt.data_ready().unwrap() {
             //     break;
             // }
 
             bt.unpause_interrupt(exti);
-
-            // match block!(bt.read_event(uart)) {
-            //     Ok(_) => {
-            //         uprintln!(uart, "read event");
-            //     }
-            //     Err(e) => {
-            //         uprintln!(uart, "error 1 = {:?}", e);
-            //     }
-            // }
         });
     }
 
