@@ -9,6 +9,7 @@
 pub mod battery;
 pub mod bluetooth;
 pub mod bt_control;
+pub mod bt_state;
 pub mod flight_control;
 pub mod init;
 pub mod leds;
@@ -70,9 +71,8 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-#[cfg(feature = "nope")]
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-
+// #[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -95,7 +95,7 @@ mod app {
         bluetooth::gap::Commands as GapCommands,
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
-        bt_control::{BTState, ConnectionChange},
+        bt_state::{BTState, ConnectionChange},
         sensors::{ahrs::*, V3},
         sensors::{SensorData, Sensors, UQuat},
         time::MonoTimer,
@@ -240,7 +240,7 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        // bt_test::spawn_after(100.millis()).unwrap();
+        bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -529,8 +529,8 @@ mod app {
     }
 }
 
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-// #[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;

@@ -1,3 +1,4 @@
+/// Received from remote control
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ControlInputs {
     pub roll:     u32,
@@ -6,6 +7,7 @@ pub struct ControlInputs {
     pub throttle: u32,
 }
 
+/// Output of PID after mixing
 /// PWM values: from 0-1900
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MotorOutputs {

@@ -49,10 +49,8 @@ use byteorder::{ByteOrder, LittleEndian};
 use crate::{
     bt_control::{
         service_input::SvInput, service_log::SvLogger, service_sensors::SvSensors, BTSpi,
-        BTState,
     },
-    uart::*,
-    uprint, uprintln,
+    bt_state::BTState,
 };
 
 use self::{
@@ -291,7 +289,6 @@ where
     pub fn block_until_ready(
         &mut self,
         access_byte: AccessByte,
-        mut uart: Option<&mut UART>,
     ) -> nb::Result<(u16, u16), BTError<SpiError, GpioError>> {
         // let mut x = 0;
         // let mut header = [access_byte as u8, 0x00, 0x00, 0x00, 0x00];
@@ -390,10 +387,9 @@ where
     fn block_until_ready_for(
         &mut self,
         access: AccessByte,
-        uart: Option<&mut UART>,
     ) -> nb::Result<u16, BTError<SpiError, GpioError>> {
         // let (write_len, read_len) = self.block_until_ready(access, uart)?;
-        let (write_len, read_len) = self.block_until_ready(access, uart)?;
+        let (write_len, read_len) = self.block_until_ready(access)?;
         Ok(match access {
             AccessByte::Read => read_len,
             AccessByte::Write => write_len,
@@ -460,7 +456,7 @@ where
             return Err(nb::Error::WouldBlock);
         }
 
-        let read_len = self.block_until_ready_for(AccessByte::Read, None)?;
+        let read_len = self.block_until_ready_for(AccessByte::Read)?;
         let mut bytes_available = read_len as usize;
         while bytes_available > 0 && self.buffer.next_contiguous_slice_len() > 0 {
             let transfer_count =
@@ -578,7 +574,7 @@ where
 
         // cortex_m::asm::nop();
 
-        let write_len = self.block_until_ready_for(AccessByte::Write, None)?;
+        let write_len = self.block_until_ready_for(AccessByte::Write)?;
         // rprintln!("write_len = {:?}", write_len);
 
         if (write_len as usize) < header.len() + payload.len() {
