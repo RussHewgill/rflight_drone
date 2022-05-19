@@ -74,6 +74,10 @@ impl MotorsPWM {
 
 /// enable, disable, set pwm
 impl MotorsPWM {
+    pub fn set_armed(&mut self, armed: bool) {
+        self.armed = armed;
+    }
+
     pub fn enable_motor(&mut self, motor: MotorSelect) {
         self._enable_motor(motor, true);
     }
@@ -115,19 +119,22 @@ impl MotorsPWM {
     }
 
     pub fn set_motor(&mut self, motor: MotorSelect, pwm: f32) {
+        if !self.armed {
+            return;
+        }
         let pwm = pwm.clamp(0.0, 1.0);
         match motor {
             MotorSelect::Motor1 => {
-                unimplemented!()
+                self.pin1.set_duty((pwm * Self::MOTOR_MAX_PWM) as u16);
             }
             MotorSelect::Motor2 => {
-                unimplemented!()
+                self.pin2.set_duty((pwm * Self::MOTOR_MAX_PWM) as u16);
             }
             MotorSelect::Motor3 => {
                 self.pin3.set_duty((pwm * Self::MOTOR_MAX_PWM) as u16);
             }
             MotorSelect::Motor4 => {
-                unimplemented!()
+                self.pin4.set_duty((pwm * Self::MOTOR_MAX_PWM) as u16);
             }
         }
     }
