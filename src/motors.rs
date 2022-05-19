@@ -34,6 +34,7 @@ impl MotorsPWM {
     // const MAX_DUTY_CYCLE: u16 = 56680;
 
     const MOTOR_MAX_PWM: f32 = 1900.0;
+    // const MOTOR_MAX_PWM_I: u16 = 1900;
 
     // fn tim4_init(tim4: TIM4)
 
@@ -85,7 +86,7 @@ impl MotorsPWM {
         self._enable_motor(motor, false);
     }
 
-    pub fn _enable_motor(&mut self, motor: MotorSelect, enable: bool) {
+    fn _enable_motor(&mut self, motor: MotorSelect, enable: bool) {
         let pin = match motor {
             MotorSelect::Motor1 => {
                 if enable {
@@ -118,7 +119,7 @@ impl MotorsPWM {
         };
     }
 
-    pub fn set_motor(&mut self, motor: MotorSelect, pwm: f32) {
+    pub fn set_motor_f32(&mut self, motor: MotorSelect, pwm: f32) {
         if !self.armed {
             return;
         }
@@ -135,6 +136,25 @@ impl MotorsPWM {
             }
             MotorSelect::Motor4 => {
                 self.pin4.set_duty((pwm * Self::MOTOR_MAX_PWM) as u16);
+            }
+        }
+    }
+
+    #[cfg(feature = "nope")]
+    fn set_motor_i16(&mut self, motor: MotorSelect, pwm: u16) {
+        let pwm = pwm.clamp(0, Self::MOTOR_MAX_PWM_I);
+        match motor {
+            MotorSelect::Motor1 => {
+                self.pin1.set_duty(pwm);
+            }
+            MotorSelect::Motor2 => {
+                self.pin2.set_duty(pwm);
+            }
+            MotorSelect::Motor3 => {
+                self.pin3.set_duty(pwm);
+            }
+            MotorSelect::Motor4 => {
+                self.pin4.set_duty(pwm);
             }
         }
     }

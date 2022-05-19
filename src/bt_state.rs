@@ -1,4 +1,5 @@
 use bluetooth_hci::ConnectionHandle;
+use embedded_hal::digital::v2::{InputPin, OutputPin};
 
 use crate::bt_control::BTEvent;
 
@@ -83,7 +84,15 @@ impl BTState {
         }
         None
     }
+}
 
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
+where
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+    Input: InputPin<Error = GpioError>,
+    GpioError: core::fmt::Debug,
+{
     pub fn handle_input(
         &mut self,
         motors: &mut MotorsPWM,
@@ -91,6 +100,19 @@ impl BTState {
         event: &BTEvent,
         //
     ) {
-        unimplemented!()
+        match event {
+            Event::Vendor(BlueNRGEvent::GattAttributeModified(att)) => {
+                if let Some(input) = self.services.input {
+                    /// attribute handle is 1 greater than characteristic handle ??
+                    if att.attr_handle.0 + 1 == input.input_char.0 {
+                        if let Some(ci) = ControlInputs::deserialize(att.data()) {
+                            *control_inputs = ci;
+                        }
+                    }
+                }
+                // if Some(att.attr_handle) == self.services.input.map(|x| )
+            }
+            _ => {}
+        }
     }
 }

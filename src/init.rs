@@ -21,7 +21,9 @@ use stm32f4xx_hal::{gpio::PB0, prelude::*};
 
 use crate::battery::BatteryAdc;
 use crate::bluetooth::BluetoothSpi;
+use crate::flight_control::ControlInputs;
 use crate::leds::LEDs;
+use crate::motors::MotorsPWM;
 use crate::sensors::barometer::Barometer;
 use crate::sensors::imu::config::ImuConfig;
 use crate::sensors::imu::IMU;
@@ -70,6 +72,7 @@ pub struct InitStruct {
     pub sensors: Sensors,
     pub bt:      BTController,
     pub adc:     BatteryAdc,
+    pub motors:  MotorsPWM,
     // pub leds:    LEDs,
 }
 
@@ -114,6 +117,9 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
 
     // let leds = init_leds(gpiob.pb4, gpiob.pb5);
 
+    let motors =
+        MotorsPWM::new(dp.TIM4, gpiob.pb6, gpiob.pb7, gpiob.pb8, gpiob.pb9, &clocks);
+
     InitStruct {
         dwt,
         exti: dp.EXTI,
@@ -125,6 +131,7 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
         bt,
         adc,
         // leds,
+        motors,
     }
 }
 

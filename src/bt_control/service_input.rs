@@ -30,6 +30,7 @@ use crate::{
         hal_bt::Commands as HalCommands,
     },
     bt_control::{UUID_INPUT_DESC_THROTTLE, UUID_LOG_CHAR, UUID_LOG_SENS_CHAR},
+    flight_control::ControlInputs,
     sensors::V3,
     uprint, uprintln,
 };
@@ -51,7 +52,10 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 pub struct SvInput {
     pub input_service: ServiceHandle,
-    pub throttle_char: CharacteristicHandle,
+    pub input_char:    CharacteristicHandle,
+    // pub roll_char:     CharacteristicHandle,
+    // pub pitch_char:    CharacteristicHandle,
+    // pub yaw_char:      CharacteristicHandle,
 }
 
 /// init
@@ -117,49 +121,9 @@ where
         };
         rprintln!("input c 0 = {:?}", defmt::Debug2Format(&c0));
 
-        // let desc = "input";
-        // let params1 = AddDescriptorParameters {
-        //     service_handle:           service.service_handle,
-        //     characteristic_handle:    c0.characteristic_handle,
-        //     descriptor_uuid:          UUID_INPUT_DESC_THROTTLE,
-        //     descriptor_value_max_len: desc.len(),
-        //     descriptor_value:         desc.as_bytes(),
-        //     security_permissions:     DescriptorPermission::empty(),
-        //     access_permissions:       AccessPermission::all(),
-        //     // gatt_event_mask: CharacteristicEvent::NONE,
-        //     gatt_event_mask:          CharacteristicEvent::ATTRIBUTE_WRITE
-        //         | CharacteristicEvent::CONFIRM_READ
-        //         | CharacteristicEvent::CONFIRM_WRITE,
-        //     encryption_key_size:      EncryptionKeySize::with_value(7).unwrap(),
-        //     is_variable:              true,
-        // };
-        // block!(self.add_characteristic_descriptor(&params1)).unwrap();
-        // self.read_event_uart()?;
-
-        // let params1 = AddCharacteristicParameters {
-        //     service_handle:            service.service_handle,
-        //     characteristic_uuid:       UUID_LOG_SENS_CHAR,
-        //     characteristic_value_len:  48,
-        //     // characteristic_properties: CharacteristicProperty::NOTIFY,
-        //     characteristic_properties: CharacteristicProperty::NOTIFY
-        //         | CharacteristicProperty::READ,
-        //     security_permissions:      CharacteristicPermission::NONE,
-        //     gatt_event_mask:           CharacteristicEvent::NONE,
-        //     encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
-        //     is_variable:               true,
-        //     fw_version_before_v72:     false,
-        // };
-        // block!(self.add_characteristic(&params1))?;
-        // rprintln!("sent c 1");
-        // let c1 = match self.read_event_params_vendor()? {
-        //     VReturnParameters::GattAddCharacteristic(c) => c,
-        //     other => unimplemented!("other = {:?}", other),
-        // };
-        // rprintln!("c 1 = {:?}", defmt::Debug2Format(&c1));
-
         let input = SvInput {
             input_service: service.service_handle,
-            throttle_char: c0.characteristic_handle,
+            input_char:    c0.characteristic_handle,
         };
 
         self.services.input = Some(input);

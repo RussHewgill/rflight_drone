@@ -96,6 +96,8 @@ mod app {
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bt_state::{BTState, ConnectionChange},
+        flight_control::ControlInputs,
+        motors::MotorsPWM,
         sensors::{ahrs::*, V3},
         sensors::{SensorData, Sensors, UQuat},
         time::MonoTimer,
@@ -125,6 +127,8 @@ mod app {
         bt:          BTController,
         tim9_flag:   bool,
         adc:         BatteryAdc,
+        motors:      MotorsPWM,
+        inputs:      ControlInputs,
     }
 
     #[local]
@@ -228,6 +232,8 @@ mod app {
             bt,
             tim9_flag: false,
             adc: init_struct.adc,
+            motors: init_struct.motors,
+            inputs: ControlInputs::default(),
         };
 
         let local = Local {
@@ -481,44 +487,52 @@ mod app {
         bt_test::spawn_after(250.millis()).unwrap();
     }
 
-    #[task(binds = EXTI4, shared = [bt, exti], priority = 8)]
+    #[task(binds = EXTI4, shared = [bt, exti, motors, inputs], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
-        (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
-            rprintln!("bt_irq");
+        (
+            cx.shared.bt,
+            cx.shared.exti,
+            cx.shared.motors,
+            cx.shared.inputs,
+        )
+            .lock(|bt, exti, motors, inputs| {
+                rprintln!("bt_irq");
 
-            bt.clear_interrupt();
-            bt.pause_interrupt(exti);
+                bt.clear_interrupt();
+                bt.pause_interrupt(exti);
 
-            loop {
-                let event: BTEvent = match bt._read_event() {
-                    Ok(ev) => {
-                        rprintln!("ev = {:?}", defmt::Debug2Format(&ev));
-                        ev
-                    }
-                    Err(e) => {
-                        rprintln!("read event error = {:?}", defmt::Debug2Format(&e));
-                        unimplemented!()
-                    }
-                };
+                loop {
+                    let event: BTEvent = match bt._read_event() {
+                        Ok(ev) => {
+                            rprintln!("ev = {:?}", defmt::Debug2Format(&ev));
+                            ev
+                        }
+                        Err(e) => {
+                            rprintln!("read event error = {:?}", defmt::Debug2Format(&e));
+                            unimplemented!()
+                        }
+                    };
 
-                /// TODO: update connection params
-                match bt.state.handle_connect_disconnect(&event) {
-                    Some(ConnectionChange::NewConnection(handle)) => {
-                        // let params = ConnectionUpdatePa
-                        // // block!(bt.le_connection_update(params)).unwrap();
-                        // block!(bt.(params)).unwrap();
-                        // bt.read_event_uart().unwrap();
+                    /// TODO: update connection params
+                    match bt.state.handle_connect_disconnect(&event) {
+                        Some(ConnectionChange::NewConnection(handle)) => {
+                            // let params = ConnectionUpdatePa
+                            // // block!(bt.le_connection_update(params)).unwrap();
+                            // block!(bt.(params)).unwrap();
+                            // bt.read_event_uart().unwrap();
+                        }
+                        _ => {}
                     }
-                    _ => {}
+
+                    bt.handle_input(motors, inputs, &event);
+
+                    if !bt.data_ready().unwrap() {
+                        break;
+                    }
                 }
 
-                if !bt.data_ready().unwrap() {
-                    break;
-                }
-            }
-
-            bt.unpause_interrupt(exti);
-        });
+                bt.unpause_interrupt(exti);
+            });
     }
 
     #[idle]
