@@ -93,8 +93,8 @@ mod app {
     use crate::{
         battery::BatteryAdc,
         bluetooth::gap::Commands as GapCommands,
-        bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
+        bluetooth::{gap::ConnectionUpdateParameters, gatt::Commands as GattCommands},
         bt_state::{BTState, ConnectionChange},
         flight_control::ControlInputs,
         motors::MotorsPWM,
@@ -104,7 +104,9 @@ mod app {
         utils::*,
     };
 
-    use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
+    use bluetooth_hci::host::{
+        uart::Hci as HciUart, ConnectionIntervalBuilder, ExpectedConnectionLength, Hci,
+    };
 
     use nalgebra as na;
 
@@ -515,8 +517,21 @@ mod app {
 
                     /// TODO: update connection params
                     match bt.state.handle_connect_disconnect(&event) {
-                        Some(ConnectionChange::NewConnection(handle)) => {
-                            // let params = ConnectionUpdatePa
+                        Some(ConnectionChange::NewConnection(conn_handle)) => {
+                            // let conn_interval = ConnectionIntervalBuilder::new()
+                            //     .with_latency()
+                            //     .build()
+                            //     .unwrap();
+                            // let params = ConnectionUpdateParameters {
+                            //     conn_handle,
+                            //     conn_interval,
+                            //     expected_connection_length:
+                            //         ExpectedConnectionLength::new(
+                            //             core::time::Duration::from_secs_f32(1.0),
+                            //             core::time::Duration::from_secs_f32(1200.0), // 20 minutes
+                            //         )
+                            //         .unwrap(),
+                            // };
                             // // block!(bt.le_connection_update(params)).unwrap();
                             // block!(bt.(params)).unwrap();
                             // bt.read_event_uart().unwrap();

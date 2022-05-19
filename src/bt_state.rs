@@ -106,6 +106,9 @@ where
                     /// attribute handle is 1 greater than characteristic handle ??
                     if att.attr_handle.0 + 1 == input.input_char.0 {
                         if let Some(ci) = ControlInputs::deserialize(att.data()) {
+                            if control_inputs.motors_armed != ci.motors_armed {
+                                motors.set_armed(ci.motors_armed);
+                            }
                             *control_inputs = ci;
                         }
                     }

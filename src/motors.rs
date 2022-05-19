@@ -6,6 +6,8 @@ use stm32f4xx_hal::{
     timer::PwmChannel,
 };
 
+use defmt::{debug, println as rprintln};
+
 /// 3 - 2
 /// 4 - 1
 /// M1: CW,  back right
@@ -76,7 +78,24 @@ impl MotorsPWM {
 /// enable, disable, set pwm
 impl MotorsPWM {
     pub fn set_armed(&mut self, armed: bool) {
-        self.armed = armed;
+        rprintln!("setting motors armed = {:?}", armed);
+        rprintln!("DEBUG: motors bypassed");
+        // self.armed = armed;
+    }
+
+    pub fn enable_all(&mut self) {
+        debug!("enabling all motors");
+        self.enable_motor(MotorSelect::Motor1);
+        self.enable_motor(MotorSelect::Motor2);
+        self.enable_motor(MotorSelect::Motor3);
+        self.enable_motor(MotorSelect::Motor4);
+    }
+    pub fn disable_all(&mut self) {
+        debug!("enabling all motors");
+        self.disable_motor(MotorSelect::Motor1);
+        self.disable_motor(MotorSelect::Motor2);
+        self.disable_motor(MotorSelect::Motor3);
+        self.disable_motor(MotorSelect::Motor4);
     }
 
     pub fn enable_motor(&mut self, motor: MotorSelect) {
@@ -87,6 +106,10 @@ impl MotorsPWM {
     }
 
     fn _enable_motor(&mut self, motor: MotorSelect, enable: bool) {
+        if !self.armed {
+            rprintln!("tried to enable motors when not armed");
+            return;
+        }
         let pin = match motor {
             MotorSelect::Motor1 => {
                 if enable {
