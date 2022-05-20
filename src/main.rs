@@ -207,14 +207,11 @@ mod app {
         ahrs.cfg_acc_rejection = 10.0;
         ahrs.cfg_mag_rejection = 20.0;
 
-        // ahrs.calibration.hard_iron_offset = V3::new(
-        //     -0.206,  //
-        //     -0.4349, //
-        //     1.1902,
-        //     // 0.0,
-        // );
-
-        ahrs.calibration.hard_iron_offset = V3::new(-1.2428659, -1.3962219, 1.879177);
+        ahrs.calibration.hard_iron_offset = V3::new(
+            -1.2428659, //
+            -1.3962219, //
+            1.879177,
+        );
 
         // /// complementary
         // let gain = 0.1;
@@ -306,13 +303,16 @@ mod app {
                     // print_v3("acc  = ", acc, 4);
                     // print_v3("mag  = ", mag, 6);
 
-                    // let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-                    // rprintln!(
-                    //     "heading = {:?}, mag(x,y) = ({:?}, {:?})",
-                    //     round_to(heading, 1),
-                    //     round_to(mag.x, 6),
-                    //     round_to(mag.y, 6),
-                    // );
+                    // print_v3("mag0 = ", mag0, 6);
+
+                    let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+                    rprintln!(
+                        "heading = {:?}, mag(x,y,z) = ({:?}, {:?}, {:?})",
+                        round_to(heading, 1),
+                        round_to(mag.x, 6),
+                        round_to(mag.y, 6),
+                        round_to(mag.z, 6),
+                    );
 
                     ahrs.update(gyro, acc, mag);
                     // ahrs.update_no_mag(gyro, acc);
@@ -438,14 +438,14 @@ mod app {
                             bt.log_write_quat(&fd.quat).unwrap();
                             bt.unpause_interrupt(exti);
 
-                            let (roll, pitch, yaw) = fd.get_euler_angles();
+                            // let (roll, pitch, yaw) = fd.get_euler_angles();
 
-                            rprintln!(
-                                "(r,p,y) = {:?}, {:?}, {:?}",
-                                r(rad_to_deg(roll)),
-                                r(rad_to_deg(pitch)),
-                                r(rad_to_deg(yaw)),
-                            );
+                            // rprintln!(
+                            //     "(r,p,y) = {:?}, {:?}, {:?}",
+                            //     r(rad_to_deg(roll)),
+                            //     r(rad_to_deg(pitch)),
+                            //     r(rad_to_deg(yaw)),
+                            // );
 
                             // let gyro0 = sd.imu_gyro.read_and_reset();
                             // let acc0 = sd.imu_acc.read_and_reset();

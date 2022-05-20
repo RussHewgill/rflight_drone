@@ -490,7 +490,7 @@ mod fusion {
             pub acc_sens:          V3,
             pub acc_offset:        V3,
             /// mag
-            pub soft_iron_rot:     Rot3,
+            pub soft_iron_rot:     Option<Rot3>,
             pub hard_iron_offset:  V3,
         }
 
@@ -510,25 +510,16 @@ mod fusion {
                     acc_sens: V3::new(1.0, 1.0, 1.0),
                     acc_offset: V3::default(),
                     /// mag
-                    soft_iron_rot: Rot3::default(),
+                    // soft_iron_rot: Rot3::default(),
+                    soft_iron_rot: None,
                     hard_iron_offset: V3::default(),
                 }
             }
         }
 
-        #[derive(Debug, Clone, Copy)]
-        pub struct GeoMagField {
-            pub declination:   f32,
-            pub inclination:   f32,
-            pub horizontal_nt: f32,
-            pub north_nt:      f32,
-            pub east_nt:       f32,
-            pub vertical_nt:   f32,
-            pub total_nt:      f32,
-        }
-
         /// calibrate
         impl FusionCalibration {
+            #[cfg(feature = "nope")]
             pub fn calc_calibration_mag(
                 &mut self,
                 geo: GeoMagField,
@@ -618,10 +609,14 @@ mod fusion {
 
             fn _calibrate_mag(
                 uncalibrated: V3,
-                soft_iron_matrix: na::Rotation3<f32>,
+                soft_iron_matrix: Option<na::Rotation3<f32>>,
                 hard_iron_offset: V3,
             ) -> V3 {
-                (soft_iron_matrix * uncalibrated) - hard_iron_offset
+                if let Some(soft_iron_matrix) = soft_iron_matrix {
+                    (soft_iron_matrix * uncalibrated) - hard_iron_offset
+                } else {
+                    uncalibrated - hard_iron_offset
+                }
             }
         }
     }
@@ -701,7 +696,7 @@ mod fusion {
         }
     }
 
-    #[cfg(feature = "nope")]
+    // #[cfg(feature = "nope")]
     mod mag_offset {
         use core::f32::consts::PI;
 
@@ -721,6 +716,17 @@ mod fusion {
             pub mag_alignment:                   V3,
             pub mag_field_body_magnitude_prev:   f32,
             pub mag_field_body_prev:             V3,
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct GeoMagField {
+            pub declination:   f32,
+            pub inclination:   f32,
+            pub horizontal_nt: f32,
+            pub north_nt:      f32,
+            pub east_nt:       f32,
+            pub vertical_nt:   f32,
+            pub total_nt:      f32,
         }
 
         impl MagOffset {
