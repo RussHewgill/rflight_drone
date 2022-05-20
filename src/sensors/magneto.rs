@@ -20,9 +20,9 @@ pub struct Magnetometer<CS> {
 const SPI_READ: u8 = 0x80; // 0x01 << 7
 const SPI_WRITE: u8 = 0x00;
 
+/// init, config
 impl<CS, PinError> Magnetometer<CS>
 where
-    // CS: hal::digital::blocking::OutputPin<Error = PinError>,
     CS: OutputPin<Error = PinError>,
 {
     pub fn new(cs: CS) -> Self {
@@ -80,6 +80,22 @@ where
         Ok(())
     }
 
+    pub fn set_hard_iron_offset(
+        &mut self,
+        spi: &mut Spi3,
+        offset: [f32; 3],
+    ) -> nb::Result<(), SpiError> {
+        // self.write_reg(spi, MagRegister::OFFSET_X_REG_H, x_h)?;
+
+        Ok(())
+    }
+}
+
+/// read and convert data
+impl<CS, PinError> Magnetometer<CS>
+where
+    CS: OutputPin<Error = PinError>,
+{
     pub fn read_new_data_available(
         &mut self,
         spi: &mut Spi3,
@@ -111,10 +127,7 @@ where
         Ok(out)
     }
 
-    // fn convert_raw_data(l: u8, h: u8, scale: u8) -> f32 {
     fn convert_raw_data(l: u8, h: u8) -> f32 {
-        // fn convert_raw_data(l: u8, h: u8) -> i16 {
-
         /// 1.5 milliGauss / LSB
         /// = 150 nT / LSB
         // const SCALE: f32 = 1.5;
@@ -124,38 +137,9 @@ where
         ((v0 as f32) / (i16::MAX as f32)) * SCALE
         // v0
     }
-
-    // pub fn read_data2(&mut self, spi: &mut Spi3) -> nb::Result<[i16; 3], SpiError> {
-    //     let outx_l = self.read_reg(spi, MagRegister::OUTX_L_REG)?;
-    //     let outx_h = self.read_reg(spi, MagRegister::OUTX_H_REG)?;
-
-    //     let outy_l = self.read_reg(spi, MagRegister::OUTY_L_REG)?;
-    //     let outy_h = self.read_reg(spi, MagRegister::OUTY_H_REG)?;
-
-    //     let outz_l = self.read_reg(spi, MagRegister::OUTZ_L_REG)?;
-    //     let outz_h = self.read_reg(spi, MagRegister::OUTZ_H_REG)?;
-
-    //     let mut out = [0u16; 3];
-
-    //     out[0] |= outx_l as u16;
-    //     out[0] |= (outx_h as u16) << 8;
-
-    //     out[1] |= outy_l as u16;
-    //     out[1] |= (outy_h as u16) << 8;
-
-    //     out[2] |= outz_l as u16;
-    //     out[2] |= (outz_h as u16) << 8;
-
-    //     let mut out2 = [0i16; 3];
-
-    //     out2[0] = out[0] as i16;
-    //     out2[1] = out[1] as i16;
-    //     out2[2] = out[2] as i16;
-
-    //     Ok(out2)
-    // }
 }
 
+/// read, write reg
 impl<CS, PinError> Magnetometer<CS>
 where
     CS: OutputPin<Error = PinError>,

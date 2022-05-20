@@ -187,19 +187,19 @@ impl Sensors {
         }) {
             //
 
-            // /// from ST firmware
-            // let mag_data = [
-            //     -mag_data[1], //
-            //     mag_data[0],
-            //     mag_data[2],
-            // ];
-
-            /// from datasheets
+            /// from ST firmware
             let mag_data = [
-                mag_data[0], //
-                -mag_data[1],
+                -mag_data[1], //
+                mag_data[0],
                 mag_data[2],
             ];
+
+            // /// from datasheets
+            // let mag_data = [
+            //     mag_data[0], //
+            //     -mag_data[1],
+            //     mag_data[2],
+            // ];
 
             data.magnetometer.update(mag_data);
         } else {

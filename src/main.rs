@@ -214,6 +214,8 @@ mod app {
         //     // 0.0,
         // );
 
+        ahrs.calibration.hard_iron_offset = V3::new(-1.2428659, -1.3962219, 1.879177);
+
         // /// complementary
         // let gain = 0.1;
         // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32), gain);
