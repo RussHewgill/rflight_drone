@@ -5,6 +5,9 @@
 #![allow(unused_doc_comments)]
 #![no_std]
 #![no_main]
+// XXX: Features:
+// for doc comments on var assignments
+#![feature(stmt_expr_attributes)]
 
 pub mod battery;
 pub mod bluetooth;
@@ -221,9 +224,9 @@ mod app {
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
-        // /// start timer
-        // tim3.start(sensor_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start timer
+        tim3.start(sensor_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -246,9 +249,9 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
-        bt_test::spawn_after(100.millis()).unwrap();
+        // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -275,7 +278,7 @@ mod app {
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
 
-                #[cfg(feature = "nope")]
+                // #[cfg(feature = "nope")]
                 {
                     /// update AHRS
                     let gyro0 = sd.imu_gyro.read_and_reset();
@@ -301,8 +304,15 @@ mod app {
                     // print_v3("acc  = ", acc, 4);
                     // print_v3("mag  = ", mag, 6);
 
-                    ahrs.update(gyro, acc, mag);
+                    let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+                    rprintln!(
+                        "heading = {:?}, mag(x,y) = ({:?}, {:?})",
+                        round_to(heading, 1),
+                        round_to(mag.x, 6),
+                        round_to(mag.y, 6),
+                    );
 
+                    ahrs.update(gyro, acc, mag);
                     // ahrs.update_no_mag(gyro, acc);
 
                     if ahrs.is_acc_warning() {
@@ -324,14 +334,6 @@ mod app {
                 // let acc = sd.imu_acc.read_and_reset();
                 // let mag = sd.magnetometer.read_and_reset();
                 // ahrs.update(gyro, acc, mag);
-
-                // let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-                // rprintln!(
-                //     "heading = {:?}, mag(x,y) = ({:?}, {:?})",
-                //     round_to(heading, 1),
-                //     round_to(mag.x, 6),
-                //     round_to(mag.y, 6),
-                // );
 
                 use na::{ComplexField, RealField};
 
@@ -365,8 +367,8 @@ mod app {
                 // // let yaw = 90.0 - rad_to_deg(f32::atan(mag0.y / mag0.x));
                 // rprintln!("yaw = {=f32:08}", yaw);
 
-                // /// update FlightData
-                // fd.update(ahrs);
+                /// update FlightData
+                fd.update(ahrs);
 
                 // let (roll, pitch, yaw) = fd.get_euler_angles();
 
@@ -389,8 +391,8 @@ mod app {
     )]
     fn main_loop(mut cx: main_loop::Context) {
         // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
-        // const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
-        const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
+        // const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
+        const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
 
         // *cx.local.bat_counter += 1;
         // if *cx.local.bat_counter

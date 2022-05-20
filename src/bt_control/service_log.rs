@@ -74,22 +74,25 @@ where
             panic!("no logger?");
         };
 
-        // let mut data = [0u8; 40];
-        let mut data = [0u8; 36];
-        // let mut data = [0u8; 24];
+        // let mut data = [0u8; 36];
+        // /// gyro
+        // data[0..4].copy_from_slice(&gyro.x.to_be_bytes());
+        // data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
+        // data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
+        // /// acc
+        // data[12..16].copy_from_slice(&acc.x.to_be_bytes());
+        // data[16..20].copy_from_slice(&acc.y.to_be_bytes());
+        // data[20..24].copy_from_slice(&acc.z.to_be_bytes());
+        // /// mag
+        // data[24..28].copy_from_slice(&mag.x.to_be_bytes());
+        // data[28..32].copy_from_slice(&mag.y.to_be_bytes());
+        // data[32..36].copy_from_slice(&mag.z.to_be_bytes());
 
-        /// gyro
-        data[0..4].copy_from_slice(&gyro.x.to_be_bytes());
-        data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
-        data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
-        /// acc
-        data[12..16].copy_from_slice(&acc.x.to_be_bytes());
-        data[16..20].copy_from_slice(&acc.y.to_be_bytes());
-        data[20..24].copy_from_slice(&acc.z.to_be_bytes());
+        let mut data = [0u8; 12];
         /// mag
-        data[24..28].copy_from_slice(&mag.x.to_be_bytes());
-        data[28..32].copy_from_slice(&mag.y.to_be_bytes());
-        data[32..36].copy_from_slice(&mag.z.to_be_bytes());
+        data[0..4].copy_from_slice(&mag.x.to_be_bytes());
+        data[4..8].copy_from_slice(&mag.y.to_be_bytes());
+        data[8..12].copy_from_slice(&mag.z.to_be_bytes());
 
         // data[36..40].copy_from_slice(&baro.to_be_bytes());
 
