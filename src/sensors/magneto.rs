@@ -80,12 +80,41 @@ where
         Ok(())
     }
 
+    pub fn set_offset_cancellation(
+        &mut self,
+        spi: &mut Spi3,
+        enable: bool,
+    ) -> nb::Result<(), SpiError> {
+        let current = self.read_reg(spi, MagRegister::CFG_REG_B)?;
+
+        let val = if enable {
+            current & 0b0010
+        } else {
+            current & !(0b0010)
+        };
+
+        self.write_reg(spi, MagRegister::CFG_REG_B, val)?;
+
+        Ok(())
+    }
+
     pub fn set_hard_iron_offset(
         &mut self,
         spi: &mut Spi3,
         offset: [f32; 3],
     ) -> nb::Result<(), SpiError> {
-        // self.write_reg(spi, MagRegister::OFFSET_X_REG_H, x_h)?;
+        let (x_l, x_h) = Self::convert_raw_data_reverse(offset[0]);
+        let (y_l, y_h) = Self::convert_raw_data_reverse(offset[1]);
+        let (z_l, z_h) = Self::convert_raw_data_reverse(offset[2]);
+
+        self.write_reg(spi, MagRegister::OFFSET_X_REG_H, x_h)?;
+        self.write_reg(spi, MagRegister::OFFSET_X_REG_L, x_l)?;
+
+        self.write_reg(spi, MagRegister::OFFSET_Y_REG_H, y_h)?;
+        self.write_reg(spi, MagRegister::OFFSET_Y_REG_L, y_l)?;
+
+        self.write_reg(spi, MagRegister::OFFSET_Z_REG_H, z_h)?;
+        self.write_reg(spi, MagRegister::OFFSET_Z_REG_L, z_l)?;
 
         Ok(())
     }
@@ -96,6 +125,11 @@ impl<CS, PinError> Magnetometer<CS>
 where
     CS: OutputPin<Error = PinError>,
 {
+    /// 1.5 milliGauss / LSB
+    /// = 150 nT / LSB
+    // const SCALE: f32 = 1.5;
+    const SCALE: f32 = 150.0;
+
     pub fn read_new_data_available(
         &mut self,
         spi: &mut Spi3,
@@ -127,14 +161,19 @@ where
         Ok(out)
     }
 
-    fn convert_raw_data(l: u8, h: u8) -> f32 {
-        /// 1.5 milliGauss / LSB
-        /// = 150 nT / LSB
-        // const SCALE: f32 = 1.5;
-        const SCALE: f32 = 150.0;
+    /// (low, high)
+    fn convert_raw_data_reverse(x: f32) -> (u8, u8) {
+        let x = (x / Self::SCALE) as i16;
 
+        let h = x.overflowing_shr(8).0 as u8;
+        let l = (x & 0b1111_1111) as u8;
+
+        (l, h)
+    }
+
+    fn convert_raw_data(l: u8, h: u8) -> f32 {
         let v0 = l as i16 | ((h as i16) << 8);
-        ((v0 as f32) / (i16::MAX as f32)) * SCALE
+        ((v0 as f32) / (i16::MAX as f32)) * Self::SCALE
         // v0
     }
 }

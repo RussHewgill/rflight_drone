@@ -306,13 +306,13 @@ mod app {
                     // print_v3("acc  = ", acc, 4);
                     // print_v3("mag  = ", mag, 6);
 
-                    let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-                    rprintln!(
-                        "heading = {:?}, mag(x,y) = ({:?}, {:?})",
-                        round_to(heading, 1),
-                        round_to(mag.x, 6),
-                        round_to(mag.y, 6),
-                    );
+                    // let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+                    // rprintln!(
+                    //     "heading = {:?}, mag(x,y) = ({:?}, {:?})",
+                    //     round_to(heading, 1),
+                    //     round_to(mag.x, 6),
+                    //     round_to(mag.y, 6),
+                    // );
 
                     ahrs.update(gyro, acc, mag);
                     // ahrs.update_no_mag(gyro, acc);
@@ -434,19 +434,28 @@ mod app {
                             // bt.unpause_interrupt(exti);
                             // // rprintln!("1");
 
-                            // bt.pause_interrupt(exti);
-                            // bt.log_write_quat(&fd.quat).unwrap();
-                            // bt.unpause_interrupt(exti);
-
-                            let gyro0 = sd.imu_gyro.read_and_reset();
-                            let acc0 = sd.imu_acc.read_and_reset();
-                            let mag0 = sd.magnetometer.read_and_reset();
-
-                            // rprintln!("0");
                             bt.pause_interrupt(exti);
-                            bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                            bt.log_write_quat(&fd.quat).unwrap();
                             bt.unpause_interrupt(exti);
-                            // rprintln!("1");
+
+                            let (roll, pitch, yaw) = fd.get_euler_angles();
+
+                            rprintln!(
+                                "(r,p,y) = {:?}, {:?}, {:?}",
+                                r(rad_to_deg(roll)),
+                                r(rad_to_deg(pitch)),
+                                r(rad_to_deg(yaw)),
+                            );
+
+                            // let gyro0 = sd.imu_gyro.read_and_reset();
+                            // let acc0 = sd.imu_acc.read_and_reset();
+                            // let mag0 = sd.magnetometer.read_and_reset();
+
+                            // // rprintln!("0");
+                            // bt.pause_interrupt(exti);
+                            // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                            // bt.unpause_interrupt(exti);
+                            // // rprintln!("1");
 
                             // //
                             // unimplemented!()

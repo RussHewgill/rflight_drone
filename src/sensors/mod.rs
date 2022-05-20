@@ -188,6 +188,7 @@ impl Sensors {
             //
 
             /// from ST firmware
+            /// works correctly with Fusion AHRS
             let mag_data = [
                 -mag_data[1], //
                 mag_data[0],

@@ -700,6 +700,35 @@ mod fusion {
             }
         }
     }
+
+    #[cfg(feature = "nope")]
+    mod mag_offset {
+        use core::f32::consts::PI;
+
+        use fugit::HertzU32;
+        use nalgebra::{
+            self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3,
+        };
+
+        use super::{Rot3, UQuat, AHRS, V3};
+        use defmt::println as rprintln;
+
+        #[derive(Debug, Default, Clone, Copy)]
+        pub struct MagOffset {
+            pub mag_field_earth:                 V3,
+            pub rot_prev:                        Rot3,
+            pub mag_field_earth_normalized_prev: V3,
+            pub mag_alignment:                   V3,
+            pub mag_field_body_magnitude_prev:   f32,
+            pub mag_field_body_prev:             V3,
+        }
+
+        impl MagOffset {
+            pub fn update(&mut self) {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 #[cfg(feature = "nope")]
