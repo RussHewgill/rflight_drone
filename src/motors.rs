@@ -42,7 +42,10 @@ impl MotorsPWM {
     /// from ST firmware, probably not very accurate
     const MOTOR_MIN_THROTTLE: f32 = 200.0;
 
-    const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
+    /// from ST firmware
+    // const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
+    const FREQ: HertzU32 = fugit::HertzU32::Hz(750);
+    // const FREQ: HertzU32 = fugit::HertzU32::Hz(250);
 
     pub fn new(
         tim4: TIM4,
@@ -144,6 +147,20 @@ impl MotorsPWM {
                 }
             }
         };
+    }
+
+    pub fn set_all_f32(&mut self, pwm: f32) {
+        self.set_motor_f32(MotorSelect::Motor1, pwm);
+        self.set_motor_f32(MotorSelect::Motor2, pwm);
+        self.set_motor_f32(MotorSelect::Motor3, pwm);
+        self.set_motor_f32(MotorSelect::Motor4, pwm);
+    }
+
+    pub fn set_all_u16(&mut self, pwm: u16) {
+        self.set_motor_u16(MotorSelect::Motor1, pwm);
+        self.set_motor_u16(MotorSelect::Motor2, pwm);
+        self.set_motor_u16(MotorSelect::Motor3, pwm);
+        self.set_motor_u16(MotorSelect::Motor4, pwm);
     }
 
     pub fn set_motor_f32(&mut self, motor: MotorSelect, pwm: f32) {

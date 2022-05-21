@@ -135,7 +135,8 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
     }
 }
 
-fn init_adc(adc1: ADC1, pb1: PB1) -> BatteryAdc {
+// fn init_adc(adc1: ADC1, pb1: PB1) -> BatteryAdc {
+pub fn init_adc(adc1: ADC1, pb1: PB1) -> BatteryAdc {
     use stm32f4xx_hal::adc::config::*;
     use stm32f4xx_hal::adc::*;
 

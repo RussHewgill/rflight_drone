@@ -640,6 +640,75 @@ mod app {
     #[local]
     struct Local {}
 
+    #[cfg(feature = "nope")]
+    // #[init]
+    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        let mut cp: stm32f401::CorePeripherals = cx.core;
+        let mut dp: stm32f401::Peripherals = cx.device;
+
+        let mut rcc = dp.RCC.constrain();
+        let clocks = rcc.cfgr.use_hse(16.MHz()).sysclk(84.MHz()).freeze();
+
+        dp.TIM4.cr1.modify(|r, w| {
+            w.dir()
+                .up() // direction
+                .cms()
+                .edge_aligned() //
+                .ckd()
+                .div1() // clock division
+                .udis()
+                .enabled() // update generation
+        });
+
+        // dp.TIM4.cr1.modify(|r, w| {
+        //     w.mms()
+        //         .
+        // });
+
+        // TODO: TRGO Reset mode
+
+        /// auto-reload value
+        dp.TIM4.arr.modify(|r, w| w.arr().bits(1999));
+
+        /// prescaler value
+        dp.TIM4.psc.modify(|r, w| w.psc().bits(84));
+
+        dp.TIM4.smcr.modify(|r, w| {
+            w.msm()
+                .no_sync() // slave mode disabled
+                .ts()
+                .itr0() // internal trigger 0
+                .etp()
+                .not_inverted() // ETR noninverted
+                .ece()
+                .disabled() // external clock mode 2
+                .etps()
+                .div1() // external trigger prescaler disabled
+                .etf()
+                .no_filter() // external trigger filter disabled
+        });
+
+        dp.TIM4.ccer.modify(|r, w| {
+            w.cc1np()
+                .clear_bit() // CC1 channel configured as output
+                .cc1p()
+                .clear_bit() //CC1 active high
+        });
+
+        // TODO: output compare PWM mode 1
+        dp.TIM4.ccmr1_output().modify(|r, w| {
+            w.oc1pe()
+                .enabled() // OC1 preload register enabled
+                .oc1fe()
+                .set_bit() // fast mode enable
+                .cc1s()
+                .output() // C1 channel configured as output
+        });
+
+        (Shared {}, Local {}, init::Monotonics())
+    }
+
+    // #[cfg(feature = "nope")]
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         // foo::spawn().unwrap();
@@ -652,47 +721,39 @@ mod app {
         rprintln!("sysclk()   core = {:?}", clocks.sysclk());
         rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
 
+        let mut delay = cp.SYST.delay(&clocks);
+
         use crate::motors::*;
 
         let gb = dp.GPIOB.split();
 
         let mut motors = MotorsPWM::new(dp.TIM4, gb.pb6, gb.pb7, gb.pb8, gb.pb9, &clocks);
 
-        let mut delay = cp.SYST.delay(&clocks);
+        let mut adc = crate::init::init_adc(dp.ADC1, gb.pb1);
 
-        let m = MotorSelect::Motor4;
+        let v = adc.sample();
+        rprintln!("v = {:?}", v);
+
+        // let m = MotorSelect::Motor4;
 
         motors.set_armed(true);
 
-        // motors.set_motor_f32(m, 0.25);
-        motors.set_motor_u16(m, 200);
-        motors.enable_motor(m);
+        let pwm = 500;
 
+        // motors.set_motor_f32(m, 0.25);
+        // motors.set_motor_u16(m, pwm);
+        // motors.enable_motor(m);
+
+        motors.set_all_u16(pwm);
+
+        motors.enable_all();
         rprintln!("wat 0");
+
         delay.delay(2000.millis());
 
-        motors.disable_motor(m);
+        // motors.disable_motor(m);
+        motors.disable_all();
         rprintln!("wat 1");
-
-        // let channels = (gb.pb6.into_alternate::<2>(), gb.pb7.into_alternate::<2>());
-        // let pwm = dp.TIM4.pwm_hz(channels, 494.Hz(), &clocks);
-        // let (mut pin1, mut pin2) = pwm.split();
-        // let pin1: stm32f4xx_hal::timer::PwmChannel<TIM4, 0> = pin1;
-
-        // let k1 = pin1.get_max_duty();
-        // rprintln!("k1 = {:?}", k1);
-
-        // let k2 = pin1.get_max_duty();
-        // rprintln!("k2 = {:?}", k2);
-
-        // let tim4 = unsafe { &(*TIM4::ptr()) };
-
-        // let mut ahrs = crate::sensors::ahrs::AhrsComplementary::new(
-        //     0.1, //
-        //     0.1,
-        // );
-
-        // foo::spawn().unwrap();
 
         (Shared {}, Local {}, init::Monotonics())
     }
