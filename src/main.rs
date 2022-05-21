@@ -74,9 +74,8 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-#[cfg(feature = "nope")]
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-
+// #[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -100,8 +99,9 @@ mod app {
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bluetooth::{gap::ConnectionUpdateParameters, gatt::Commands as GattCommands},
         bt_state::{BTState, ConnectionChange},
-        flight_control::ControlInputs,
+        flight_control::{ControlInputs, DroneController},
         motors::MotorsPWM,
+        pid::PID,
         sensors::{ahrs::*, V3},
         sensors::{SensorData, Sensors, UQuat},
         time::MonoTimer,
@@ -135,6 +135,7 @@ mod app {
         adc:         BatteryAdc,
         motors:      MotorsPWM,
         inputs:      ControlInputs,
+        controller:  DroneController,
     }
 
     #[local]
@@ -199,6 +200,24 @@ mod app {
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
 
+        let pid_stab_roll = PID::new(0.0, 0.0, 0.0);
+        let pid_rate_roll = PID::new(0.0, 0.0, 0.0);
+        let pid_stab_pitch = PID::new(0.0, 0.0, 0.0);
+        let pid_rate_pitch = PID::new(0.0, 0.0, 0.0);
+        let pid_stab_yaw = PID::new(0.0, 0.0, 0.0);
+        let pid_rate_yaw = PID::new(0.0, 0.0, 0.0);
+        let pid_throttle = PID::new(0.0, 0.0, 0.0);
+
+        let controller = DroneController::new(
+            pid_stab_roll,
+            pid_rate_roll,
+            pid_stab_pitch,
+            pid_rate_pitch,
+            pid_stab_yaw,
+            pid_rate_yaw,
+            pid_throttle,
+        );
+
         /// Fusion
         let mut ahrs = AhrsFusion::new(
             sensor_period,
@@ -224,9 +243,9 @@ mod app {
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
-        /// start timer
-        tim3.start(sensor_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start timer
+        // tim3.start(sensor_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -239,6 +258,7 @@ mod app {
             adc: init_struct.adc,
             motors: init_struct.motors,
             inputs: ControlInputs::default(),
+            controller,
         };
 
         let local = Local {
@@ -247,22 +267,22 @@ mod app {
             // interval,
         };
 
-        // timer_sensors::spawn_after(100.millis()).unwrap();
+        timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(
-        binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag],
-        local = [tim3, sensors],
-        priority = 4
-    )]
+    #[cfg(feature = "nope")]
+    // #[task(
+    // binds = TIM3,
+    // shared = [ahrs, sens_data, flight_data, tim9_flag],
+    // local = [tim3, sensors],
+    // priority = 4
+    // )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -386,7 +406,31 @@ mod app {
             });
     }
 
-    // #[cfg(feature = "nope")]
+    #[task(
+        // binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag],
+        local = [tim3, sensors],
+        priority = 4
+    )]
+    fn timer_sensors(mut cx: timer_sensors::Context) {
+        cx.shared.sens_data.lock(|sd| {
+            // cx.local.sensors.read_data_baro(sd);
+
+            cx.local.sensors.with_spi_baro(|spi, baro| {
+                let (pressure, temp) = baro.read_new_data_available(spi).unwrap();
+
+                if pressure {
+                    let pressure = baro.read_data(spi).unwrap();
+                    rprintln!("pressure = {:?}", pressure);
+                } else {
+                    rprintln!("no pressure ?");
+                }
+            });
+        });
+        timer_sensors::spawn_after(250.millis()).unwrap();
+    }
+
+    #[cfg(feature = "nope")]
     #[task(
         shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag],
         local = [counter: u32 = 0, bat_counter: u32 = 0, buf: [u8; 16] = [0; 16]],
@@ -469,7 +513,8 @@ mod app {
         main_loop::spawn().unwrap();
     }
 
-    #[task(shared = [bt, exti], local = [x: f32 = 0.0], priority = 3)]
+    #[cfg(feature = "nope")]
+    // #[task(shared = [bt, exti], local = [x: f32 = 0.0], priority = 3)]
     fn bt_test(mut cx: bt_test::Context) {
         (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
             if let BTState::Connected(conn) = bt.state {
@@ -572,9 +617,8 @@ mod app {
     }
 }
 
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-// #[cfg(feature = "nope")]
-
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
@@ -1030,6 +1074,7 @@ fn main_bluetooth() -> ! {
     //
 }
 
+#[cfg(feature = "nope")]
 // #[entry]
 fn main_uart2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
@@ -1057,13 +1102,13 @@ fn main_uart2() -> ! {
         .into_push_pull_output()
         .speed(Speed::High)
         .internal_resistor(stm32f4xx_hal::gpio::Pull::None);
-
     led1_pin.set_high();
     led2_pin.set_high();
 
     loop {}
 }
 
+#[cfg(feature = "nope")]
 // #[entry]
 fn main_adc2() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
@@ -1098,6 +1143,7 @@ fn main_adc2() -> ! {
     loop {}
 }
 
+#[cfg(feature = "nope")]
 // #[entry]
 fn main_adc() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();
@@ -1174,6 +1220,7 @@ fn main_adc() -> ! {
     loop {}
 }
 
+#[cfg(feature = "nope")]
 // #[entry]
 fn main_imu3() -> ! {
     let mut cp = stm32f401::CorePeripherals::take().unwrap();

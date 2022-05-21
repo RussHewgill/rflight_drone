@@ -208,14 +208,16 @@ impl Sensors {
         }
     }
 
-    // TODO:
-    pub fn read_data_baro(&mut self) {
-        // if let Ok(data) = self.with_spi_baro(|spi, baro| baro.read_data(spi)) {
-        //     self.data.barometer.update(data);
-        // } else {
-        //     unimplemented!()
-        // }
-        unimplemented!()
+    pub fn read_data_baro(&mut self, data: &mut SensorData) {
+        if let Ok(baro_data) = self.with_spi_baro(|spi, baro| {
+            if baro.read_new_data_available(spi).unwrap().0 {
+                baro.read_data(spi)
+            } else {
+                Err(nb::Error::WouldBlock)
+            }
+        }) {
+            unimplemented!()
+        }
     }
 }
 

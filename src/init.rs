@@ -247,6 +247,12 @@ pub fn init_sensors(sensors: &mut Sensors) {
         mag.init_continuous(spi, crate::sensors::magneto::MagDataRate::R100)
             .unwrap();
     });
+
+    sensors.with_spi_baro(|spi, baro| {
+        baro.init(spi).unwrap();
+        baro.set_data_rate(spi, crate::sensors::barometer::BaroDataRate::R75)
+            .unwrap();
+    });
 }
 
 fn init_bt_interrupt(

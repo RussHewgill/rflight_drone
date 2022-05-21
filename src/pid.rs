@@ -1,6 +1,6 @@
 // use cortex_m_semihosting::hprintln;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PID {
     pub kp: f32,
     pub ki: f32,
@@ -12,7 +12,7 @@ pub struct PID {
 
     pub output_limit: (f32, f32),
 
-    pub integral: f32,
+    pub integral:   f32,
     pub prev_input: Option<f32>,
 
     pub setpoint: f32,
@@ -20,10 +20,17 @@ pub struct PID {
 
 impl Default for PID {
     fn default() -> Self {
+        Self::new(0.0, 0.0, 0.0)
+    }
+}
+
+/// new
+impl PID {
+    pub fn new(kp: f32, ki: f32, kd: f32) -> Self {
         Self {
-            kp: 0.0,
-            ki: 0.0,
-            kd: 0.0,
+            kp,
+            ki,
+            kd,
 
             p_limit: (f32::MIN, f32::MAX),
             i_limit: (f32::MIN, f32::MAX),
@@ -32,12 +39,7 @@ impl Default for PID {
 
             integral: 0.0,
             prev_input: None,
-            // prev_output: None,
 
-            // p_hist: VecDeque::default(),
-            // i_hist: VecDeque::default(),
-            // d_hist: VecDeque::default(),
-            // output_hist: VecDeque::default(),
             setpoint: 0.0,
         }
     }
