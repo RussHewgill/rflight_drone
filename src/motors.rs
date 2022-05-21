@@ -1,3 +1,4 @@
+use fugit::HertzU32;
 use stm32f4::stm32f401::TIM4;
 use stm32f4xx_hal::{
     gpio::{Pin, PB6, PB7, PB8, PB9},
@@ -36,9 +37,12 @@ impl MotorsPWM {
     // const MAX_DUTY_CYCLE: u16 = 56680;
 
     const MOTOR_MAX_PWM: f32 = 1900.0;
-    // const MOTOR_MAX_PWM_I: u16 = 1900;
+    const MOTOR_MAX_PWM_I: u16 = 1900;
 
-    // fn tim4_init(tim4: TIM4)
+    /// from ST firmware, probably not very accurate
+    const MOTOR_MIN_THROTTLE: f32 = 200.0;
+
+    const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
 
     pub fn new(
         tim4: TIM4,
@@ -55,7 +59,7 @@ impl MotorsPWM {
             pin4.into_alternate::<2>(),
         );
 
-        let pwm = tim4.pwm_hz(channels, 494.Hz(), &clocks);
+        let pwm = tim4.pwm_hz(channels, Self::FREQ, &clocks);
 
         let (mut pin1, mut pin2, mut pin3, mut pin4) = pwm.split();
 
@@ -163,9 +167,10 @@ impl MotorsPWM {
         }
     }
 
-    #[cfg(feature = "nope")]
-    fn set_motor_i16(&mut self, motor: MotorSelect, pwm: u16) {
-        let pwm = pwm.clamp(0, Self::MOTOR_MAX_PWM_I);
+    // #[cfg(feature = "nope")]
+    pub fn set_motor_u16(&mut self, motor: MotorSelect, pwm: u16) {
+        // let pwm = pwm.clamp(0, Self::MOTOR_MAX_PWM_I);
+        let pwm = pwm.min(Self::MOTOR_MAX_PWM_I);
         match motor {
             MotorSelect::Motor1 => {
                 self.pin1.set_duty(pwm);

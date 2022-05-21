@@ -16,7 +16,7 @@ pub struct Barometer<CS> {
     pub cs: CS,
 }
 
-/// new
+/// new, config
 impl<CS, PinError> Barometer<CS>
 where
     CS: OutputPin<Error = PinError>,
@@ -48,19 +48,6 @@ where
         Ok(())
     }
 
-    /// pressure, temperature
-    pub fn read_new_data_available(
-        &mut self,
-        spi: &mut Spi3,
-    ) -> nb::Result<(bool, bool), SpiError> {
-        let status = self.read_reg(spi, BaroRegister::STATUS)?;
-
-        Ok((
-            (status & 0b0000_0001) == 0b1,
-            (status & 0b0000_0010) == 0b10,
-        ))
-    }
-
     /// needs short wait before data is ready, even if status register is high
     /// about 50 nops
     pub fn one_shot(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
@@ -78,6 +65,25 @@ where
         let current = current & !0b0111_0000;
         self.write_reg(spi, BaroRegister::CTRL_REG1, current | rate.to_val())?;
         Ok(())
+    }
+}
+
+/// read data
+impl<CS, PinError> Barometer<CS>
+where
+    CS: OutputPin<Error = PinError>,
+{
+    /// pressure, temperature
+    pub fn read_new_data_available(
+        &mut self,
+        spi: &mut Spi3,
+    ) -> nb::Result<(bool, bool), SpiError> {
+        let status = self.read_reg(spi, BaroRegister::STATUS)?;
+
+        Ok((
+            (status & 0b0000_0001) == 0b1,
+            (status & 0b0000_0010) == 0b10,
+        ))
     }
 
     pub fn read_data(&mut self, spi: &mut Spi3) -> nb::Result<f32, SpiError> {

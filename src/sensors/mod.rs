@@ -38,13 +38,6 @@ pub struct Sensors {
     pub offset_mag:  V3,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct DataVal {
-    // data:    [f32; 3],
-    data:    V3,
-    changed: bool,
-}
-
 /// Board: (battery connector in upper right, pointing up)
 ///     +X = Right
 ///     +Y = Up
@@ -63,18 +56,26 @@ pub struct DataVal {
 ///     +Z = Normal
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SensorData {
-    pub imu_acc:      DataVal,
-    pub imu_gyro:     DataVal,
-    pub magnetometer: DataVal,
-    pub barometer:    DataVal,
+    pub imu_acc:          DataVal<V3>,
+    pub imu_gyro:         DataVal<V3>,
+    pub magnetometer:     DataVal<V3>,
+    pub baro_pressure:    DataVal<f32>,
+    pub baro_temperature: DataVal<f32>,
 }
 
-impl DataVal {
-    pub fn update(&mut self, data: [f32; 3]) {
-        self.data = data.into();
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DataVal<T> {
+    // data:    [f32; 3],
+    data:    T,
+    changed: bool,
+}
+
+impl<T: Copy> DataVal<T> {
+    pub fn update(&mut self, data: T) {
+        self.data = data;
         self.changed = true;
     }
-    pub fn read_and_reset(&mut self) -> V3 {
+    pub fn read_and_reset(&mut self) -> T {
         self.changed = false;
         self.data
     }
@@ -149,11 +150,11 @@ impl Sensors {
             imu.read_data(spi)
         }) {
             if !discard {
-                let data_gyro = [
+                let data_gyro = V3::new(
                     -data_gyro[1], // pitch
                     data_gyro[0],  // roll
                     data_gyro[2],  // yaw
-                ];
+                );
                 data.imu_gyro.update(data_gyro);
 
                 // /// rot about x,y,z
@@ -164,11 +165,11 @@ impl Sensors {
                 // ];
 
                 /// roll, pitch, yaw to match na::Quat
-                let data_acc = [
+                let data_acc = V3::new(
                     -data_acc[0], //
                     data_acc[1],
                     data_acc[2],
-                ];
+                );
 
                 data.imu_acc.update(data_acc);
             }
@@ -189,11 +190,11 @@ impl Sensors {
 
             /// from ST firmware
             /// works correctly with Fusion AHRS
-            let mag_data = [
+            let mag_data = V3::new(
                 -mag_data[1], //
                 mag_data[0],
                 mag_data[2],
-            ];
+            );
 
             // /// from datasheets
             // let mag_data = [
@@ -209,15 +210,27 @@ impl Sensors {
     }
 
     pub fn read_data_baro(&mut self, data: &mut SensorData) {
-        if let Ok(baro_data) = self.with_spi_baro(|spi, baro| {
-            if baro.read_new_data_available(spi).unwrap().0 {
-                baro.read_data(spi)
-            } else {
-                Err(nb::Error::WouldBlock)
+        self.with_spi_baro(|spi, baro| {
+            let (pressure, temp) = baro.read_new_data_available(spi).unwrap();
+            if pressure {
+                let pressure = baro.read_data(spi).unwrap();
+                data.baro_pressure.update(pressure);
             }
-        }) {
-            unimplemented!()
-        }
+            if temp {
+                let temp = baro.read_temperature_data(spi).unwrap();
+                data.baro_temperature.update(temp);
+            }
+        });
+
+        // if let Ok(baro_data) = self.with_spi_baro(|spi, baro| {
+        //     if baro.read_new_data_available(spi).unwrap().0 {
+        //         baro.read_data(spi)
+        //     } else {
+        //         Err(nb::Error::WouldBlock)
+        //     }
+        // }) {
+        //     unimplemented!()
+        // }
     }
 }
 

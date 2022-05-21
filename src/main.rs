@@ -74,8 +74,9 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-// #[cfg(feature = "nope")]
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,EXTI0])]
+
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -100,6 +101,7 @@ mod app {
         bluetooth::{gap::ConnectionUpdateParameters, gatt::Commands as GattCommands},
         bt_state::{BTState, ConnectionChange},
         flight_control::{ControlInputs, DroneController},
+        leds::LEDs,
         motors::MotorsPWM,
         pid::PID,
         sensors::{ahrs::*, V3},
@@ -133,6 +135,7 @@ mod app {
         bt:          BTController,
         tim9_flag:   bool,
         adc:         BatteryAdc,
+        leds:        LEDs,
         motors:      MotorsPWM,
         inputs:      ControlInputs,
         controller:  DroneController,
@@ -243,9 +246,9 @@ mod app {
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
-        // /// start timer
-        // tim3.start(sensor_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start timer
+        tim3.start(sensor_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -256,6 +259,7 @@ mod app {
             bt,
             tim9_flag: false,
             adc: init_struct.adc,
+            leds: init_struct.leds,
             motors: init_struct.motors,
             inputs: ControlInputs::default(),
             controller,
@@ -267,22 +271,21 @@ mod app {
             // interval,
         };
 
-        timer_sensors::spawn_after(100.millis()).unwrap();
+        // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    // binds = TIM3,
-    // shared = [ahrs, sens_data, flight_data, tim9_flag],
-    // local = [tim3, sensors],
-    // priority = 4
-    // )]
+    #[task(
+        binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag],
+        local = [tim3, sensors],
+        priority = 4
+    )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -297,6 +300,7 @@ mod app {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
+                cx.local.sensors.read_data_baro(sd);
 
                 // #[cfg(feature = "nope")]
                 {
@@ -407,32 +411,7 @@ mod app {
     }
 
     #[task(
-        // binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag],
-        local = [tim3, sensors],
-        priority = 4
-    )]
-    fn timer_sensors(mut cx: timer_sensors::Context) {
-        cx.shared.sens_data.lock(|sd| {
-            // cx.local.sensors.read_data_baro(sd);
-
-            cx.local.sensors.with_spi_baro(|spi, baro| {
-                let (pressure, temp) = baro.read_new_data_available(spi).unwrap();
-
-                if pressure {
-                    let pressure = baro.read_data(spi).unwrap();
-                    rprintln!("pressure = {:?}", pressure);
-                } else {
-                    rprintln!("no pressure ?");
-                }
-            });
-        });
-        timer_sensors::spawn_after(250.millis()).unwrap();
-    }
-
-    #[cfg(feature = "nope")]
-    #[task(
-        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag],
+        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller],
         local = [counter: u32 = 0, bat_counter: u32 = 0, buf: [u8; 16] = [0; 16]],
         priority = 3
     )]
@@ -441,9 +420,17 @@ mod app {
         // const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
         const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
 
+        let flight_data = cx.shared.flight_data;
+        let sens_data = cx.shared.sens_data;
+        let bt = cx.shared.bt;
+        let exti = cx.shared.exti;
+        let inputs = cx.shared.inputs;
+        let controller = cx.shared.controller;
+
         // *cx.local.bat_counter += 1;
         // if *cx.local.bat_counter
 
+        /// send telemetry over bluetooth, at 20-30 Hz
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
                 *tim9_flag = false;
@@ -451,60 +438,54 @@ mod app {
                 *cx.local.counter += 1;
                 if *cx.local.counter >= COUNTER_TIMES {
                     *cx.local.counter = 0;
-                    (
-                        cx.shared.flight_data,
-                        cx.shared.sens_data,
-                        cx.shared.bt,
-                        cx.shared.exti,
-                    )
-                        .lock(|fd, sd, bt, exti| {
-                            // let qq = fd.quat.coords;
-                            // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                            // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                            // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                            // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
-                            // // rprintln!("0..");
-                            // bt.pause_interrupt(exti);
-                            // match bt.log_write(false, &cx.local.buf[..]) {
-                            //     Ok(true) => {
-                            //         // uprintln!(uart, "sent log write command");
-                            //     }
-                            //     Ok(false) => {
-                            //         // uprintln!(uart, "failed to write");
-                            //     }
-                            //     Err(e) => {
-                            //         // uprintln!(uart, "error 0 = {:?}", e);
-                            //     }
-                            // }
-                            // bt.unpause_interrupt(exti);
-                            // // rprintln!("1");
+                    (flight_data, sens_data, bt, exti).lock(|fd, sd, bt, exti| {
+                        // let qq = fd.quat.coords;
+                        // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
+                        // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
+                        // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
+                        // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
+                        // // rprintln!("0..");
+                        // bt.pause_interrupt(exti);
+                        // match bt.log_write(false, &cx.local.buf[..]) {
+                        //     Ok(true) => {
+                        //         // uprintln!(uart, "sent log write command");
+                        //     }
+                        //     Ok(false) => {
+                        //         // uprintln!(uart, "failed to write");
+                        //     }
+                        //     Err(e) => {
+                        //         // uprintln!(uart, "error 0 = {:?}", e);
+                        //     }
+                        // }
+                        // bt.unpause_interrupt(exti);
+                        // // rprintln!("1");
 
-                            bt.pause_interrupt(exti);
-                            bt.log_write_quat(&fd.quat).unwrap();
-                            bt.unpause_interrupt(exti);
+                        bt.pause_interrupt(exti);
+                        bt.log_write_quat(&fd.quat).unwrap();
+                        bt.unpause_interrupt(exti);
 
-                            // let (roll, pitch, yaw) = fd.get_euler_angles();
+                        // let (roll, pitch, yaw) = fd.get_euler_angles();
 
-                            // rprintln!(
-                            //     "(r,p,y) = {:?}, {:?}, {:?}",
-                            //     r(rad_to_deg(roll)),
-                            //     r(rad_to_deg(pitch)),
-                            //     r(rad_to_deg(yaw)),
-                            // );
+                        // rprintln!(
+                        //     "(r,p,y) = {:?}, {:?}, {:?}",
+                        //     r(rad_to_deg(roll)),
+                        //     r(rad_to_deg(pitch)),
+                        //     r(rad_to_deg(yaw)),
+                        // );
 
-                            // let gyro0 = sd.imu_gyro.read_and_reset();
-                            // let acc0 = sd.imu_acc.read_and_reset();
-                            // let mag0 = sd.magnetometer.read_and_reset();
+                        // let gyro0 = sd.imu_gyro.read_and_reset();
+                        // let acc0 = sd.imu_acc.read_and_reset();
+                        // let mag0 = sd.magnetometer.read_and_reset();
 
-                            // // rprintln!("0");
-                            // bt.pause_interrupt(exti);
-                            // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                            // bt.unpause_interrupt(exti);
-                            // // rprintln!("1");
+                        // // rprintln!("0");
+                        // bt.pause_interrupt(exti);
+                        // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                        // bt.unpause_interrupt(exti);
+                        // // rprintln!("1");
 
-                            // //
-                            // unimplemented!()
-                        });
+                        // //
+                        // unimplemented!()
+                    });
                 }
             }
         });
@@ -548,7 +529,7 @@ mod app {
         bt_test::spawn_after(250.millis()).unwrap();
     }
 
-    #[task(binds = EXTI4, shared = [bt, exti, motors, inputs], priority = 8)]
+    #[task(binds = EXTI4, shared = [bt, exti, motors, inputs, leds], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
         (
             cx.shared.bt,
@@ -617,8 +598,8 @@ mod app {
     }
 }
 
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-#[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+// #[cfg(feature = "nope")]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
@@ -683,11 +664,12 @@ mod app {
 
         motors.set_armed(true);
 
-        motors.set_motor_f32(m, 0.25);
+        // motors.set_motor_f32(m, 0.25);
+        motors.set_motor_u16(m, 200);
         motors.enable_motor(m);
 
         rprintln!("wat 0");
-        delay.delay(1000.millis());
+        delay.delay(2000.millis());
 
         motors.disable_motor(m);
         rprintln!("wat 1");

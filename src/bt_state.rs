@@ -93,6 +93,7 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
+    /// attribute handle is 1 greater than characteristic handle ??
     pub fn handle_input(
         &mut self,
         motors: &mut MotorsPWM,
@@ -103,12 +104,14 @@ where
         match event {
             Event::Vendor(BlueNRGEvent::GattAttributeModified(att)) => {
                 if let Some(input) = self.services.input {
-                    /// attribute handle is 1 greater than characteristic handle ??
+                    /// received input changed event
                     if att.attr_handle.0 + 1 == input.input_char.0 {
                         if let Some(ci) = ControlInputs::deserialize(att.data()) {
+                            /// arm or disarm motors if changed
                             if control_inputs.motors_armed != ci.motors_armed {
                                 motors.set_armed(ci.motors_armed);
                             }
+                            /// set new inputs
                             *control_inputs = ci;
                         }
                     }

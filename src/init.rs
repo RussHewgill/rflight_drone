@@ -72,8 +72,8 @@ pub struct InitStruct {
     pub sensors: Sensors,
     pub bt:      BTController,
     pub adc:     BatteryAdc,
+    pub leds:    LEDs,
     pub motors:  MotorsPWM,
-    // pub leds:    LEDs,
 }
 
 pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
@@ -115,7 +115,7 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
 
     let adc = init_adc(dp.ADC1, gpiob.pb1);
 
-    // let leds = init_leds(gpiob.pb4, gpiob.pb5);
+    let leds = init_leds(gpiob.pb4, gpiob.pb5);
 
     let motors =
         MotorsPWM::new(dp.TIM4, gpiob.pb6, gpiob.pb7, gpiob.pb8, gpiob.pb9, &clocks);
@@ -130,7 +130,7 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
         sensors,
         bt,
         adc,
-        // leds,
+        leds,
         motors,
     }
 }
