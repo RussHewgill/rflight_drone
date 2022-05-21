@@ -74,8 +74,9 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-// #[cfg(feature = "nope")]
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -571,8 +572,9 @@ mod app {
     }
 }
 
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-#[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+// #[cfg(feature = "nope")]
+
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
@@ -595,7 +597,6 @@ mod app {
         bluetooth::gap::Commands as GapCommands,
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
-        bt_control::BTState,
         sensors::ahrs::{FlightData, AHRS},
         sensors::{SensorData, Sensors, UQuat},
         time::MonoTimer,
@@ -638,7 +639,7 @@ mod app {
 
         motors.set_armed(true);
 
-        motors.set_motor(m, 0.1);
+        motors.set_motor_f32(m, 0.25);
         motors.enable_motor(m);
 
         rprintln!("wat 0");
