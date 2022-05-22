@@ -74,8 +74,9 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-// #[cfg(feature = "nope")]
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,EXTI0])]
+#[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,EXTI0])]
+
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -272,7 +273,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -307,6 +308,12 @@ mod app {
                     let gyro0 = sd.imu_gyro.read_and_reset();
                     let acc0 = sd.imu_acc.read_and_reset();
                     let mag0 = sd.magnetometer.read_and_reset();
+
+                    let pressure = sd.baro_pressure.read_and_reset();
+                    let temp = sd.baro_temperature.read_and_reset();
+
+                    let alt = ahrs.update_baro(pressure, temp);
+                    rprintln!("alt = {:?}", alt);
 
                     // if ahrs.calibration.initializing {
                     //     ahrs.calibration.update(gyro0, acc0, mag0);
@@ -389,13 +396,6 @@ mod app {
                 // print_v3("gyro = ", gyro, 2);
                 // print_v3("acc  = ", acc * 0.5, 4);
                 // print_v3("mag  = ", mag, 5);
-
-                let pressure = sd.baro_pressure.read_and_reset();
-                let temp = sd.baro_temperature.read_and_reset();
-
-                let alt = ahrs.update_baro(pressure, temp);
-                // let alt = ahrs.get_altitude();
-                rprintln!("alt = {:?}", alt);
 
                 // let yaw = 90.0 - rad_to_deg(f32::atan2(mag0.y, mag0.x));
                 // // let yaw = 90.0 - rad_to_deg(f32::atan(mag0.y / mag0.x));
@@ -605,8 +605,8 @@ mod app {
     }
 }
 
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-#[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+// #[cfg(feature = "nope")]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
@@ -621,6 +621,7 @@ mod app {
         dwt::Dwt,
         gpio::{Output, Pin},
         prelude::*,
+        rcc::BusTimerClock,
         timer::{CounterHz, CounterMs, DelayMs},
     };
 
@@ -734,33 +735,149 @@ mod app {
 
         let gb = dp.GPIOB.split();
 
-        let mut motors = MotorsPWM::new(dp.TIM4, gb.pb6, gb.pb7, gb.pb8, gb.pb9, &clocks);
+        // let mut motors = MotorsPWM::new(dp.TIM4, gb.pb6, gb.pb7, gb.pb8, gb.pb9, &clocks);
 
-        let mut adc = crate::init::init_adc(dp.ADC1, gb.pb1);
+        // let mut adc = crate::init::init_adc(dp.ADC1, gb.pb1);
+        // let v = adc.sample();
+        // rprintln!("v = {:?}", v);
 
-        let v = adc.sample();
-        rprintln!("v = {:?}", v);
+        #[cfg(feature = "nope")]
+        {
+            let tim4 = dp.TIM4;
 
-        // let m = MotorSelect::Motor4;
+            tim4.ccmr1_output().modify(|r, w| {
+                w.oc1pe()
+                    .enabled() // preload enabled
+                    .oc1m()
+                    .pwm_mode1()
+            });
+            tim4.ccmr1_output().modify(|r, w| {
+                w.oc2pe()
+                    .enabled() // preload enabled
+                    .oc2m()
+                    .pwm_mode1()
+            });
+            tim4.ccmr2_output().modify(|r, w| {
+                w.oc3pe()
+                    .enabled() // preload enabled
+                    .oc3m()
+                    .pwm_mode1()
+            });
+            tim4.ccmr2_output().modify(|r, w| {
+                w.oc4pe()
+                    .enabled() // preload enabled
+                    .oc4m()
+                    .pwm_mode1()
+            });
 
-        motors.set_armed(true);
+            /// enable preload
+            tim4.cr1.modify(|_, w| w.arpe().enabled());
 
-        let pwm = 500;
+            let psc = 84;
+            let arr = 1999;
 
-        // motors.set_motor_f32(m, 0.25);
-        // motors.set_motor_u16(m, pwm);
-        // motors.enable_motor(m);
+            /// set prescaler
+            tim4.psc.write(|w| w.psc().bits(psc));
 
-        motors.enable_all();
-        rprintln!("wat 0");
+            /// set auto-reload value, 0 would cause infinite loop
+            if arr > 0 {
+                tim4.arr.write(|w| unsafe { w.bits(arr) });
+            } else {
+                panic!();
+            }
 
-        motors.set_all_u16(pwm);
+            /// trigger update
+            tim4.cr1.modify(|_, w| w.urs().set_bit());
+            tim4.egr.write(|w| w.ug().set_bit());
+            tim4.cr1.modify(|_, w| w.urs().clear_bit());
 
-        delay.delay(1000.millis());
+            /// start pwm
+            tim4.cr1.write(|w| w.cen().set_bit());
 
-        // motors.disable_motor(m);
-        motors.disable_all();
-        rprintln!("wat 1");
+            let (mut m1, mut m2, mut m3, mut m4) = (gb.pb6, gb.pb7, gb.pb8, gb.pb9);
+
+            //
+        }
+
+        // let time: fugit::TimerDurationU32<494> = 4.millis();
+        let time: fugit::TimerDurationU32<494> =
+            fugit::TimerDurationU32::<494>::from_ticks(1999);
+        rprintln!("time = {:?}", time);
+        rprintln!("time.ticks() = {:?}", time.ticks());
+
+        // let clk = TIM4::timer_clock(&clocks);
+        // rprintln!("clk = {:?}", clk);
+
+        let freq = 494;
+
+        // let psc = clk.raw() / freq;
+        // rprintln!("psc = {:?}", psc);
+
+        // let psc2 = u16::try_from(psc - 1).unwrap();
+        // rprintln!("psc2 = {:?}", psc2);
+
+        #[cfg(feature = "nope")]
+        {
+            let tim4 = unsafe { &(*TIM4::ptr()) };
+
+            // let clk = tim4.clk
+
+            // let freq: u32 = 494;
+            // let clock = TIM4::timer_clock(&clocks);
+
+            // rprintln!("clock = {:?}", clock);
+            // let clock = clock.raw();
+
+            // let ticks = clock / freq;
+            // let psc = (ticks - 1) / (1 << 16);
+            // let arr = ticks / (psc + 1) - 1;
+            // let (psc, arr) = (psc as u16, arr);
+            // rprintln!("psc = {:?}", psc);
+            // rprintln!("arr = {:?}", arr);
+
+            // let cr1 = tim4.cr1.read();
+            // rprintln!("cr1.dir = {:?}", defmt::Debug2Format(&cr1.dir().variant()));
+            // rprintln!("cr1.cms = {:?}", defmt::Debug2Format(&cr1.cms().variant()));
+            // rprintln!("cr1.ckd = {:?}", defmt::Debug2Format(&cr1.ckd().variant()));
+            // rprintln!(
+            //     "cr1.udis = {:?}",
+            //     defmt::Debug2Format(&cr1.udis().variant())
+            // );
+
+            let arr = tim4.arr.read();
+            rprintln!("arr = {:?}", defmt::Debug2Format(&arr.arr().bits())); // 56679
+
+            let psc = tim4.psc.read();
+            rprintln!("psc = {:?}", defmt::Debug2Format(&psc.psc().bits())); // 2
+
+            //
+        }
+
+        #[cfg(feature = "nope")]
+        {
+            motors.set_armed(true);
+
+            let m0 = MotorSelect::Motor3;
+            let m1 = MotorSelect::Motor4;
+
+            let pwm = 600;
+
+            motors.enable_motor(m0);
+            motors.enable_motor(m1);
+            // motors.enable_all();
+            rprintln!("wat 0");
+
+            // motors.set_all_u16(pwm);
+            motors.set_motor_u16(m0, pwm);
+            motors.set_motor_u16(m1, pwm);
+
+            delay.delay(1000.millis());
+
+            motors.disable_motor(m0);
+            motors.disable_motor(m1);
+            // motors.disable_all();
+            rprintln!("wat 1");
+        }
 
         (Shared {}, Local {}, init::Monotonics())
     }

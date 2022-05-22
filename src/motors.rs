@@ -32,7 +32,7 @@ pub enum MotorSelect {
     Motor4,
 }
 
-/// new, consts
+/// consts
 impl MotorsPWM {
     // const MAX_DUTY_CYCLE: u16 = 56680;
 
@@ -46,7 +46,10 @@ impl MotorsPWM {
     const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
     // const FREQ: HertzU32 = fugit::HertzU32::Hz(750);
     // const FREQ: HertzU32 = fugit::HertzU32::Hz(250);
+}
 
+/// new
+impl MotorsPWM {
     pub fn new(
         tim4: TIM4,
         pin1: PB6,
@@ -62,7 +65,16 @@ impl MotorsPWM {
             pin4.into_alternate::<2>(),
         );
 
+        // let time = fugit::TimerDurationU32
+        // let time: fugit::TimerDurationU32<494> = 2.millis();
+        // let time: fugit::TimerDurationU32<500> = 4.millis();
+
+        // let time: fugit::TimerDurationU32<494> =
+        //     fugit::TimerDurationU32::<494>::from_ticks(1999);
+        // // rprintln!("time = {:?}", time);
+
         let pwm = tim4.pwm_hz(channels, Self::FREQ, &clocks);
+        // let pwm = tim4.pwm(channels, time, &clocks);
 
         let (mut pin1, mut pin2, mut pin3, mut pin4) = pwm.split();
 
