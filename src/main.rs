@@ -74,9 +74,8 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-#[cfg(feature = "nope")]
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,EXTI0])]
-
+// #[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,EXTI0])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -273,7 +272,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -324,20 +323,45 @@ mod app {
                     let gyro = ahrs.offset.update(gyro1);
                     // let gyro = gyro1;
 
-                    // print_v3("gyro = ", gyro, 4);
-                    // print_v3("acc  = ", acc, 4);
-                    // print_v3("mag  = ", mag, 6);
+                    #[cfg(feature = "nope")]
+                    {
+                        // print_v3("gyro = ", gyro, 4);
+                        // print_v3("acc  = ", acc, 4);
+                        // print_v3("mag  = ", mag, 6);
 
-                    // print_v3("mag0 = ", mag0, 6);
+                        // print_v3("mag0 = ", mag0, 6);
 
-                    let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-                    rprintln!(
-                        "heading = {:?}, mag(x,y,z) = ({:?}, {:?}, {:?})",
-                        round_to(heading, 1),
-                        round_to(mag.x, 6),
-                        round_to(mag.y, 6),
-                        round_to(mag.z, 6),
-                    );
+                        let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+                        rprintln!(
+                            "heading = {:?}, mag(x,y,z) = ({:?}, {:?}, {:?})",
+                            round_to(heading, 1),
+                            round_to(mag.x, 6),
+                            round_to(mag.y, 6),
+                            round_to(mag.z, 6),
+                        );
+
+                        // /// expected magnetic field:
+                        // /// Declination (+E) = 15.9 deg
+                        // /// Inclination (+D) = 70.1 deg
+                        // /// total:      53_743 nT
+                        // /// +North:     17_611 nT
+                        // /// +East:      5_028  nT
+                        // /// +Vertical:  50_527 nT
+                        // let mag_strength = mag.magnitude();
+                        // let mag_horiz = {
+                        //     let v = V3::new(mag.x, mag.y, 0.0);
+                        //     v.magnitude()
+                        // };
+
+                        // rprintln!(
+                        //     "mag total: [{=f32:08}]\nhorizontal = {=f32:08}\n{=f32:08}, {=f32:08}, {=f32:08}",
+                        //     mag_strength,
+                        //     mag_horiz,
+                        //     r(mag.x),
+                        //     r(mag.y),
+                        //     r(mag.z)
+                        // );
+                    }
 
                     ahrs.update(gyro, acc, mag);
                     // ahrs.update_no_mag(gyro, acc);
@@ -362,33 +386,16 @@ mod app {
                 // let mag = sd.magnetometer.read_and_reset();
                 // ahrs.update(gyro, acc, mag);
 
-                use na::{ComplexField, RealField};
-
                 // print_v3("gyro = ", gyro, 2);
                 // print_v3("acc  = ", acc * 0.5, 4);
                 // print_v3("mag  = ", mag, 5);
 
-                // /// expected magnetic field:
-                // /// Declination (+E) = 15.9 deg
-                // /// Inclination (+D) = 70.1 deg
-                // /// total:      53_743 nT
-                // /// +North:     17_611 nT
-                // /// +East:      5_028  nT
-                // /// +Vertical:  50_527 nT
-                // let mag_strength = mag.magnitude();
-                // let mag_horiz = {
-                //     let v = V3::new(mag.x, mag.y, 0.0);
-                //     v.magnitude()
-                // };
+                let pressure = sd.baro_pressure.read_and_reset();
+                let temp = sd.baro_temperature.read_and_reset();
 
-                // rprintln!(
-                //     "mag total: [{=f32:08}]\nhorizontal = {=f32:08}\n{=f32:08}, {=f32:08}, {=f32:08}",
-                //     mag_strength,
-                //     mag_horiz,
-                //     r(mag.x),
-                //     r(mag.y),
-                //     r(mag.z)
-                // );
+                let alt = ahrs.update_baro(pressure, temp);
+                // let alt = ahrs.get_altitude();
+                rprintln!("alt = {:?}", alt);
 
                 // let yaw = 90.0 - rad_to_deg(f32::atan2(mag0.y, mag0.x));
                 // // let yaw = 90.0 - rad_to_deg(f32::atan(mag0.y / mag0.x));
@@ -598,8 +605,8 @@ mod app {
     }
 }
 
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-// #[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
@@ -744,12 +751,12 @@ mod app {
         // motors.set_motor_u16(m, pwm);
         // motors.enable_motor(m);
 
-        motors.set_all_u16(pwm);
-
         motors.enable_all();
         rprintln!("wat 0");
 
-        delay.delay(2000.millis());
+        motors.set_all_u16(pwm);
+
+        delay.delay(1000.millis());
 
         // motors.disable_motor(m);
         motors.disable_all();

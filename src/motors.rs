@@ -43,8 +43,8 @@ impl MotorsPWM {
     const MOTOR_MIN_THROTTLE: f32 = 200.0;
 
     /// from ST firmware
-    // const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
-    const FREQ: HertzU32 = fugit::HertzU32::Hz(750);
+    const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
+    // const FREQ: HertzU32 = fugit::HertzU32::Hz(750);
     // const FREQ: HertzU32 = fugit::HertzU32::Hz(250);
 
     pub fn new(

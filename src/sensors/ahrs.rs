@@ -177,6 +177,10 @@ mod fusion {
         quat:       UQuat,
         delta_time: f32,
 
+        alt_ref_pressure:    f32,
+        alt_ref_temperature: f32,
+        altitude:            f32,
+
         pub offset:      FusionOffset,
         pub calibration: FusionCalibration,
 
@@ -220,6 +224,10 @@ mod fusion {
                 quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
                 delta_time,
 
+                alt_ref_pressure: 0.0,
+                alt_ref_temperature: 0.0,
+                altitude: 0.0,
+
                 offset,
                 calibration,
 
@@ -248,6 +256,7 @@ mod fusion {
         pub fn reset(&mut self) {
             // self.offset.reset();
             self.quat = UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0));
+            self.altitude = 0.0;
             self.initializing = true;
             self.ramped_gain = Self::INITIAL_GAIN;
             self.half_acc_feedback = V3::zeros();
@@ -269,6 +278,35 @@ mod fusion {
             if self.initializing && !self.acc_rejection_timeout {
                 self.set_heading(0.0);
             }
+        }
+    }
+
+    /// altitude
+    impl AhrsFusion {
+        pub fn get_altitude(&self) -> f32 {
+            self.altitude
+        }
+
+        pub fn update_baro(&mut self, pressure: f32, temp: f32) -> f32 {
+            use nalgebra::ComplexField;
+
+            if self.alt_ref_pressure == 0.0 && self.alt_ref_temperature == 0.0 {
+                self.alt_ref_pressure = pressure;
+                self.alt_ref_temperature = temp;
+            }
+
+            // self.altitude = (self.alt_ref_temperature )
+
+            const R: f32 = 8.31432; // universal gas constant
+            const G0: f32 = 9.80665;
+            const M: f32 = 0.0289644; // molar mass of Earth’s air (kg/mol)
+
+            self.altitude = (R
+                * self.alt_ref_temperature
+                * f32::ln(pressure / self.alt_ref_pressure))
+                / (-G0 * M);
+
+            self.altitude
         }
     }
 
