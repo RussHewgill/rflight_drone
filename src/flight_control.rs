@@ -57,6 +57,33 @@ impl ControlInputs {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum IdPID {
+    StabRoll,
+    RateRoll,
+    StabPitch,
+    RatePitch,
+    StabYaw,
+    RateYaw,
+    AltitudeRate,
+}
+
+impl IdPID {
+    pub fn from_u8(p: u8) -> Option<Self> {
+        match p {
+            0 => Some(Self::StabRoll),
+            1 => Some(Self::RateRoll),
+            2 => Some(Self::StabPitch),
+            3 => Some(Self::RatePitch),
+            4 => Some(Self::StabYaw),
+            5 => Some(Self::RateYaw),
+            6 => Some(Self::AltitudeRate),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct DroneController {
     /// roll
     pub pid_stab_roll:     PID,
@@ -87,8 +114,15 @@ impl DroneController {
 
         let mut pid_altitude = PID::new(0.0, 0.0, 0.0);
 
-        pid_stab_roll.kp = 3.0;
-        pid_rate_roll.kp = 3.0;
+        pid_stab_roll.kp = 3.0; // kp1
+        pid_stab_roll.p_limit = 2.0; // XXX: ST firmware says this is 5 degrees ??
+
+        pid_rate_roll.kp = 80.0; // kp2
+        pid_rate_roll.ki = 80.0; // ki2
+        pid_rate_roll.kd = 10.0; // kd2
+        pid_rate_roll.p_limit = 20.0;
+
+        // pid_
 
         Self {
             pid_stab_roll,

@@ -26,7 +26,8 @@ use crate::{
         gatt::UpdateLongCharacteristicValueParameters, hal_bt::Commands as HalCommands,
     },
     bt_control::{UUID_LOG_CHAR, UUID_LOG_PID_CHAR, UUID_LOG_SENS_CHAR},
-    pid::PID,
+    flight_control::IdPID,
+    pid::{PIDOutput, PID},
     sensors::V3,
     uprint, uprintln,
 };
@@ -100,18 +101,20 @@ where
 
     pub fn log_write_pid(
         &mut self,
+        pid_id: IdPID,
         pid: &PID,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         let logger = self.services.logger.expect("no logger?");
 
-        let (out, p, i, d) = pid.prev_outputs;
+        let PIDOutput { p, i, d, output } = pid.prev_output;
 
-        let mut data = [0u8; 16];
+        let mut data = [0u8; 17];
 
-        data[0..4].copy_from_slice(&out.to_be_bytes());
+        data[0..4].copy_from_slice(&output.to_be_bytes());
         data[4..8].copy_from_slice(&p.to_be_bytes());
         data[8..12].copy_from_slice(&i.to_be_bytes());
         data[12..16].copy_from_slice(&d.to_be_bytes());
+        data[17] = pid_id as u8;
 
         self.log_write(logger.char_handle_pid, &data, false)?;
 

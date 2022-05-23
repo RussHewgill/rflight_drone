@@ -99,7 +99,7 @@ mod app {
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bluetooth::{gap::ConnectionUpdateParameters, gatt::Commands as GattCommands},
         bt_state::{BTState, ConnectionChange},
-        flight_control::{ControlInputs, DroneController, MotorOutputs},
+        flight_control::{ControlInputs, DroneController, IdPID, MotorOutputs},
         leds::LEDs,
         motors::MotorsPWM,
         pid::PID,
@@ -278,7 +278,7 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        // bt_test::spawn_after(100.millis()).unwrap();
+        bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -498,8 +498,6 @@ mod app {
         (cx.shared.bt, cx.shared.exti, cx.shared.controller).lock(
             |bt, exti, controller| {
                 if let BTState::Connected(conn) = bt.state {
-                    bt.pause_interrupt(exti);
-
                     // let handle = match bt.services.input {
                     //     Some(i) => i.throttle_char,
                     //     _ => panic!("no throttle handle"),
@@ -514,12 +512,14 @@ mod app {
 
                     controller.pid_altitude_rate.step(-1.0);
 
-                    // bt.log_write_pid()
+                    rprintln!("sending");
+                    bt.pause_interrupt(exti);
+                    bt.log_write_pid(IdPID::AltitudeRate, &controller.pid_altitude_rate)
+                        .unwrap();
+                    bt.unpause_interrupt(exti);
 
                     // bt.read_event_uart().unwrap();
                     // rprintln!("finished read");
-
-                    bt.unpause_interrupt(exti);
                 }
             },
         );
