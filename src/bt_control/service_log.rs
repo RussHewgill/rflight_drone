@@ -25,7 +25,8 @@ use crate::{
     bluetooth::{
         gatt::UpdateLongCharacteristicValueParameters, hal_bt::Commands as HalCommands,
     },
-    bt_control::{UUID_LOG_CHAR, UUID_LOG_SENS_CHAR},
+    bt_control::{UUID_LOG_CHAR, UUID_LOG_PID_CHAR, UUID_LOG_SENS_CHAR},
+    pid::PID,
     sensors::V3,
     uprint, uprintln,
 };
@@ -51,6 +52,7 @@ pub struct SvLogger {
     pub service_handle:   ServiceHandle,
     pub char_handle_quat: CharacteristicHandle,
     pub char_handle_sens: CharacteristicHandle,
+    pub char_handle_pid:  CharacteristicHandle,
 }
 
 /// write
@@ -61,6 +63,61 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
+    fn log_write(
+        &mut self,
+        char_handle: CharacteristicHandle,
+        data: &[u8],
+        long: bool,
+    ) -> Result<(), BTError<SpiError, GpioError>> {
+        let logger = self.services.logger.expect("no logger?");
+
+        if long {
+            let val = UpdateLongCharacteristicValueParameters {
+                service_handle:        logger.service_handle,
+                characteristic_handle: char_handle,
+                update_type:           crate::bluetooth::gatt::UpdateType::NOTIFICATION,
+                total_len:             data.len(),
+                offset:                0,
+                value:                 &data,
+            };
+            block!(self.update_long_characteristic_value(&val)).unwrap();
+
+            let result = self.ignore_event_timeout(None)?;
+        } else {
+            let val = UpdateCharacteristicValueParameters {
+                service_handle:        logger.service_handle,
+                characteristic_handle: char_handle,
+                offset:                0,
+                value:                 &data,
+            };
+            block!(self.update_characteristic_value(&val)).unwrap();
+
+            let result = self.ignore_event_timeout(None)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn log_write_pid(
+        &mut self,
+        pid: &PID,
+    ) -> Result<(), BTError<SpiError, GpioError>> {
+        let logger = self.services.logger.expect("no logger?");
+
+        let (out, p, i, d) = pid.prev_outputs;
+
+        let mut data = [0u8; 16];
+
+        data[0..4].copy_from_slice(&out.to_be_bytes());
+        data[4..8].copy_from_slice(&p.to_be_bytes());
+        data[8..12].copy_from_slice(&i.to_be_bytes());
+        data[12..16].copy_from_slice(&d.to_be_bytes());
+
+        self.log_write(logger.char_handle_pid, &data, false)?;
+
+        Ok(())
+    }
+
     pub fn log_write_sens(
         &mut self,
         gyro: V3,
@@ -277,10 +334,19 @@ where
         };
         rprintln!("c 1 = {:?}", defmt::Debug2Format(&c1));
 
+        let handle_pid = self.add_log_char(
+            service.service_handle,
+            UUID_LOG_PID_CHAR,
+            18,
+            CharacteristicProperty::NOTIFY,
+            2,
+        )?;
+
         let logger = SvLogger {
             service_handle:   service.service_handle,
             char_handle_quat: c0.characteristic_handle,
             char_handle_sens: c1.characteristic_handle,
+            char_handle_pid:  handle_pid,
         };
 
         self.services.logger = Some(logger);
@@ -288,109 +354,34 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "nope")]
-    /// Retry
-    pub fn init_log_service(
+    fn add_log_char(
         &mut self,
-        uart: &mut UART,
-    ) -> Result<(), BTError<SpiError, GpioError>> {
-        self.wait_ms(25.millis());
-
-        /// how long to wait before re-sending command
-        let timeout = 1000.millis();
-
-        let params = AddServiceParameters {
-            uuid:                  UUID_LOG_SERVICE,
-            service_type:          crate::bluetooth::gatt::ServiceType::Primary,
-            max_attribute_records: 8,
-        };
-
-        let service: GattService = loop {
-            block!(self.add_service(&params))?;
-            match self._read_event_timeout(timeout, uart) {
-                Ok(Some(e)) => match e {
-                    Event::CommandComplete(params) => match params.return_params {
-                        ReturnParameters::Vendor(vs) => match vs {
-                            VReturnParameters::GattAddService(service) => {
-                                break service;
-                            }
-                            other => {
-                                uprintln!(uart, "other a 0 = {:?}", other);
-                            }
-                        },
-                        other => {
-                            uprintln!(uart, "other a 1 = {:?}", other);
-                        }
-                    },
-                    other => {
-                        uprintln!(uart, "other a 2 = {:?}", other);
-                    }
-                },
-                Ok(None) => {
-                    uprintln!(uart, "init_log_service, re-sending add_service");
-                    block!(self.add_service(&params))?;
-                }
-                Err(e) => panic!("init_log_service error = {:?}", e),
-            }
-        };
-        uprintln!(uart, "service = {:?}", service);
-
-        self.wait_ms(100.millis());
-
-        let params0 = AddCharacteristicParameters {
-            service_handle:            service.service_handle,
-            characteristic_uuid:       UUID_LOG_CHAR,
-            characteristic_value_len:  18,
-            characteristic_properties: CharacteristicProperty::NOTIFY,
-            // characteristic_properties: CharacteristicProperty::NOTIFY
-            // | CharacteristicProperty::READ,
+        service: ServiceHandle,
+        uuid: crate::bluetooth::gatt::Uuid,
+        len: usize,
+        props: CharacteristicProperty,
+        n: u8,
+    ) -> Result<CharacteristicHandle, BTError<SpiError, GpioError>> {
+        let params = AddCharacteristicParameters {
+            service_handle:            service,
+            characteristic_uuid:       uuid,
+            characteristic_value_len:  len,
+            characteristic_properties: props,
             security_permissions:      CharacteristicPermission::NONE,
             gatt_event_mask:           CharacteristicEvent::NONE,
             encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
             is_variable:               true,
-            // fw_version_before_v72:     true,
             fw_version_before_v72:     false,
         };
+        block!(self.add_characteristic(&params))?;
+        rprintln!("sent c {}", n);
 
-        let c = loop {
-            block!(self.add_characteristic(&params0))?;
-            match self._read_event_timeout(timeout, uart) {
-                Ok(Some(e)) => match e {
-                    Event::CommandComplete(params) => match params.return_params {
-                        ReturnParameters::Vendor(vs) => match vs {
-                            VReturnParameters::GattAddCharacteristic(service) => {
-                                break service;
-                            }
-                            other => {
-                                uprintln!(uart, "other b 0 = {:?}", other);
-                            }
-                        },
-                        other => {
-                            uprintln!(uart, "other b 1 = {:?}", other);
-                        }
-                    },
-                    other => {
-                        uprintln!(uart, "other b 2 = {:?}", other);
-                    }
-                },
-                Ok(None) => {
-                    uprintln!(uart, "init_log_service, re-sending add_characteristic");
-                    block!(self.add_characteristic(&params0))?;
-                }
-                Err(e) => panic!("init_log_service error = {:?}", e),
-            }
+        let c = match self.read_event_params_vendor()? {
+            VReturnParameters::GattAddCharacteristic(c) => c,
+            other => unimplemented!("other = {:?}", other),
         };
-        uprintln!(uart, "c = {:?}", c);
+        rprintln!("c {} = {:?}", n, defmt::Debug2Format(&c));
 
-        let logger = SvLogger {
-            service_handle: service.service_handle,
-            char_handle:    c.characteristic_handle,
-        };
-
-        self.services.logger = Some(logger);
-
-        // self.log_write_uart(uart, "wat".as_bytes()).unwrap();
-
-        Ok(())
+        Ok(c.characteristic_handle)
     }
 }

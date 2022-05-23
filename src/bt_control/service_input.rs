@@ -29,7 +29,7 @@ use crate::{
         },
         hal_bt::Commands as HalCommands,
     },
-    bt_control::{UUID_INPUT_DESC_THROTTLE, UUID_LOG_CHAR, UUID_LOG_SENS_CHAR},
+    bt_control::{UUID_LOG_CHAR, UUID_LOG_SENS_CHAR},
     flight_control::ControlInputs,
     sensors::V3,
     uprint, uprintln,

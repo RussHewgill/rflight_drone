@@ -74,9 +74,8 @@ use crate::bluetooth::{
 use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
-#[cfg(feature = "nope")]
-// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,EXTI0])]
-
+// #[cfg(feature = "nope")]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,EXTI0])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -100,7 +99,7 @@ mod app {
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bluetooth::{gap::ConnectionUpdateParameters, gatt::Commands as GattCommands},
         bt_state::{BTState, ConnectionChange},
-        flight_control::{ControlInputs, DroneController},
+        flight_control::{ControlInputs, DroneController, MotorOutputs},
         leds::LEDs,
         motors::MotorsPWM,
         pid::PID,
@@ -125,20 +124,21 @@ mod app {
 
     #[shared]
     struct Shared {
-        dwt:         Dwt,
-        exti:        EXTI,
+        dwt:           Dwt,
+        exti:          EXTI,
         // ahrs:        AhrsComplementary,
-        ahrs:        AhrsFusion,
+        ahrs:          AhrsFusion,
         // ahrs:        AhrsMadgwick,
-        sens_data:   SensorData,
-        flight_data: FlightData,
-        bt:          BTController,
-        tim9_flag:   bool,
-        adc:         BatteryAdc,
-        leds:        LEDs,
-        motors:      MotorsPWM,
-        inputs:      ControlInputs,
-        controller:  DroneController,
+        sens_data:     SensorData,
+        flight_data:   FlightData,
+        bt:            BTController,
+        tim9_flag:     bool,
+        adc:           BatteryAdc,
+        leds:          LEDs,
+        motors:        MotorsPWM,
+        motor_outputs: MotorOutputs,
+        inputs:        ControlInputs,
+        controller:    DroneController,
     }
 
     #[local]
@@ -203,23 +203,25 @@ mod app {
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
 
-        let pid_stab_roll = PID::new(0.0, 0.0, 0.0);
-        let pid_rate_roll = PID::new(0.0, 0.0, 0.0);
-        let pid_stab_pitch = PID::new(0.0, 0.0, 0.0);
-        let pid_rate_pitch = PID::new(0.0, 0.0, 0.0);
-        let pid_stab_yaw = PID::new(0.0, 0.0, 0.0);
-        let pid_rate_yaw = PID::new(0.0, 0.0, 0.0);
-        let pid_throttle = PID::new(0.0, 0.0, 0.0);
+        let controller = DroneController::new_default_params();
 
-        let controller = DroneController::new(
-            pid_stab_roll,
-            pid_rate_roll,
-            pid_stab_pitch,
-            pid_rate_pitch,
-            pid_stab_yaw,
-            pid_rate_yaw,
-            pid_throttle,
-        );
+        // let pid_stab_roll = PID::new(0.0, 0.0, 0.0);
+        // let pid_rate_roll = PID::new(0.0, 0.0, 0.0);
+        // let pid_stab_pitch = PID::new(0.0, 0.0, 0.0);
+        // let pid_rate_pitch = PID::new(0.0, 0.0, 0.0);
+        // let pid_stab_yaw = PID::new(0.0, 0.0, 0.0);
+        // let pid_rate_yaw = PID::new(0.0, 0.0, 0.0);
+        // let pid_throttle = PID::new(0.0, 0.0, 0.0);
+
+        // let controller = DroneController::new(
+        //     pid_stab_roll,
+        //     pid_rate_roll,
+        //     pid_stab_pitch,
+        //     pid_rate_pitch,
+        //     pid_stab_yaw,
+        //     pid_rate_yaw,
+        //     pid_throttle,
+        // );
 
         /// Fusion
         let mut ahrs = AhrsFusion::new(
@@ -246,9 +248,9 @@ mod app {
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
-        /// start timer
-        tim3.start(sensor_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start timer
+        // tim3.start(sensor_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -261,6 +263,7 @@ mod app {
             adc: init_struct.adc,
             leds: init_struct.leds,
             motors: init_struct.motors,
+            motor_outputs: MotorOutputs::default(),
             inputs: ControlInputs::default(),
             controller,
         };
@@ -273,7 +276,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -282,7 +285,7 @@ mod app {
 
     #[task(
         binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag],
+        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
         local = [tim3, sensors],
         priority = 4
     )]
@@ -290,121 +293,110 @@ mod app {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+
+        let ahrs = cx.shared.ahrs;
+        let flight_data = cx.shared.flight_data;
+        let sens_data = cx.shared.sens_data;
+        let tim9_flag = cx.shared.tim9_flag;
+        let motors = cx.shared.motors;
+        let inputs = cx.shared.inputs;
+        let controller = cx.shared.controller;
+
+        /// update sensors, ahrs
         (
-            cx.shared.ahrs,
-            cx.shared.sens_data,
-            cx.shared.flight_data,
-            cx.shared.tim9_flag,
+            ahrs,
+            sens_data,
+            flight_data,
+            tim9_flag,
+            motors,
+            inputs,
+            controller,
         )
-            .lock(|ahrs, sd, fd, tim9_flag| {
+            .lock(|ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd);
                 cx.local.sensors.read_data_imu(sd, false);
                 cx.local.sensors.read_data_baro(sd);
 
-                // #[cfg(feature = "nope")]
+                /// update AHRS
+                let gyro0 = sd.imu_gyro.read_and_reset();
+                let acc0 = sd.imu_acc.read_and_reset();
+                let mag0 = sd.magnetometer.read_and_reset();
+
+                let pressure = sd.baro_pressure.read_and_reset();
+                let temp = sd.baro_temperature.read_and_reset();
+
+                let alt = ahrs.update_baro(pressure, temp);
+                rprintln!("alt = {:?}", alt);
+
+                // if ahrs.calibration.initializing {
+                //     ahrs.calibration.update(gyro0, acc0, mag0);
+                // }
+
+                let gyro1 = ahrs.calibration.calibrate_gyro(gyro0);
+                let acc = ahrs.calibration.calibrate_acc(acc0);
+                let mag = ahrs.calibration.calibrate_mag(mag0);
+
+                // let gyro = gyro0;
+                // let acc = acc0;
+                // let mag = mag0;
+
+                let gyro = ahrs.offset.update(gyro1);
+                // let gyro = gyro1;
+
+                #[cfg(feature = "nope")]
                 {
-                    /// update AHRS
-                    let gyro0 = sd.imu_gyro.read_and_reset();
-                    let acc0 = sd.imu_acc.read_and_reset();
-                    let mag0 = sd.magnetometer.read_and_reset();
+                    // print_v3("gyro = ", gyro, 4);
+                    // print_v3("acc  = ", acc, 4);
+                    // print_v3("mag  = ", mag, 6);
 
-                    let pressure = sd.baro_pressure.read_and_reset();
-                    let temp = sd.baro_temperature.read_and_reset();
+                    // print_v3("mag0 = ", mag0, 6);
 
-                    let alt = ahrs.update_baro(pressure, temp);
-                    rprintln!("alt = {:?}", alt);
+                    let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+                    rprintln!(
+                        "heading = {:?}, mag(x,y,z) = ({:?}, {:?}, {:?})",
+                        round_to(heading, 1),
+                        round_to(mag.x, 6),
+                        round_to(mag.y, 6),
+                        round_to(mag.z, 6),
+                    );
 
-                    // if ahrs.calibration.initializing {
-                    //     ahrs.calibration.update(gyro0, acc0, mag0);
-                    // }
+                    // /// expected magnetic field:
+                    // /// Declination (+E) = 15.9 deg
+                    // /// Inclination (+D) = 70.1 deg
+                    // /// total:      53_743 nT
+                    // /// +North:     17_611 nT
+                    // /// +East:      5_028  nT
+                    // /// +Vertical:  50_527 nT
+                    // let mag_strength = mag.magnitude();
+                    // let mag_horiz = {
+                    //     let v = V3::new(mag.x, mag.y, 0.0);
+                    //     v.magnitude()
+                    // };
 
-                    let gyro1 = ahrs.calibration.calibrate_gyro(gyro0);
-                    let acc = ahrs.calibration.calibrate_acc(acc0);
-                    let mag = ahrs.calibration.calibrate_mag(mag0);
-
-                    // let gyro = gyro0;
-                    // let acc = acc0;
-                    // let mag = mag0;
-
-                    let gyro = ahrs.offset.update(gyro1);
-                    // let gyro = gyro1;
-
-                    #[cfg(feature = "nope")]
-                    {
-                        // print_v3("gyro = ", gyro, 4);
-                        // print_v3("acc  = ", acc, 4);
-                        // print_v3("mag  = ", mag, 6);
-
-                        // print_v3("mag0 = ", mag0, 6);
-
-                        let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-                        rprintln!(
-                            "heading = {:?}, mag(x,y,z) = ({:?}, {:?}, {:?})",
-                            round_to(heading, 1),
-                            round_to(mag.x, 6),
-                            round_to(mag.y, 6),
-                            round_to(mag.z, 6),
-                        );
-
-                        // /// expected magnetic field:
-                        // /// Declination (+E) = 15.9 deg
-                        // /// Inclination (+D) = 70.1 deg
-                        // /// total:      53_743 nT
-                        // /// +North:     17_611 nT
-                        // /// +East:      5_028  nT
-                        // /// +Vertical:  50_527 nT
-                        // let mag_strength = mag.magnitude();
-                        // let mag_horiz = {
-                        //     let v = V3::new(mag.x, mag.y, 0.0);
-                        //     v.magnitude()
-                        // };
-
-                        // rprintln!(
-                        //     "mag total: [{=f32:08}]\nhorizontal = {=f32:08}\n{=f32:08}, {=f32:08}, {=f32:08}",
-                        //     mag_strength,
-                        //     mag_horiz,
-                        //     r(mag.x),
-                        //     r(mag.y),
-                        //     r(mag.z)
-                        // );
-                    }
-
-                    ahrs.update(gyro, acc, mag);
-                    // ahrs.update_no_mag(gyro, acc);
-
-                    if ahrs.is_acc_warning() {
-                        rprintln!("acc warning");
-                    }
-                    if ahrs.is_acc_timeout() {
-                        rprintln!("acc timeout");
-                    }
-                    if ahrs.is_mag_warning() {
-                        rprintln!("mag warning");
-                    }
-                    if ahrs.is_mag_timeout() {
-                        rprintln!("mag timeout");
-                    }
+                    // rprintln!(
+                    //     "mag total: [{=f32:08}]\nhorizontal = {=f32:08}\n{=f32:08}, {=f32:08}, {=f32:08}",
+                    //     mag_strength,
+                    //     mag_horiz,
+                    //     r(mag.x),
+                    //     r(mag.y),
+                    //     r(mag.z)
+                    // );
                 }
 
-                // /// update AHRS
-                // let gyro = sd.imu_gyro.read_and_reset();
-                // let acc = sd.imu_acc.read_and_reset();
-                // let mag = sd.magnetometer.read_and_reset();
-                // ahrs.update(gyro, acc, mag);
-
-                // print_v3("gyro = ", gyro, 2);
-                // print_v3("acc  = ", acc * 0.5, 4);
-                // print_v3("mag  = ", mag, 5);
-
-                // let yaw = 90.0 - rad_to_deg(f32::atan2(mag0.y, mag0.x));
-                // // let yaw = 90.0 - rad_to_deg(f32::atan(mag0.y / mag0.x));
-                // rprintln!("yaw = {=f32:08}", yaw);
+                ahrs.update(gyro, acc, mag);
+                // ahrs.update_no_mag(gyro, acc);
 
                 /// update FlightData
                 fd.update(ahrs);
 
                 // let (roll, pitch, yaw) = fd.get_euler_angles();
+
+                /// update PIDs
+                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+
+                /// apply mixed PID outputs to motors
+                motor_outputs.apply(motors);
 
                 // rprintln!(
                 //     "(r,p,y) = {:?}, {:?}, {:?}",
@@ -412,7 +404,6 @@ mod app {
                 //     r(rad_to_deg(pitch)),
                 //     r(rad_to_deg(yaw)),
                 // );
-
                 *tim9_flag = true;
             });
     }
@@ -431,8 +422,8 @@ mod app {
         let sens_data = cx.shared.sens_data;
         let bt = cx.shared.bt;
         let exti = cx.shared.exti;
-        let inputs = cx.shared.inputs;
-        let controller = cx.shared.controller;
+        // let inputs = cx.shared.inputs;
+        // let controller = cx.shared.controller;
 
         // *cx.local.bat_counter += 1;
         // if *cx.local.bat_counter
@@ -501,37 +492,37 @@ mod app {
         main_loop::spawn().unwrap();
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(shared = [bt, exti], local = [x: f32 = 0.0], priority = 3)]
+    // #[cfg(feature = "nope")]
+    #[task(shared = [bt, exti, inputs, controller], local = [x: f32 = 0.0], priority = 3)]
     fn bt_test(mut cx: bt_test::Context) {
-        (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
-            if let BTState::Connected(conn) = bt.state {
-                bt.pause_interrupt(exti);
+        (cx.shared.bt, cx.shared.exti, cx.shared.controller).lock(
+            |bt, exti, controller| {
+                if let BTState::Connected(conn) = bt.state {
+                    bt.pause_interrupt(exti);
 
-                // let handle = match bt.services.input {
-                //     Some(i) => i.throttle_char,
-                //     _ => panic!("no throttle handle"),
-                // };
+                    // let handle = match bt.services.input {
+                    //     Some(i) => i.throttle_char,
+                    //     _ => panic!("no throttle handle"),
+                    // };
 
-                // let quat = UQuat::default();
-                let quat = UQuat::from_euler_angles(deg_to_rad(*cx.local.x), 0.0, 0.0);
-                *cx.local.x += 1.0;
+                    // let quat = UQuat::from_euler_angles(deg_to_rad(*cx.local.x), 0.0, 0.0);
+                    // *cx.local.x += 1.0;
+                    // rprintln!("cx.local.x = {:?}", *cx.local.x);
 
-                rprintln!("cx.local.x = {:?}", *cx.local.x);
+                    // // rprintln!("sending");
+                    // bt.log_write_quat(&quat).unwrap();
 
-                // rprintln!("sending");
-                bt.log_write_quat(&quat).unwrap();
+                    controller.pid_altitude_rate.step(-1.0);
 
-                // // block!(bt.read_characteristic_using_uuid(
-                // block!(bt.read_characteristic_value(conn, handle)).unwrap();
-                // rprintln!("send read req");
+                    // bt.log_write_pid()
 
-                // bt.read_event_uart().unwrap();
-                // rprintln!("finished read");
+                    // bt.read_event_uart().unwrap();
+                    // rprintln!("finished read");
 
-                bt.unpause_interrupt(exti);
-            }
-        });
+                    bt.unpause_interrupt(exti);
+                }
+            },
+        );
 
         bt_test::spawn_after(250.millis()).unwrap();
     }
@@ -605,8 +596,8 @@ mod app {
     }
 }
 
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
-// #[cfg(feature = "nope")]
+// #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3])]
+#[cfg(feature = "nope")]
 mod app {
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
@@ -735,149 +726,34 @@ mod app {
 
         let gb = dp.GPIOB.split();
 
-        // let mut motors = MotorsPWM::new(dp.TIM4, gb.pb6, gb.pb7, gb.pb8, gb.pb9, &clocks);
+        let mut motors = MotorsPWM::new(dp.TIM4, gb.pb6, gb.pb7, gb.pb8, gb.pb9, &clocks);
 
-        // let mut adc = crate::init::init_adc(dp.ADC1, gb.pb1);
-        // let v = adc.sample();
-        // rprintln!("v = {:?}", v);
+        let mut adc = crate::init::init_adc(dp.ADC1, gb.pb1);
+        let v = adc.sample();
+        rprintln!("v = {:?}", v);
 
-        #[cfg(feature = "nope")]
-        {
-            let tim4 = dp.TIM4;
+        motors.set_armed(true);
 
-            tim4.ccmr1_output().modify(|r, w| {
-                w.oc1pe()
-                    .enabled() // preload enabled
-                    .oc1m()
-                    .pwm_mode1()
-            });
-            tim4.ccmr1_output().modify(|r, w| {
-                w.oc2pe()
-                    .enabled() // preload enabled
-                    .oc2m()
-                    .pwm_mode1()
-            });
-            tim4.ccmr2_output().modify(|r, w| {
-                w.oc3pe()
-                    .enabled() // preload enabled
-                    .oc3m()
-                    .pwm_mode1()
-            });
-            tim4.ccmr2_output().modify(|r, w| {
-                w.oc4pe()
-                    .enabled() // preload enabled
-                    .oc4m()
-                    .pwm_mode1()
-            });
+        let m0 = MotorSelect::Motor3;
+        let m1 = MotorSelect::Motor4;
 
-            /// enable preload
-            tim4.cr1.modify(|_, w| w.arpe().enabled());
+        let pwm = 1800;
 
-            let psc = 84;
-            let arr = 1999;
+        motors.enable_motor(m0);
+        motors.enable_motor(m1);
+        // motors.enable_all();
+        rprintln!("wat 0");
 
-            /// set prescaler
-            tim4.psc.write(|w| w.psc().bits(psc));
+        // motors.set_all_u16(pwm);
+        motors.set_motor_u16(m0, pwm);
+        motors.set_motor_u16(m1, pwm);
 
-            /// set auto-reload value, 0 would cause infinite loop
-            if arr > 0 {
-                tim4.arr.write(|w| unsafe { w.bits(arr) });
-            } else {
-                panic!();
-            }
+        delay.delay(1000.millis());
 
-            /// trigger update
-            tim4.cr1.modify(|_, w| w.urs().set_bit());
-            tim4.egr.write(|w| w.ug().set_bit());
-            tim4.cr1.modify(|_, w| w.urs().clear_bit());
-
-            /// start pwm
-            tim4.cr1.write(|w| w.cen().set_bit());
-
-            let (mut m1, mut m2, mut m3, mut m4) = (gb.pb6, gb.pb7, gb.pb8, gb.pb9);
-
-            //
-        }
-
-        // let time: fugit::TimerDurationU32<494> = 4.millis();
-        let time: fugit::TimerDurationU32<494> =
-            fugit::TimerDurationU32::<494>::from_ticks(1999);
-        rprintln!("time = {:?}", time);
-        rprintln!("time.ticks() = {:?}", time.ticks());
-
-        // let clk = TIM4::timer_clock(&clocks);
-        // rprintln!("clk = {:?}", clk);
-
-        let freq = 494;
-
-        // let psc = clk.raw() / freq;
-        // rprintln!("psc = {:?}", psc);
-
-        // let psc2 = u16::try_from(psc - 1).unwrap();
-        // rprintln!("psc2 = {:?}", psc2);
-
-        #[cfg(feature = "nope")]
-        {
-            let tim4 = unsafe { &(*TIM4::ptr()) };
-
-            // let clk = tim4.clk
-
-            // let freq: u32 = 494;
-            // let clock = TIM4::timer_clock(&clocks);
-
-            // rprintln!("clock = {:?}", clock);
-            // let clock = clock.raw();
-
-            // let ticks = clock / freq;
-            // let psc = (ticks - 1) / (1 << 16);
-            // let arr = ticks / (psc + 1) - 1;
-            // let (psc, arr) = (psc as u16, arr);
-            // rprintln!("psc = {:?}", psc);
-            // rprintln!("arr = {:?}", arr);
-
-            // let cr1 = tim4.cr1.read();
-            // rprintln!("cr1.dir = {:?}", defmt::Debug2Format(&cr1.dir().variant()));
-            // rprintln!("cr1.cms = {:?}", defmt::Debug2Format(&cr1.cms().variant()));
-            // rprintln!("cr1.ckd = {:?}", defmt::Debug2Format(&cr1.ckd().variant()));
-            // rprintln!(
-            //     "cr1.udis = {:?}",
-            //     defmt::Debug2Format(&cr1.udis().variant())
-            // );
-
-            let arr = tim4.arr.read();
-            rprintln!("arr = {:?}", defmt::Debug2Format(&arr.arr().bits())); // 56679
-
-            let psc = tim4.psc.read();
-            rprintln!("psc = {:?}", defmt::Debug2Format(&psc.psc().bits())); // 2
-
-            //
-        }
-
-        #[cfg(feature = "nope")]
-        {
-            motors.set_armed(true);
-
-            let m0 = MotorSelect::Motor3;
-            let m1 = MotorSelect::Motor4;
-
-            let pwm = 600;
-
-            motors.enable_motor(m0);
-            motors.enable_motor(m1);
-            // motors.enable_all();
-            rprintln!("wat 0");
-
-            // motors.set_all_u16(pwm);
-            motors.set_motor_u16(m0, pwm);
-            motors.set_motor_u16(m1, pwm);
-
-            delay.delay(1000.millis());
-
-            motors.disable_motor(m0);
-            motors.disable_motor(m1);
-            // motors.disable_all();
-            rprintln!("wat 1");
-        }
+        motors.disable_motor(m0);
+        motors.disable_motor(m1);
+        // motors.disable_all();
+        rprintln!("wat 1");
 
         (Shared {}, Local {}, init::Monotonics())
     }

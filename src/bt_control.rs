@@ -1,6 +1,6 @@
 pub mod service_input;
 pub mod service_log;
-pub mod service_sensors;
+// pub mod service_sensors;
 
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
@@ -111,12 +111,15 @@ mod uuids {
     pub const UUID_LOG_SENS_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x5724d4c76ed5402cbf0d3765bf4b9c5c);
 
-    /// Sensors
-    pub const UUID_SENSOR_SERVICE: crate::bluetooth::gatt::Uuid =
-        uuid_from_hex(0x639d0157e75a4eb9835298b676f51912);
+    pub const UUID_LOG_PID_CHAR: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x954ea4cad97841018a6ab34dd34df896);
 
-    pub const UUID_SENSOR_CHAR: crate::bluetooth::gatt::Uuid =
-        uuid_from_hex(0x4f1f7252db544d4faa8f208d48637b3f);
+    // /// Sensors
+    // pub const UUID_SENSOR_SERVICE: crate::bluetooth::gatt::Uuid =
+    //     uuid_from_hex(0x639d0157e75a4eb9835298b676f51912);
+
+    // pub const UUID_SENSOR_CHAR: crate::bluetooth::gatt::Uuid =
+    //     uuid_from_hex(0x4f1f7252db544d4faa8f208d48637b3f);
 
     /// Input
     pub const UUID_INPUT_SERVICE: crate::bluetooth::gatt::Uuid =
@@ -125,8 +128,8 @@ mod uuids {
     pub const UUID_INPUT_CHAR_THROTTLE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x0d2d404bff6d4e8a97b15bc440288423);
 
-    pub const UUID_INPUT_DESC_THROTTLE: crate::bluetooth::gatt::Uuid =
-        uuid_from_hex(0x7e6c30a33bb241ef838e15912c120dd0);
+    // pub const UUID_INPUT_DESC_THROTTLE: crate::bluetooth::gatt::Uuid =
+    //     uuid_from_hex(0x7e6c30a33bb241ef838e15912c120dd0);
 }
 
 /// init

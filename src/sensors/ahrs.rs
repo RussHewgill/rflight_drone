@@ -445,6 +445,19 @@ mod fusion {
 
             // self.quat = UQuat::from_quaternion(*self.quat + quat_mult_vec(*self.quat, v));
 
+            if self.is_acc_warning() {
+                rprintln!("acc warning");
+            }
+            if self.is_acc_timeout() {
+                rprintln!("acc timeout");
+            }
+            if self.is_mag_warning() {
+                rprintln!("mag warning");
+            }
+            if self.is_mag_timeout() {
+                rprintln!("mag timeout");
+            }
+
             //
         }
 

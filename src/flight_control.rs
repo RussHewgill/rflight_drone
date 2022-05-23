@@ -1,4 +1,5 @@
 use crate::{
+    motors::MotorsPWM,
     pid::PID,
     sensors::{UQuat, V3},
 };
@@ -58,22 +59,100 @@ impl ControlInputs {
 #[derive(Debug, Clone, Copy)]
 pub struct DroneController {
     /// roll
-    pub pid_stab_roll:  PID,
-    pub pid_rate_roll:  PID,
+    pub pid_stab_roll:     PID,
+    pub pid_rate_roll:     PID,
     /// pitch
-    pub pid_stab_pitch: PID,
-    pub pid_rate_pitch: PID,
+    pub pid_stab_pitch:    PID,
+    pub pid_rate_pitch:    PID,
     /// yaw
-    pub pid_stab_yaw:   PID,
-    pub pid_rate_yaw:   PID,
+    pub pid_stab_yaw:      PID,
+    pub pid_rate_yaw:      PID,
     /// throttle
-    pub pid_throttle:   PID,
+    pub pid_altitude_rate: PID,
     /// config
-    pub config:         FlightConfig,
+    pub config:            FlightConfig,
 }
 
 /// new
 impl DroneController {
+    pub fn new_default_params() -> Self {
+        let mut pid_stab_roll = PID::new(0.0, 0.0, 0.0);
+        let mut pid_rate_roll = PID::new(0.0, 0.0, 0.0);
+
+        let mut pid_stab_pitch = PID::new(0.0, 0.0, 0.0);
+        let mut pid_rate_pitch = PID::new(0.0, 0.0, 0.0);
+
+        let mut pid_stab_yaw = PID::new(0.0, 0.0, 0.0);
+        let mut pid_rate_yaw = PID::new(0.0, 0.0, 0.0);
+
+        let mut pid_altitude = PID::new(0.0, 0.0, 0.0);
+
+        pid_stab_roll.kp = 3.0;
+        pid_rate_roll.kp = 3.0;
+
+        Self {
+            pid_stab_roll,
+            pid_rate_roll,
+            pid_stab_pitch,
+            pid_rate_pitch,
+            pid_stab_yaw,
+            pid_rate_yaw,
+            pid_altitude_rate: pid_altitude,
+            config: FlightConfig::default(),
+        }
+    }
+
+    #[rustfmt::skip]
+    #[cfg(feature = "nope")]
+    pub fn new_default_params() -> Self {
+        let pid_stab_roll = PID::new(
+            3.0,
+            0.0,
+            0.0,
+        );
+        let pid_rate_roll = PID::new(
+            80.0,
+            0.0,
+            0.0
+        );
+        let pid_stab_pitch = PID::new(
+            0.0,
+            0.0,
+            0.0
+        );
+        let pid_rate_pitch = PID::new(
+            0.0,
+            0.0,
+            0.0
+        );
+        let pid_stab_yaw = PID::new(
+            0.0,
+            0.0,
+            0.0
+        );
+        let pid_rate_yaw = PID::new(
+            0.0,
+            0.0,
+            0.0
+        );
+        let pid_throttle = PID::new(
+            0.0,
+            0.0,
+            0.0
+        );
+
+        Self {
+            pid_stab_roll,
+            pid_rate_roll,
+            pid_stab_pitch,
+            pid_rate_pitch,
+            pid_stab_yaw,
+            pid_rate_yaw,
+            pid_throttle,
+            config: FlightConfig::default(),
+        }
+    }
+
     pub fn new(
         pid_stab_roll: PID,
         pid_rate_roll: PID,
@@ -90,7 +169,7 @@ impl DroneController {
             pid_rate_pitch,
             pid_stab_yaw,
             pid_rate_yaw,
-            pid_throttle,
+            pid_altitude_rate: pid_throttle,
             config: FlightConfig::default(),
         }
     }
@@ -129,8 +208,31 @@ impl DroneController {
         self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
     }
 
+    /// +roll  = left wing up
+    /// +pitch = nose up
+    /// +yaw   = nose right
     pub fn mix(&self, throttle: f32, roll: f32, pitch: f32, yaw: f32) -> MotorOutputs {
-        unimplemented!()
+        let front_left = throttle - yaw + pitch + roll; // M3
+        let front_right = throttle + yaw + pitch - roll; // M2
+        let back_left = throttle + yaw - pitch + roll; // M4
+        let back_right = throttle - yaw - pitch - roll; // M1
+
+        let outs = [front_left, front_right, back_left, back_right];
+        let excess_output = *outs
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+
+        if excess_output > 1.0 {
+            return self.mix(throttle - (excess_output - 1.0), roll, pitch, yaw);
+        }
+
+        MotorOutputs {
+            front_left,
+            front_right,
+            back_left,
+            back_right,
+        }
     }
 }
 
@@ -163,19 +265,27 @@ impl Default for FlightConfig {
 /// PWM values: from 0-1900
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MotorOutputs {
-    front_left:  u16,
-    front_right: u16,
-    back_left:   u16,
-    back_right:  u16,
+    front_left:  f32,
+    front_right: f32,
+    back_left:   f32,
+    back_right:  f32,
 }
 
 impl MotorOutputs {
-    pub fn mix(throttle: f32, roll: f32, pitch: f32, yaw: f32) -> Self {
-        Self {
-            front_left:  0,
-            front_right: 0,
-            back_left:   0,
-            back_right:  0,
-        }
+    pub fn apply(&self, motors: &mut MotorsPWM) {
+        use crate::motors::MotorSelect::*;
+        motors.set_motor_f32(Motor1, self.back_right);
+        motors.set_motor_f32(Motor2, self.front_right);
+        motors.set_motor_f32(Motor3, self.front_left);
+        motors.set_motor_f32(Motor4, self.back_left);
     }
+
+    // pub fn mix(throttle: f32, roll: f32, pitch: f32, yaw: f32) -> Self {
+    //     Self {
+    //         front_left:  0,
+    //         front_right: 0,
+    //         back_left:   0,
+    //         back_right:  0,
+    //     }
+    // }
 }

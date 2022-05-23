@@ -6,14 +6,19 @@ pub struct PID {
     pub ki: f32,
     pub kd: f32,
 
-    pub p_limit: (f32, f32),
-    pub i_limit: (f32, f32),
-    pub d_limit: (f32, f32),
-
-    pub output_limit: (f32, f32),
+    // pub p_limit: (f32, f32),
+    // pub i_limit: (f32, f32),
+    // pub d_limit: (f32, f32),
+    // pub output_limit: (f32, f32),
+    pub p_limit:      f32,
+    pub i_limit:      f32,
+    pub d_limit:      f32,
+    pub output_limit: f32,
 
     pub integral:   f32,
     pub prev_input: Option<f32>,
+
+    pub prev_outputs: (f32, f32, f32, f32),
 
     pub setpoint: f32,
 }
@@ -32,19 +37,26 @@ impl PID {
             ki,
             kd,
 
-            p_limit: (f32::MIN, f32::MAX),
-            i_limit: (f32::MIN, f32::MAX),
-            d_limit: (f32::MIN, f32::MAX),
-            output_limit: (f32::MIN, f32::MAX),
+            // p_limit: (f32::MIN, f32::MAX),
+            // i_limit: (f32::MIN, f32::MAX),
+            // d_limit: (f32::MIN, f32::MAX),
+            // output_limit: (f32::MIN, f32::MAX),
+            p_limit: f32::MAX,
+            i_limit: f32::MAX,
+            d_limit: f32::MAX,
+            output_limit: f32::MAX,
 
             integral: 0.0,
             prev_input: None,
+
+            prev_outputs: (0.0, 0.0, 0.0, 0.0),
 
             setpoint: 0.0,
         }
     }
 }
 
+/// reset, step
 impl PID {
     pub fn reset(&mut self) {
         self.integral = 0.0;
@@ -62,6 +74,11 @@ impl PID {
         output
     }
 
+    pub fn _step(&mut self, input: f32) -> (f32, f32, f32, f32) {
+        unimplemented!()
+    }
+
+    #[cfg(feature = "nope")]
     pub fn _step(&mut self, input: f32) -> (f32, f32, f32, f32) {
         let error = self.setpoint - input;
 
@@ -107,5 +124,49 @@ impl PID {
 
         // self.prev_output = Some(output);
         (output, p, self.integral, d)
+    }
+}
+
+/// set param
+impl PID {
+    pub fn set_param(&mut self, param: PIDParam, val: f32) {
+        use self::PIDParam::*;
+        #[rustfmt::skip]
+        match param {
+            Kp        => self.kp = val,
+            Ki        => self.ki = val,
+            Kd        => self.kd = val,
+            KpLimit     => self.p_limit = val,
+            KiLimit     => self.i_limit = val,
+            KdLimit     => self.d_limit = val,
+            OutputLimit => self.output_limit = val,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum PIDParam {
+    Kp,
+    Ki,
+    Kd,
+    KpLimit,
+    KiLimit,
+    KdLimit,
+    OutputLimit,
+}
+
+impl PIDParam {
+    pub fn from_u8(p: u8) -> Option<Self> {
+        match p {
+            0 => Some(Self::Kp),
+            1 => Some(Self::Ki),
+            2 => Some(Self::Kd),
+            3 => Some(Self::KpLimit),
+            4 => Some(Self::KiLimit),
+            5 => Some(Self::KdLimit),
+            6 => Some(Self::OutputLimit),
+            _ => None,
+        }
     }
 }

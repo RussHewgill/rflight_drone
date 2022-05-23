@@ -47,9 +47,7 @@ use bluetooth_hci::{host::HciHeader, Controller, Opcode};
 use byteorder::{ByteOrder, LittleEndian};
 
 use crate::{
-    bt_control::{
-        service_input::SvInput, service_log::SvLogger, service_sensors::SvSensors, BTSpi,
-    },
+    bt_control::{service_input::SvInput, service_log::SvLogger, BTSpi},
     bt_state::BTState,
 };
 
@@ -164,9 +162,9 @@ pub struct BluetoothSpi<CS, Reset, Input> {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BTServices {
-    pub logger:  Option<SvLogger>,
-    pub sensors: Option<SvSensors>,
-    pub input:   Option<SvInput>,
+    pub logger: Option<SvLogger>,
+    // pub sensors: Option<SvSensors>,
+    pub input:  Option<SvInput>,
 }
 
 /// new

@@ -36,8 +36,11 @@ pub enum MotorSelect {
 impl MotorsPWM {
     // const MAX_DUTY_CYCLE: u16 = 56680;
 
-    const MOTOR_MAX_PWM: f32 = 1900.0;
-    const MOTOR_MAX_PWM_I: u16 = 1900;
+    const MOTOR_MAX_PWM: f32 = 56680.0;
+    const MOTOR_MAX_PWM_I: u16 = 56680;
+
+    // const MOTOR_MAX_PWM: f32 = 1900.0;
+    // const MOTOR_MAX_PWM_I: u16 = 1900;
 
     /// from ST firmware, probably not very accurate
     const MOTOR_MIN_THROTTLE: f32 = 200.0;
