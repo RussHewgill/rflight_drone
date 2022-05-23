@@ -86,15 +86,16 @@ impl IdPID {
 #[derive(Debug, Clone, Copy)]
 pub struct DroneController {
     /// roll
-    pub pid_stab_roll:     PID,
-    pub pid_rate_roll:     PID,
+    pub pid_roll_stab:     PID,
+    pub pid_roll_rate:     PID,
     /// pitch
-    pub pid_stab_pitch:    PID,
-    pub pid_rate_pitch:    PID,
+    pub pid_pitch_stab:    PID,
+    pub pid_pitch_rate:    PID,
     /// yaw
-    pub pid_stab_yaw:      PID,
-    pub pid_rate_yaw:      PID,
+    pub pid_yaw_stab:      PID,
+    pub pid_yaw_rate:      PID,
     /// throttle
+    pub pid_altitude_stab: PID,
     pub pid_altitude_rate: PID,
     /// config
     pub config:            FlightConfig,
@@ -103,35 +104,53 @@ pub struct DroneController {
 /// new
 impl DroneController {
     pub fn new_default_params() -> Self {
-        let mut pid_stab_roll = PID::new(0.0, 0.0, 0.0);
-        let mut pid_rate_roll = PID::new(0.0, 0.0, 0.0);
+        let mut pid_roll_stab = PID::new(0.0, 0.0, 0.0);
+        let mut pid_roll_rate = PID::new(0.0, 0.0, 0.0);
 
-        let mut pid_stab_pitch = PID::new(0.0, 0.0, 0.0);
-        let mut pid_rate_pitch = PID::new(0.0, 0.0, 0.0);
+        let mut pid_pitch_stab = PID::new(0.0, 0.0, 0.0);
+        let mut pid_pitch_rate = PID::new(0.0, 0.0, 0.0);
 
-        let mut pid_stab_yaw = PID::new(0.0, 0.0, 0.0);
-        let mut pid_rate_yaw = PID::new(0.0, 0.0, 0.0);
+        let mut pid_yaw_stab = PID::new(0.0, 0.0, 0.0);
+        let mut pid_yaw_rate = PID::new(0.0, 0.0, 0.0);
 
-        let mut pid_altitude = PID::new(0.0, 0.0, 0.0);
+        let mut pid_altitude_stab = PID::new(0.0, 0.0, 0.0);
+        let mut pid_altitude_rate = PID::new(0.0, 0.0, 0.0);
 
-        pid_stab_roll.kp = 3.0; // kp1
-        pid_stab_roll.p_limit = 2.0; // XXX: ST firmware says this is 5 degrees ??
+        pid_roll_stab.kp = 3.0; // kp1
+        pid_roll_stab.i_limit = 2.0; // XXX: ST firmware says this is 5 degrees ??
 
-        pid_rate_roll.kp = 80.0; // kp2
-        pid_rate_roll.ki = 80.0; // ki2
-        pid_rate_roll.kd = 10.0; // kd2
-        pid_rate_roll.p_limit = 20.0;
+        pid_roll_rate.kp = 80.0; // kp2
+        pid_roll_rate.ki = 80.0; // ki2
+        pid_roll_rate.kd = 10.0; // kd2
+        pid_roll_rate.i_limit = 20.0;
 
-        // pid_
+        pid_pitch_stab.kp = pid_roll_stab.kp;
+        pid_pitch_stab.ki = pid_roll_stab.ki;
+        pid_pitch_stab.i_limit = pid_roll_stab.i_limit;
+
+        pid_pitch_rate.kp = pid_roll_rate.kp;
+        pid_pitch_rate.ki = pid_roll_rate.ki;
+        pid_pitch_rate.kd = pid_roll_rate.kd;
+        pid_pitch_rate.i_limit = pid_roll_rate.i_limit;
+
+        pid_yaw_stab.kp = 4.0;
+        pid_yaw_stab.ki = 0.0;
+        pid_yaw_stab.i_limit = 2.0;
+
+        pid_yaw_rate.kp = 900.0;
+        pid_yaw_rate.ki = 3.0;
+        pid_yaw_rate.kd = 3.0;
+        pid_yaw_rate.i_limit = 2.0;
 
         Self {
-            pid_stab_roll,
-            pid_rate_roll,
-            pid_stab_pitch,
-            pid_rate_pitch,
-            pid_stab_yaw,
-            pid_rate_yaw,
-            pid_altitude_rate: pid_altitude,
+            pid_roll_stab,
+            pid_roll_rate,
+            pid_pitch_stab,
+            pid_pitch_rate,
+            pid_yaw_stab,
+            pid_yaw_rate,
+            pid_altitude_stab,
+            pid_altitude_rate,
             config: FlightConfig::default(),
         }
     }
@@ -188,22 +207,24 @@ impl DroneController {
     }
 
     pub fn new(
-        pid_stab_roll: PID,
-        pid_rate_roll: PID,
-        pid_stab_pitch: PID,
-        pid_rate_pitch: PID,
-        pid_stab_yaw: PID,
-        pid_rate_yaw: PID,
-        pid_throttle: PID,
+        pid_roll_stab: PID,
+        pid_roll_rate: PID,
+        pid_pitch_stab: PID,
+        pid_pitch_rate: PID,
+        pid_yaw_stab: PID,
+        pid_yaw_rate: PID,
+        pid_altitude_stab: PID,
+        pid_altitude_rate: PID,
     ) -> Self {
         Self {
-            pid_stab_roll,
-            pid_rate_roll,
-            pid_stab_pitch,
-            pid_rate_pitch,
-            pid_stab_yaw,
-            pid_rate_yaw,
-            pid_altitude_rate: pid_throttle,
+            pid_roll_stab,
+            pid_roll_rate,
+            pid_pitch_stab,
+            pid_pitch_rate,
+            pid_yaw_stab,
+            pid_yaw_rate,
+            pid_altitude_stab,
+            pid_altitude_rate,
             config: FlightConfig::default(),
         }
     }
@@ -227,17 +248,17 @@ impl DroneController {
 
         // let err_throttle = i_throttle - throttle;
 
-        let out0_roll = self.pid_stab_roll.step(err0_roll);
-        let out0_pitch = self.pid_stab_pitch.step(err0_pitch);
-        let out0_yaw = self.pid_stab_yaw.step(err0_yaw);
+        let out0_roll = self.pid_roll_stab.step(err0_roll);
+        let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
+        let out0_yaw = self.pid_yaw_stab.step(err0_yaw);
 
         let err1_roll = out0_roll - gyro.y;
         let err1_pitch = out0_pitch - gyro.x;
         let err1_yaw = out0_pitch - gyro.z;
 
-        let out1_roll = self.pid_rate_roll.step(err1_roll);
-        let out1_pitch = self.pid_rate_pitch.step(err1_pitch);
-        let out1_yaw = self.pid_rate_yaw.step(err1_yaw);
+        let out1_roll = self.pid_roll_rate.step(err1_roll);
+        let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
+        let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
         self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
     }
