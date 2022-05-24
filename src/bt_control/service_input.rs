@@ -29,7 +29,10 @@ use crate::{
         },
         hal_bt::Commands as HalCommands,
     },
-    bt_control::{UUID_LOG_CHAR, UUID_LOG_SENS_CHAR},
+    bt_control::{
+        UUID_INPUT_PID_CFG_CHAR, UUID_LOG_QUAT_CHAR, UUID_LOG_SENS_CHAR, UUID_TEST0,
+        UUID_TEST1,
+    },
     flight_control::ControlInputs,
     sensors::V3,
     uprint, uprintln,
@@ -45,14 +48,15 @@ use crate::{
         gatt::{AddServiceParameters, CharacteristicHandle, ServiceHandle},
         BTError, BluetoothSpi,
     },
-    bt_control::{UUID_INPUT_CHAR_THROTTLE, UUID_INPUT_SERVICE},
+    bt_control::{UUID_INPUT_CHAR, UUID_INPUT_SERVICE},
     uart::*,
 };
 
 #[derive(Debug, Clone, Copy)]
 pub struct SvInput {
-    pub input_service: ServiceHandle,
-    pub input_char:    CharacteristicHandle,
+    pub input_service:      ServiceHandle,
+    pub input_char:         CharacteristicHandle,
+    pub input_pid_cfg_char: CharacteristicHandle,
     // pub roll_char:     CharacteristicHandle,
     // pub pitch_char:    CharacteristicHandle,
     // pub yaw_char:      CharacteristicHandle,
@@ -67,10 +71,13 @@ where
     GpioError: core::fmt::Debug,
 {
     pub fn init_input_service(&mut self) -> Result<(), BTError<SpiError, GpioError>> {
+        const NUM_SERVICES: usize = 2;
+        // const NUM_RECORDS: usize = 1 + 3 * NUM_SERVICES;
+
         let params = AddServiceParameters {
             uuid:                  UUID_INPUT_SERVICE,
             service_type:          crate::bluetooth::gatt::ServiceType::Primary,
-            max_attribute_records: 8,
+            max_attribute_records: 1 + 3 * NUM_SERVICES,
         };
         block!(self.add_service(&params))?;
         rprintln!("sent input service");
@@ -93,41 +100,99 @@ where
         };
         rprintln!("service = {:?}", defmt::Debug2Format(&service));
 
-        let params0 = AddCharacteristicParameters {
-            service_handle:            service.service_handle,
-            characteristic_uuid:       UUID_INPUT_CHAR_THROTTLE,
-            characteristic_value_len:  18,
-            characteristic_properties: CharacteristicProperty::empty()
-                // | CharacteristicProperty::WRITE
-                | CharacteristicProperty::WRITE_WITHOUT_RESPONSE
-                | CharacteristicProperty::NOTIFY
-                | CharacteristicProperty::READ,
-            security_permissions:      CharacteristicPermission::NONE,
-            // gatt_event_mask:           CharacteristicEvent::NONE,
-            gatt_event_mask:           CharacteristicEvent::ATTRIBUTE_WRITE,
-            // gatt_event_mask:           CharacteristicEvent::ATTRIBUTE_WRITE
-            //     | CharacteristicEvent::CONFIRM_READ
-            //     | CharacteristicEvent::CONFIRM_WRITE,
-            encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
-            is_variable:               true,
-            fw_version_before_v72:     false,
-        };
-        block!(self.add_characteristic(&params0))?;
-        rprintln!("sent input c 0");
+        // let params0 = AddCharacteristicParameters {
+        //     service_handle:            service.service_handle,
+        //     characteristic_uuid:       UUID_INPUT_CHAR_THROTTLE,
+        //     characteristic_value_len:  18,
+        //     characteristic_properties: CharacteristicProperty::empty()
+        //         // | CharacteristicProperty::WRITE
+        //         | CharacteristicProperty::WRITE_WITHOUT_RESPONSE
+        //         | CharacteristicProperty::NOTIFY
+        //         | CharacteristicProperty::READ,
+        //     security_permissions:      CharacteristicPermission::NONE,
+        //     // gatt_event_mask:           CharacteristicEvent::NONE,
+        //     gatt_event_mask:           CharacteristicEvent::ATTRIBUTE_WRITE,
+        //     // gatt_event_mask:           CharacteristicEvent::ATTRIBUTE_WRITE
+        //     //     | CharacteristicEvent::CONFIRM_READ
+        //     //     | CharacteristicEvent::CONFIRM_WRITE,
+        //     encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
+        //     is_variable:               true,
+        //     fw_version_before_v72:     false,
+        // };
+        // block!(self.add_characteristic(&params0))?;
+        // rprintln!("sent input c 0");
+        // let c0 = match self.read_event_params_vendor()? {
+        //     VReturnParameters::GattAddCharacteristic(c) => c,
+        //     other => unimplemented!("other = {:?}", other),
+        // };
+        // rprintln!("input c 0 = {:?}", defmt::Debug2Format(&c0));
 
-        let c0 = match self.read_event_params_vendor()? {
-            VReturnParameters::GattAddCharacteristic(c) => c,
-            other => unimplemented!("other = {:?}", other),
-        };
-        rprintln!("input c 0 = {:?}", defmt::Debug2Format(&c0));
+        let handle_input = self.add_input_char(
+            service.service_handle,
+            UUID_INPUT_CHAR,
+            18,
+            CharacteristicProperty::NOTIFY
+                | CharacteristicProperty::WRITE_WITHOUT_RESPONSE
+                | CharacteristicProperty::READ,
+            CharacteristicEvent::ATTRIBUTE_WRITE,
+            0,
+        )?;
+
+        let handle_pid_cfg = self.add_input_char(
+            service.service_handle,
+            UUID_INPUT_PID_CFG_CHAR,
+            18,
+            CharacteristicProperty::NOTIFY
+                | CharacteristicProperty::WRITE_WITHOUT_RESPONSE
+                | CharacteristicProperty::READ,
+            CharacteristicEvent::ATTRIBUTE_WRITE,
+            0,
+        )?;
 
         let input = SvInput {
-            input_service: service.service_handle,
-            input_char:    c0.characteristic_handle,
+            input_service:      service.service_handle,
+            input_char:         handle_input,
+            input_pid_cfg_char: handle_pid_cfg,
         };
 
         self.services.input = Some(input);
 
         Ok(())
+    }
+
+    fn add_input_char(
+        &mut self,
+        service: ServiceHandle,
+        uuid: crate::bluetooth::gatt::Uuid,
+        len: usize,
+        props: CharacteristicProperty,
+        event_mask: CharacteristicEvent,
+        n: u8,
+    ) -> Result<CharacteristicHandle, BTError<SpiError, GpioError>> {
+        let params = AddCharacteristicParameters {
+            service_handle:            service,
+            characteristic_uuid:       uuid,
+            characteristic_value_len:  len,
+            characteristic_properties: props,
+            security_permissions:      CharacteristicPermission::NONE,
+            gatt_event_mask:           event_mask,
+            encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
+            is_variable:               true,
+            fw_version_before_v72:     false,
+        };
+        block!(self.add_characteristic(&params))?;
+        rprintln!("sent c {}", n);
+
+        let c = match self.read_event_params_vendor()? {
+            VReturnParameters::GattAddCharacteristic(c) => c,
+            other => unimplemented!("other = {:?}", other),
+        };
+
+        if c.status != bluetooth_hci::Status::Success {
+            panic!("c {} error: {:?}", n, c);
+        }
+        rprintln!("c {} = {:?}", n, defmt::Debug2Format(&c));
+
+        Ok(c.characteristic_handle)
     }
 }

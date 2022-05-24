@@ -278,7 +278,7 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        bt_test::spawn_after(100.millis()).unwrap();
+        // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
@@ -497,6 +497,15 @@ mod app {
     fn bt_test(mut cx: bt_test::Context) {
         (cx.shared.bt, cx.shared.exti, cx.shared.controller).lock(
             |bt, exti, controller| {
+                controller.pid_altitude_rate.step(-1.0);
+
+                rprintln!("sending: {:?}", controller.pid_altitude_rate);
+                bt.pause_interrupt(exti);
+                bt.log_write_pid(IdPID::AltitudeRate, &controller.pid_altitude_rate)
+                    .unwrap();
+                bt.unpause_interrupt(exti);
+
+                #[cfg(feature = "nope")]
                 if let BTState::Connected(conn) = bt.state {
                     // let handle = match bt.services.input {
                     //     Some(i) => i.throttle_char,
@@ -512,7 +521,7 @@ mod app {
 
                     controller.pid_altitude_rate.step(-1.0);
 
-                    rprintln!("sending");
+                    rprintln!("sending: {:?}", controller.pid_altitude_rate);
                     bt.pause_interrupt(exti);
                     bt.log_write_pid(IdPID::AltitudeRate, &controller.pid_altitude_rate)
                         .unwrap();
@@ -524,7 +533,7 @@ mod app {
             },
         );
 
-        bt_test::spawn_after(250.millis()).unwrap();
+        bt_test::spawn_after(38.millis()).unwrap();
     }
 
     #[task(binds = EXTI4, shared = [bt, exti, motors, inputs, leds], priority = 8)]

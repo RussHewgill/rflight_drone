@@ -25,7 +25,7 @@ use crate::{
     bluetooth::{
         gatt::UpdateLongCharacteristicValueParameters, hal_bt::Commands as HalCommands,
     },
-    bt_control::{UUID_LOG_CHAR, UUID_LOG_PID_CHAR, UUID_LOG_SENS_CHAR},
+    bt_control::{UUID_LOG_PID_CHAR, UUID_LOG_QUAT_CHAR, UUID_LOG_SENS_CHAR},
     flight_control::IdPID,
     pid::{PIDOutput, PID},
     sensors::V3,
@@ -114,7 +114,7 @@ where
         data[4..8].copy_from_slice(&p.to_be_bytes());
         data[8..12].copy_from_slice(&i.to_be_bytes());
         data[12..16].copy_from_slice(&d.to_be_bytes());
-        data[17] = pid_id as u8;
+        data[16] = pid_id as u8;
 
         self.log_write(logger.char_handle_pid, &data, false)?;
 
@@ -256,10 +256,13 @@ where
     GpioError: core::fmt::Debug,
 {
     pub fn init_log_service(&mut self) -> Result<(), BTError<SpiError, GpioError>> {
+        const NUM_SERVICES: usize = 3;
+        // const NUM_RECORDS: usize = 1 + 3 * NUM_SERVICES;
+
         let params = AddServiceParameters {
             uuid:                  UUID_LOG_SERVICE,
             service_type:          crate::bluetooth::gatt::ServiceType::Primary,
-            max_attribute_records: 8,
+            max_attribute_records: 1 + 3 * NUM_SERVICES,
         };
         block!(self.add_service(&params))?;
         rprintln!("sent service");
@@ -294,48 +297,41 @@ where
         };
         rprintln!("service = {:?}", defmt::Debug2Format(&service));
 
-        let params0 = AddCharacteristicParameters {
-            service_handle:            service.service_handle,
-            characteristic_uuid:       UUID_LOG_CHAR,
-            characteristic_value_len:  18,
-            characteristic_properties: CharacteristicProperty::NOTIFY,
-            security_permissions:      CharacteristicPermission::NONE,
-            gatt_event_mask:           CharacteristicEvent::NONE,
-            encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
-            is_variable:               true,
-            fw_version_before_v72:     false,
-        };
+        // let params0 = AddCharacteristicParameters {
+        //     service_handle:            service.service_handle,
+        //     characteristic_uuid:       UUID_LOG_CHAR,
+        //     characteristic_value_len:  18,
+        //     characteristic_properties: CharacteristicProperty::NOTIFY,
+        //     security_permissions:      CharacteristicPermission::NONE,
+        //     gatt_event_mask:           CharacteristicEvent::NONE,
+        //     encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
+        //     is_variable:               true,
+        //     fw_version_before_v72:     false,
+        // };
+        // block!(self.add_characteristic(&params0))?;
+        // rprintln!("sent c 0");
 
-        block!(self.add_characteristic(&params0))?;
-        rprintln!("sent c 0");
+        // let c0 = match self.read_event_params_vendor()? {
+        //     VReturnParameters::GattAddCharacteristic(c) => c,
+        //     other => unimplemented!("other = {:?}", other),
+        // };
+        // rprintln!("c 0 = {:?}", defmt::Debug2Format(&c0));
 
-        let c0 = match self.read_event_params_vendor()? {
-            VReturnParameters::GattAddCharacteristic(c) => c,
-            other => unimplemented!("other = {:?}", other),
-        };
-        rprintln!("c 0 = {:?}", defmt::Debug2Format(&c0));
+        let handle_quat = self.add_log_char(
+            service.service_handle,
+            UUID_LOG_QUAT_CHAR,
+            18,
+            CharacteristicProperty::NOTIFY,
+            0,
+        )?;
 
-        let params1 = AddCharacteristicParameters {
-            service_handle:            service.service_handle,
-            characteristic_uuid:       UUID_LOG_SENS_CHAR,
-            characteristic_value_len:  48,
-            // characteristic_properties: CharacteristicProperty::NOTIFY,
-            characteristic_properties: CharacteristicProperty::NOTIFY
-                | CharacteristicProperty::READ,
-            security_permissions:      CharacteristicPermission::NONE,
-            gatt_event_mask:           CharacteristicEvent::NONE,
-            encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
-            is_variable:               true,
-            fw_version_before_v72:     false,
-        };
-        block!(self.add_characteristic(&params1))?;
-        rprintln!("sent c 1");
-
-        let c1 = match self.read_event_params_vendor()? {
-            VReturnParameters::GattAddCharacteristic(c) => c,
-            other => unimplemented!("other = {:?}", other),
-        };
-        rprintln!("c 1 = {:?}", defmt::Debug2Format(&c1));
+        let handle_sens = self.add_log_char(
+            service.service_handle,
+            UUID_LOG_SENS_CHAR,
+            18,
+            CharacteristicProperty::NOTIFY | CharacteristicProperty::READ,
+            1,
+        )?;
 
         let handle_pid = self.add_log_char(
             service.service_handle,
@@ -345,10 +341,57 @@ where
             2,
         )?;
 
+        // let params1 = AddCharacteristicParameters {
+        //     service_handle:            service.service_handle,
+        //     characteristic_uuid:       UUID_LOG_SENS_CHAR,
+        //     characteristic_value_len:  48,
+        //     // characteristic_properties: CharacteristicProperty::NOTIFY,
+        //     characteristic_properties: CharacteristicProperty::NOTIFY
+        //         | CharacteristicProperty::READ,
+        //     security_permissions:      CharacteristicPermission::NONE,
+        //     gatt_event_mask:           CharacteristicEvent::NONE,
+        //     encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
+        //     is_variable:               true,
+        //     fw_version_before_v72:     false,
+        // };
+        // block!(self.add_characteristic(&params1))?;
+        // rprintln!("sent c 1");
+        // let c1 = match self.read_event_params_vendor()? {
+        //     VReturnParameters::GattAddCharacteristic(c) => c,
+        //     other => unimplemented!("other = {:?}", other),
+        // };
+        // rprintln!("c 1 = {:?}", defmt::Debug2Format(&c1));
+
+        // let params2 = AddCharacteristicParameters {
+        //     service_handle:            service.service_handle,
+        //     characteristic_uuid:       UUID_LOG_PID_CHAR,
+        //     characteristic_value_len:  18,
+        //     // characteristic_properties: CharacteristicProperty::NOTIFY,
+        //     characteristic_properties: CharacteristicProperty::NOTIFY,
+        //     security_permissions:      CharacteristicPermission::NONE,
+        //     gatt_event_mask:           CharacteristicEvent::NONE,
+        //     encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
+        //     is_variable:               true,
+        //     fw_version_before_v72:     false,
+        // };
+        // block!(self.add_characteristic(&params2))?;
+        // rprintln!("sent c 2");
+        // let c2 = match self.read_event_params_vendor()? {
+        //     VReturnParameters::GattAddCharacteristic(c) => c,
+        //     other => unimplemented!("other = {:?}", other),
+        // };
+        // if c2.status != bluetooth_hci::Status::Success {
+        //     panic!("c2 error: {:?}", c2);
+        // }
+        // rprintln!("c 2 = {:?}", defmt::Debug2Format(&c2));
+
         let logger = SvLogger {
             service_handle:   service.service_handle,
-            char_handle_quat: c0.characteristic_handle,
-            char_handle_sens: c1.characteristic_handle,
+            // char_handle_quat: c0.characteristic_handle,
+            // char_handle_sens: c1.characteristic_handle,
+            // char_handle_pid:  c2.characteristic_handle,
+            char_handle_quat: handle_quat,
+            char_handle_sens: handle_sens,
             char_handle_pid:  handle_pid,
         };
 
@@ -383,6 +426,10 @@ where
             VReturnParameters::GattAddCharacteristic(c) => c,
             other => unimplemented!("other = {:?}", other),
         };
+
+        if c.status != bluetooth_hci::Status::Success {
+            panic!("c {} error: {:?}", n, c);
+        }
         rprintln!("c {} = {:?}", n, defmt::Debug2Format(&c));
 
         Ok(c.characteristic_handle)

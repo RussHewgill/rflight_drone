@@ -2,16 +2,14 @@
 
 use nalgebra::{self as na};
 
-#[derive(Debug, Clone, Copy)]
+use defmt::Format;
+
+#[derive(Debug, Clone, Copy, Format)]
 pub struct PID {
     pub kp: f32,
     pub ki: f32,
     pub kd: f32,
 
-    // pub p_limit: (f32, f32),
-    // pub i_limit: (f32, f32),
-    // pub d_limit: (f32, f32),
-    // pub output_limit: (f32, f32),
     pub p_limit:      f32,
     pub i_limit:      f32,
     pub d_limit:      f32,
@@ -20,13 +18,12 @@ pub struct PID {
     pub integral:   f32,
     pub prev_input: Option<f32>,
 
-    // pub prev_outputs: (f32, f32, f32, f32),
     pub prev_output: PIDOutput,
 
     pub setpoint: f32,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Format)]
 pub struct PIDOutput {
     pub p:      f32,
     pub i:      f32,

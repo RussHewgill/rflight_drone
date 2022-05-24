@@ -101,11 +101,16 @@ mod uuids {
         crate::bluetooth::gatt::Uuid::Uuid128(x)
     }
 
+    pub const UUID_TEST0: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x5724d4c76ed5402cbf0d3765bf4b000d);
+    pub const UUID_TEST1: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x5724d4c76ed5402cbf0d3765bf4b000e);
+
     /// Logger
     pub const UUID_LOG_SERVICE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x3f44d56a86074db0945b6c285b73d48a);
 
-    pub const UUID_LOG_CHAR: crate::bluetooth::gatt::Uuid =
+    pub const UUID_LOG_QUAT_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x1450781d919c49f0a16c0ec28dfb83d5);
 
     pub const UUID_LOG_SENS_CHAR: crate::bluetooth::gatt::Uuid =
@@ -125,8 +130,11 @@ mod uuids {
     pub const UUID_INPUT_SERVICE: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0xa7a2eafd569442debf3bee79d621779c);
 
-    pub const UUID_INPUT_CHAR_THROTTLE: crate::bluetooth::gatt::Uuid =
+    pub const UUID_INPUT_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x0d2d404bff6d4e8a97b15bc440288423);
+
+    pub const UUID_INPUT_PID_CFG_CHAR: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0xd0187a4d3bc640818a09c890aa6bfdb2);
 
     // pub const UUID_INPUT_DESC_THROTTLE: crate::bluetooth::gatt::Uuid =
     //     uuid_from_hex(0x7e6c30a33bb241ef838e15912c120dd0);

@@ -85,19 +85,19 @@ impl IdPID {
 
 #[derive(Debug, Clone, Copy)]
 pub struct DroneController {
-    /// roll
+    /// Roll
     pub pid_roll_stab:     PID,
     pub pid_roll_rate:     PID,
-    /// pitch
+    /// Pitch
     pub pid_pitch_stab:    PID,
     pub pid_pitch_rate:    PID,
-    /// yaw
+    /// Yaw
     pub pid_yaw_stab:      PID,
     pub pid_yaw_rate:      PID,
-    /// throttle
+    /// Throttle
     pub pid_altitude_stab: PID,
     pub pid_altitude_rate: PID,
-    /// config
+    /// Config
     pub config:            FlightConfig,
 }
 
