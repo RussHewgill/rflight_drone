@@ -737,7 +737,7 @@ mod app {
         let m0 = MotorSelect::Motor3;
         let m1 = MotorSelect::Motor4;
 
-        let pwm = 1800;
+        let pwm = 1000;
 
         motors.enable_motor(m0);
         motors.enable_motor(m1);
