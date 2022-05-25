@@ -209,6 +209,16 @@ pub enum PIDParam {
 }
 
 impl PIDParam {
+    pub const ITER: [PIDParam; 7] = [
+        PIDParam::Kp,
+        PIDParam::Ki,
+        PIDParam::Kd,
+        PIDParam::KpLimit,
+        PIDParam::KiLimit,
+        PIDParam::KdLimit,
+        PIDParam::OutputLimit,
+    ];
+
     pub fn from_u8(p: u8) -> Option<Self> {
         match p {
             0 => Some(Self::Kp),

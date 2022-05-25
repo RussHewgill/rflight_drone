@@ -248,6 +248,16 @@ mod app {
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
+        // rprintln!(
+        //     "core::mem::size_of::<PID>() = {:?}",
+        //     core::mem::size_of::<PID>()
+        // );
+
+        // rprintln!(
+        //     "core::mem::size_of::<DroneController>() = {:?}",
+        //     core::mem::size_of::<DroneController>()
+        // );
+
         /// start timer
         tim3.start(sensor_period).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
@@ -323,11 +333,10 @@ mod app {
                 let acc0 = sd.imu_acc.read_and_reset();
                 let mag0 = sd.magnetometer.read_and_reset();
 
-                let pressure = sd.baro_pressure.read_and_reset();
-                let temp = sd.baro_temperature.read_and_reset();
-
-                let alt = ahrs.update_baro(pressure, temp);
-                rprintln!("alt = {:?}", alt);
+                // let pressure = sd.baro_pressure.read_and_reset();
+                // let temp = sd.baro_temperature.read_and_reset();
+                // let alt = ahrs.update_baro(pressure, temp);
+                // rprintln!("alt = {:?}", alt);
 
                 // if ahrs.calibration.initializing {
                 //     ahrs.calibration.update(gyro0, acc0, mag0);
@@ -390,14 +399,13 @@ mod app {
                 /// update FlightData
                 fd.update(ahrs);
 
+                // /// update PIDs
+                // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+
+                // /// apply mixed PID outputs to motors
+                // motor_outputs.apply(motors);
+
                 // let (roll, pitch, yaw) = fd.get_euler_angles();
-
-                /// update PIDs
-                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
-
-                /// apply mixed PID outputs to motors
-                motor_outputs.apply(motors);
-
                 // rprintln!(
                 //     "(r,p,y) = {:?}, {:?}, {:?}",
                 //     r(rad_to_deg(roll)),
@@ -423,7 +431,7 @@ mod app {
         let bt = cx.shared.bt;
         let exti = cx.shared.exti;
         // let inputs = cx.shared.inputs;
-        // let controller = cx.shared.controller;
+        let controller = cx.shared.controller;
 
         // *cx.local.bat_counter += 1;
         // if *cx.local.bat_counter
@@ -436,54 +444,41 @@ mod app {
                 *cx.local.counter += 1;
                 if *cx.local.counter >= COUNTER_TIMES {
                     *cx.local.counter = 0;
-                    (flight_data, sens_data, bt, exti).lock(|fd, sd, bt, exti| {
-                        // let qq = fd.quat.coords;
-                        // cx.local.buf[0..4].copy_from_slice(&qq[0].to_be_bytes());
-                        // cx.local.buf[4..8].copy_from_slice(&qq[1].to_be_bytes());
-                        // cx.local.buf[8..12].copy_from_slice(&qq[2].to_be_bytes());
-                        // cx.local.buf[12..16].copy_from_slice(&qq[3].to_be_bytes());
-                        // // rprintln!("0..");
-                        // bt.pause_interrupt(exti);
-                        // match bt.log_write(false, &cx.local.buf[..]) {
-                        //     Ok(true) => {
-                        //         // uprintln!(uart, "sent log write command");
-                        //     }
-                        //     Ok(false) => {
-                        //         // uprintln!(uart, "failed to write");
-                        //     }
-                        //     Err(e) => {
-                        //         // uprintln!(uart, "error 0 = {:?}", e);
-                        //     }
-                        // }
-                        // bt.unpause_interrupt(exti);
-                        // // rprintln!("1");
+                    (flight_data, sens_data, bt, exti, controller).lock(
+                        |fd, sd, bt, exti, controller| {
+                            // (flight_data, sens_data, bt, exti).lock(|fd, sd, bt, exti| {
+                            bt.pause_interrupt(exti);
+                            bt.log_write_quat(&fd.quat).unwrap();
+                            bt.unpause_interrupt(exti);
 
-                        bt.pause_interrupt(exti);
-                        bt.log_write_quat(&fd.quat).unwrap();
-                        bt.unpause_interrupt(exti);
+                            // let (roll, pitch, yaw) = fd.get_euler_angles();
 
-                        // let (roll, pitch, yaw) = fd.get_euler_angles();
+                            // rprintln!(
+                            //     "(r,p,y) = {:?}, {:?}, {:?}",
+                            //     r(rad_to_deg(roll)),
+                            //     r(rad_to_deg(pitch)),
+                            //     r(rad_to_deg(yaw)),
+                            // );
 
-                        // rprintln!(
-                        //     "(r,p,y) = {:?}, {:?}, {:?}",
-                        //     r(rad_to_deg(roll)),
-                        //     r(rad_to_deg(pitch)),
-                        //     r(rad_to_deg(yaw)),
-                        // );
+                            // let gyro0 = sd.imu_gyro.read_and_reset();
+                            // let acc0 = sd.imu_acc.read_and_reset();
+                            // let mag0 = sd.magnetometer.read_and_reset();
 
-                        // let gyro0 = sd.imu_gyro.read_and_reset();
-                        // let acc0 = sd.imu_acc.read_and_reset();
-                        // let mag0 = sd.magnetometer.read_and_reset();
+                            // // rprintln!("0");
+                            // bt.pause_interrupt(exti);
+                            // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                            // bt.unpause_interrupt(exti);
+                            // // rprintln!("1");
 
-                        // // rprintln!("0");
-                        // bt.pause_interrupt(exti);
-                        // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                        // bt.unpause_interrupt(exti);
-                        // // rprintln!("1");
+                            // #[cfg(feature = "nope")]
+                            // for id in IdPID::ITER {
+                            //     bt.log_write_pid(id, &controller[id]).unwrap();
+                            // }
 
-                        // //
-                        // unimplemented!()
-                    });
+                            // //
+                            // unimplemented!()
+                        },
+                    );
                 }
             }
         });

@@ -72,6 +72,17 @@ pub enum IdPID {
 }
 
 impl IdPID {
+    pub const ITER: [IdPID; 8] = [
+        IdPID::RollStab,
+        IdPID::RollRate,
+        IdPID::PitchStab,
+        IdPID::PitchRate,
+        IdPID::YawStab,
+        IdPID::YawRate,
+        IdPID::AltitudeStab,
+        IdPID::AltitudeRate,
+    ];
+
     pub fn from_u8(p: u8) -> Option<Self> {
         match p {
             0 => Some(Self::RollStab),
@@ -87,6 +98,7 @@ impl IdPID {
     }
 }
 
+/// size: each PID is 60 bytes
 #[derive(Debug, Clone, Copy, Format)]
 pub struct DroneController {
     /// Roll
@@ -236,6 +248,7 @@ impl DroneController {
 
 /// update, mix
 impl DroneController {
+    /// XXX: causes stack overflow ??
     pub fn update(
         &mut self,
         inputs: ControlInputs,
