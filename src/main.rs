@@ -536,15 +536,16 @@ mod app {
         bt_test::spawn_after(38.millis()).unwrap();
     }
 
-    #[task(binds = EXTI4, shared = [bt, exti, motors, inputs, leds], priority = 8)]
+    #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
         (
             cx.shared.bt,
             cx.shared.exti,
+            cx.shared.controller,
             cx.shared.motors,
             cx.shared.inputs,
         )
-            .lock(|bt, exti, motors, inputs| {
+            .lock(|bt, exti, controller, motors, inputs| {
                 rprintln!("bt_irq");
 
                 bt.clear_interrupt();
@@ -586,7 +587,7 @@ mod app {
                         _ => {}
                     }
 
-                    bt.handle_input(motors, inputs, &event);
+                    bt.handle_input(motors, inputs, controller, &event);
 
                     if !bt.data_ready().unwrap() {
                         break;

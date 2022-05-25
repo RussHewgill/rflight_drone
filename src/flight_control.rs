@@ -4,8 +4,10 @@ use crate::{
     sensors::{UQuat, V3},
 };
 
+use defmt::Format;
+
 /// Received from remote control
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Format)]
 pub struct ControlInputs {
     pub roll:         i16,
     pub pitch:        i16,
@@ -56,34 +58,36 @@ impl ControlInputs {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Format)]
 #[repr(u8)]
 pub enum IdPID {
-    StabRoll,
-    RateRoll,
-    StabPitch,
-    RatePitch,
-    StabYaw,
-    RateYaw,
+    RollStab,
+    RollRate,
+    PitchStab,
+    PitchRate,
+    YawStab,
+    YawRate,
+    AltitudeStab,
     AltitudeRate,
 }
 
 impl IdPID {
     pub fn from_u8(p: u8) -> Option<Self> {
         match p {
-            0 => Some(Self::StabRoll),
-            1 => Some(Self::RateRoll),
-            2 => Some(Self::StabPitch),
-            3 => Some(Self::RatePitch),
-            4 => Some(Self::StabYaw),
-            5 => Some(Self::RateYaw),
-            6 => Some(Self::AltitudeRate),
+            0 => Some(Self::RollStab),
+            1 => Some(Self::RollRate),
+            2 => Some(Self::PitchStab),
+            3 => Some(Self::PitchRate),
+            4 => Some(Self::YawStab),
+            5 => Some(Self::YawRate),
+            6 => Some(Self::AltitudeStab),
+            7 => Some(Self::AltitudeRate),
             _ => None,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Format)]
 pub struct DroneController {
     /// Roll
     pub pid_roll_stab:     PID,
@@ -291,7 +295,40 @@ impl DroneController {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+impl core::ops::Index<IdPID> for DroneController {
+    type Output = PID;
+    fn index(&self, index: IdPID) -> &Self::Output {
+        use self::IdPID::*;
+        match index {
+            RollStab => &self.pid_roll_stab,
+            RollRate => &self.pid_roll_rate,
+            PitchStab => &self.pid_pitch_stab,
+            PitchRate => &self.pid_pitch_rate,
+            YawStab => &self.pid_yaw_stab,
+            YawRate => &self.pid_yaw_rate,
+            AltitudeStab => &self.pid_altitude_stab,
+            AltitudeRate => &self.pid_altitude_rate,
+        }
+    }
+}
+
+impl core::ops::IndexMut<IdPID> for DroneController {
+    fn index_mut(&mut self, index: IdPID) -> &mut Self::Output {
+        use self::IdPID::*;
+        match index {
+            RollStab => &mut self.pid_roll_stab,
+            RollRate => &mut self.pid_roll_rate,
+            PitchStab => &mut self.pid_pitch_stab,
+            PitchRate => &mut self.pid_pitch_rate,
+            YawStab => &mut self.pid_yaw_stab,
+            YawRate => &mut self.pid_yaw_rate,
+            AltitudeStab => &mut self.pid_altitude_stab,
+            AltitudeRate => &mut self.pid_altitude_rate,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Format)]
 pub struct FlightConfig {
     pub max_pitch: f32,
     pub max_roll:  f32,
@@ -318,7 +355,7 @@ impl Default for FlightConfig {
 
 /// Output of PID after mixing
 /// PWM values: from 0-1900
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Format)]
 pub struct MotorOutputs {
     front_left:  f32,
     front_right: f32,

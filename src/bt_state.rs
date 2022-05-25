@@ -5,8 +5,9 @@ use crate::bt_control::BTEvent;
 
 use crate::bluetooth::ev_command::ReturnParameters as VReturnParameters;
 use crate::bluetooth::{events::BlueNRGEvent, BTError, BluetoothSpi};
-use crate::flight_control::ControlInputs;
+use crate::flight_control::{ControlInputs, DroneController, IdPID};
 use crate::motors::MotorsPWM;
+use crate::pid::PIDParam;
 
 use bluetooth_hci::event::command::ReturnParameters;
 use bluetooth_hci::event::{Event, VendorEvent};
@@ -98,9 +99,53 @@ where
         &mut self,
         motors: &mut MotorsPWM,
         control_inputs: &mut ControlInputs,
+        controller: &mut DroneController,
         event: &BTEvent,
         //
     ) {
+        let input = if let Some(input) = self.services.input {
+            input
+        } else {
+            return;
+        };
+
+        /// 24 = input att = input char + 1
+        /// 27 = pid att = pid char + 1
+        match event {
+            Event::Vendor(BlueNRGEvent::GattAttributeModified(att)) => {
+                let data = att.data();
+                // rprintln!("att.attr_handle = {:?}", att.attr_handle.0);
+                // rprintln!("data = {:?}", data);
+
+                /// received input changed event
+                if att.attr_handle.0 == input.input_char.0 + 1 {
+                    // rprintln!("input update");
+                    // rprintln!("data.len() = {:?}", data.len());
+                    if let Some(ci) = ControlInputs::deserialize(att.data()) {
+                        /// arm or disarm motors if changed
+                        if control_inputs.motors_armed != ci.motors_armed {
+                            motors.set_armed(ci.motors_armed);
+                        }
+                        /// set new inputs
+                        *control_inputs = ci;
+                    }
+                }
+
+                if att.attr_handle.0 == input.input_pid_cfg_char.0 + 1 {
+                    // rprintln!("pid update");
+                    // rprintln!("data.len() = {:?}", data.len());
+                    let id = IdPID::from_u8(data[0]).unwrap();
+                    let param = PIDParam::from_u8(data[1]).unwrap();
+                    let val = f32::from_be_bytes(data[2..6].try_into().unwrap());
+
+                    rprintln!("setting {:?} {:?} = {:?}", id, param, val);
+                    controller[id][param] = val;
+                }
+            }
+            _ => {}
+        }
+
+        #[cfg(feature = "nope")]
         match event {
             Event::Vendor(BlueNRGEvent::GattAttributeModified(att)) => {
                 if let Some(input) = self.services.input {
@@ -114,6 +159,23 @@ where
                             /// set new inputs
                             *control_inputs = ci;
                         }
+                    }
+                    if att.attr_handle.0 + 1 == input.input_pid_cfg_char.0 {
+                        let data = att.data();
+
+                        rprintln!(
+                            "input.input_pid_cfg_char.0 = {:?}",
+                            input.input_pid_cfg_char.0
+                        );
+                        rprintln!("att.attr_handle.0 = {:?}", att.attr_handle.0);
+                        rprintln!("data.len() = {:?}", data.len());
+
+                        let id = IdPID::from_u8(data[0]).unwrap();
+                        let param = PIDParam::from_u8(data[1]).unwrap();
+                        let val = f32::from_be_bytes(data[2..6].try_into().unwrap());
+
+                        rprintln!("setting {:?} {:?} = {:?}", id, param, val);
+                        controller[id][param] = val;
                     }
                 }
                 // if Some(att.attr_handle) == self.services.input.map(|x| )

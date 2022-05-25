@@ -196,7 +196,7 @@ impl PID {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Format)]
 #[repr(u8)]
 pub enum PIDParam {
     Kp,
@@ -219,6 +219,35 @@ impl PIDParam {
             5 => Some(Self::KdLimit),
             6 => Some(Self::OutputLimit),
             _ => None,
+        }
+    }
+}
+
+impl core::ops::Index<PIDParam> for PID {
+    type Output = f32;
+    fn index(&self, index: PIDParam) -> &Self::Output {
+        match index {
+            PIDParam::Kp => &self.kp,
+            PIDParam::Ki => &self.ki,
+            PIDParam::Kd => &self.kd,
+            PIDParam::KpLimit => &self.p_limit,
+            PIDParam::KiLimit => &self.i_limit,
+            PIDParam::KdLimit => &self.d_limit,
+            PIDParam::OutputLimit => &self.output_limit,
+        }
+    }
+}
+
+impl core::ops::IndexMut<PIDParam> for PID {
+    fn index_mut(&mut self, index: PIDParam) -> &mut Self::Output {
+        match index {
+            PIDParam::Kp => &mut self.kp,
+            PIDParam::Ki => &mut self.ki,
+            PIDParam::Kd => &mut self.kd,
+            PIDParam::KpLimit => &mut self.p_limit,
+            PIDParam::KiLimit => &mut self.i_limit,
+            PIDParam::KdLimit => &mut self.d_limit,
+            PIDParam::OutputLimit => &mut self.output_limit,
         }
     }
 }

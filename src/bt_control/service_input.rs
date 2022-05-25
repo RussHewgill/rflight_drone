@@ -135,7 +135,7 @@ where
                 | CharacteristicProperty::WRITE_WITHOUT_RESPONSE
                 | CharacteristicProperty::READ,
             CharacteristicEvent::ATTRIBUTE_WRITE,
-            0,
+            3,
         )?;
 
         let handle_pid_cfg = self.add_input_char(
@@ -146,7 +146,7 @@ where
                 | CharacteristicProperty::WRITE_WITHOUT_RESPONSE
                 | CharacteristicProperty::READ,
             CharacteristicEvent::ATTRIBUTE_WRITE,
-            0,
+            4,
         )?;
 
         let input = SvInput {
