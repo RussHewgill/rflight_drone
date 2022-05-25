@@ -34,21 +34,21 @@ pub enum MotorSelect {
 
 /// consts
 impl MotorsPWM {
-    // const MAX_DUTY_CYCLE: u16 = 56680;
+    // pub const MAX_DUTY_CYCLE: u16 = 56680;
 
-    const MOTOR_MAX_PWM: f32 = 56680.0;
-    const MOTOR_MAX_PWM_I: u16 = 56680;
+    pub const MOTOR_MAX_PWM: f32 = 56680.0;
+    pub const MOTOR_MAX_PWM_I: u16 = 56680;
 
-    // const MOTOR_MAX_PWM: f32 = 1900.0;
-    // const MOTOR_MAX_PWM_I: u16 = 1900;
+    // pub const MOTOR_MAX_PWM: f32 = 1900.0;
+    // pub const MOTOR_MAX_PWM_I: u16 = 1900;
 
     /// from ST firmware, probably not very accurate
-    const MOTOR_MIN_THROTTLE: f32 = 200.0;
+    pub const MOTOR_MIN_THROTTLE: f32 = 200.0;
 
     /// from ST firmware
-    const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
-    // const FREQ: HertzU32 = fugit::HertzU32::Hz(750);
-    // const FREQ: HertzU32 = fugit::HertzU32::Hz(250);
+    pub const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
+    // pub const FREQ: HertzU32 = fugit::HertzU32::Hz(750);
+    // pub const FREQ: HertzU32 = fugit::HertzU32::Hz(250);
 }
 
 /// new

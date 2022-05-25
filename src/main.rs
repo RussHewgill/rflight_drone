@@ -248,9 +248,9 @@ mod app {
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
-        // /// start timer
-        // tim3.start(sensor_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start timer
+        tim3.start(sensor_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -276,7 +276,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -717,6 +717,7 @@ mod app {
         (Shared {}, Local {}, init::Monotonics())
     }
 
+    #[allow(unreachable_code)]
     // #[cfg(feature = "nope")]
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -742,27 +743,39 @@ mod app {
         let v = adc.sample();
         rprintln!("v = {:?}", v);
 
+        return (Shared {}, Local {}, init::Monotonics());
+
         motors.set_armed(true);
 
-        let m0 = MotorSelect::Motor3;
-        let m1 = MotorSelect::Motor4;
+        // let m0 = MotorSelect::Motor3;
+        // let m1 = MotorSelect::Motor4;
 
-        let pwm = 1000;
+        // let pwm = 700;
 
-        motors.enable_motor(m0);
-        motors.enable_motor(m1);
-        // motors.enable_all();
+        // let pwm_f32 = pwm as f32 / MotorsPWM::MOTOR_MAX_PWM;
+        // rprintln!("pwm_f32 = {:?}", pwm_f32);
+
+        let pwm = 0.25;
+
+        rprintln!("pwm = {:?}", pwm);
+        let pwm_u16 = (pwm * MotorsPWM::MOTOR_MAX_PWM) as u16;
+        rprintln!("pwm_u16 = {:?}", pwm_u16);
+
+        // motors.enable_motor(m0);
+        // motors.enable_motor(m1);
+        motors.enable_all();
         rprintln!("wat 0");
 
         // motors.set_all_u16(pwm);
-        motors.set_motor_u16(m0, pwm);
-        motors.set_motor_u16(m1, pwm);
+        motors.set_all_f32(pwm);
+        // motors.set_motor_u16(m0, pwm);
+        // motors.set_motor_u16(m1, pwm);
 
-        delay.delay(1000.millis());
+        delay.delay(2000.millis());
 
-        motors.disable_motor(m0);
-        motors.disable_motor(m1);
-        // motors.disable_all();
+        // motors.disable_motor(m0);
+        // motors.disable_motor(m1);
+        motors.disable_all();
         rprintln!("wat 1");
 
         (Shared {}, Local {}, init::Monotonics())
