@@ -31,9 +31,8 @@ use crate::sensors::magneto::Magnetometer;
 use crate::sensors::Sensors;
 use crate::spi::Spi3;
 use crate::time::MonoTimer;
-use crate::uprintln;
 // use crate::time::MonoTimer;
-use crate::{bt_control::BTController, uart::*};
+use crate::bt_control::BTController;
 
 // use systick_monotonic::{ExtU64, Systick};
 

@@ -11,7 +11,6 @@ use stm32f4xx_hal::{
 
 use crate::spi::{Spi3, SpiError};
 
-#[derive(Debug)]
 pub struct Magnetometer<CS> {
     // spi: Spi3,
     cs: CS,
@@ -240,7 +239,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(u8)]
 pub enum MagDataRate {
     R10  = 0b00,
@@ -256,7 +255,6 @@ impl MagDataRate {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug)]
 #[repr(u8)]
 pub enum MagRegister {
     OFFSET_X_REG_L = 0x45,

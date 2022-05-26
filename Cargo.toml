@@ -14,8 +14,12 @@ ms = []
 [profile.release]
 # symbols are nice and they don't increase the size on Flash
 debug = true
+# debug = false
 opt-level = "s" # size
-# opt-level = "z" # speed
+# opt-level = "z" # size, but also turn off loop vectorization.
+# strip = true
+# strip = "debuginfo"
+# lto = true
 
 # [profile.dev.package."*"]
 # opt-level = 3

@@ -29,7 +29,6 @@ use crate::{
     flight_control::IdPID,
     pid::{PIDOutput, PID},
     sensors::V3,
-    uprint, uprintln,
 };
 use crate::{
     bluetooth::{ev_command::GattService, gap::Commands as GapCommands},
@@ -43,7 +42,6 @@ use crate::{
         BTError, BluetoothSpi,
     },
     bt_control::UUID_LOG_SERVICE,
-    uart::*,
 };
 
 use super::TimeoutResult;

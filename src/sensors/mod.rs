@@ -13,7 +13,7 @@ use nalgebra::{self as na, UnitQuaternion, Vector3};
 
 use self::{barometer::Barometer, imu::IMU, magneto::Magnetometer};
 
-// #[derive(Debug, Clone, Copy, PartialEq)]
+// #[derive(Clone, Copy, PartialEq)]
 // pub enum SensorType {
 //     IMU,
 //     Mag,
@@ -24,7 +24,7 @@ pub type V3 = Vector3<f32>;
 pub type UQuat = UnitQuaternion<f32>;
 pub type Rot3 = na::Rotation3<f32>;
 
-#[derive(Debug)]
+// #[derive()]
 pub struct Sensors {
     spi:          Spi3,
     // spi:          SensSpi,
@@ -54,7 +54,7 @@ pub struct Sensors {
 ///     +X = Right
 ///     +Y = Down
 ///     +Z = Normal
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub struct SensorData {
     pub imu_acc:          DataVal<V3>,
     pub imu_gyro:         DataVal<V3>,
@@ -63,7 +63,7 @@ pub struct SensorData {
     pub baro_temperature: DataVal<f32>,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub struct DataVal<T> {
     // data:    [f32; 3],
     data:    T,
@@ -234,7 +234,7 @@ impl Sensors {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct SensorOffset {
     time:     f32,
     t0:       f32,

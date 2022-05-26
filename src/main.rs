@@ -22,13 +22,13 @@ pub mod pid;
 pub mod sensors;
 pub mod spi;
 pub mod time;
-pub mod uart;
+// pub mod uart;
 pub mod utils;
 
 use crate::{
     battery::*, bluetooth::*, bt_control::*, flight_control::*, init::init_all_pre,
     math::*, sensors::barometer::*, sensors::imu::*, sensors::magneto::*, sensors::*,
-    spi::*, time::*, uart::*, utils::*,
+    spi::*, time::*, utils::*,
 };
 
 use byteorder::ByteOrder;
@@ -1134,6 +1134,17 @@ fn main_bluetooth() -> ! {
     // loop {}
 
     //
+}
+
+#[cfg(feature = "nope")]
+// #[entry]
+fn main_test() -> ! {
+    let x = bluetooth_hci_defmt::event::command::LmpFeatures::ENCRYPTION;
+
+    rprintln!("x = {:?}", x);
+    rprintln!("x = {:?}", defmt::Debug2Format(&x));
+
+    loop {}
 }
 
 #[cfg(feature = "nope")]

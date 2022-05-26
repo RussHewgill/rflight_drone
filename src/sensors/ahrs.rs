@@ -1,7 +1,7 @@
 // use ahrs::{Ahrs, Madgwick};
 use nalgebra::{Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
-use crate::{math::*, uart::*, uprintln};
+use crate::math::*;
 use defmt::println as rprintln;
 
 use super::{Rot3, UQuat, V3};
@@ -39,7 +39,7 @@ mod complementary {
     };
 
     use super::{UQuat, AHRS, V3};
-    use crate::{math::*, sensors::Rot3, uart::*, uprintln};
+    use crate::{math::*, sensors::Rot3};
     use defmt::println as rprintln;
 
     #[derive(Debug, Clone, Copy)]
@@ -167,7 +167,7 @@ mod fusion {
     use nalgebra::{self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
     use super::{Rot3, UQuat, AHRS, V3};
-    use crate::{math::*, uart::*, uprintln, utils::print_v3};
+    use crate::{math::*, utils::print_v3};
     use defmt::println as rprintln;
 
     pub use self::{calibration::*, offset::*};
@@ -793,7 +793,7 @@ mod fusion {
     use nalgebra::{Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
     use super::{UQuat, AHRS, V3};
-    use crate::{math::*, uart::*, uprintln};
+    use crate::math::*;
     use defmt::println as rprintln;
 
     // #[derive(Debug, Default, Clone, Copy)]

@@ -316,7 +316,6 @@ mod spi3 {
         time::*,
     };
 
-    #[derive(Debug)]
     pub struct Spi3 {
         spi:         SPI2,
         sck:         Pin<'B', 13, Alternate<5>>,

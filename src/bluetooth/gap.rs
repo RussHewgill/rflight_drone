@@ -1265,7 +1265,7 @@ where
 /// Before some commands are sent to the controller, the parameters are validated. This type
 /// enumerates the potential validation errors. Must be specialized on the types of communication
 /// errors.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Error<E> {
     /// For the [GAP Set Limited Discoverable](Commands::set_limited_discoverable) and
     /// [GAP Set Discoverable](Commands::set_discoverable) commands, the connection
@@ -1605,7 +1605,7 @@ impl DirectConnectableParameters {
 /// I/O capabilities available for the [GAP Set I/O
 /// Capability](Commands::set_io_capability) command.
 #[repr(u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub enum IoCapability {
     /// Display Only
     Display         = 0x00,
@@ -1735,7 +1735,7 @@ bitflags! {
 /// Indicates the type of address being used in the advertising packets, for the
 /// [`set_nonconnectable`](Commands::set_nonconnectable).
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum AddressType {
     /// Public device address.
     Public               = 0x00,

@@ -7,7 +7,7 @@ use crate::{
 use defmt::Format;
 
 /// Received from remote control
-#[derive(Debug, Default, Clone, Copy, Format)]
+#[derive(Default, Clone, Copy, Format)]
 pub struct ControlInputs {
     pub roll:         i16,
     pub pitch:        i16,
@@ -58,7 +58,7 @@ impl ControlInputs {
     }
 }
 
-#[derive(Debug, Clone, Copy, Format)]
+#[derive(Clone, Copy, Format)]
 #[repr(u8)]
 pub enum IdPID {
     RollStab,
@@ -99,7 +99,7 @@ impl IdPID {
 }
 
 /// size: each PID is 60 bytes
-#[derive(Debug, Clone, Copy, Format)]
+#[derive(Clone, Copy, Format)]
 pub struct DroneController {
     /// Roll
     pub pid_roll_stab:     PID,
@@ -341,7 +341,7 @@ impl core::ops::IndexMut<IdPID> for DroneController {
     }
 }
 
-#[derive(Debug, Clone, Copy, Format)]
+#[derive(Clone, Copy, Format)]
 pub struct FlightConfig {
     pub max_pitch: f32,
     pub max_roll:  f32,
@@ -368,7 +368,7 @@ impl Default for FlightConfig {
 
 /// Output of PID after mixing
 /// PWM values: from 0-1900
-#[derive(Debug, Default, Clone, Copy, Format)]
+#[derive(Default, Clone, Copy, Format)]
 pub struct MotorOutputs {
     front_left:  f32,
     front_right: f32,

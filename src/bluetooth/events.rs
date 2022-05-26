@@ -23,7 +23,7 @@ use defmt::Format;
 
 /// Vendor-specific events for the BlueNRG-MS controllers.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Copy, Debug, Format)]
+#[derive(Clone, Copy, Format)]
 pub enum BlueNRGEvent {
     /// When the BlueNRG-MS firmware is started normally, it gives this event to the user to
     /// indicate the system has started.
@@ -249,7 +249,7 @@ pub enum BlueNRGEvent {
 }
 
 /// Enumeration of vendor-specific status codes.
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 #[repr(u8)]
 pub enum Status {
     /// The command cannot be executed due to the current state of the device.
@@ -376,7 +376,7 @@ impl From<Status> for u8 {
 }
 
 /// Enumeration of potential errors when sending commands or deserializing events.
-#[derive(Clone, Copy, Debug, PartialEq, Format)]
+#[derive(Clone, Copy, PartialEq, Format)]
 pub enum BlueNRGError {
     /// The event is not recoginized. Includes the unknown opcode.
     UnknownEvent(u16),
@@ -752,7 +752,7 @@ impl hci::event::VendorEvent for BlueNRGEvent {
 
 /// Potential reasons the controller sent the [`HalInitialized`](BlueNRGEvent::HalInitialized)
 /// event.
-#[derive(Clone, Copy, Debug, PartialEq, Format)]
+#[derive(Clone, Copy, PartialEq, Format)]
 pub enum ResetReason {
     /// Firmware started properly
     Normal,
@@ -952,7 +952,7 @@ const MAX_DEBUG_DATA_LEN: usize = 215;
 
 /// Specific reason for the fault reported with [`FaultData`].
 #[cfg(feature = "ms")]
-#[derive(Clone, Copy, Debug, PartialEq, Format)]
+#[derive(Clone, Copy, PartialEq, Format)]
 pub enum CrashReason {
     /// The controller reset because an assertion failed.
     Assertion,
@@ -1015,7 +1015,8 @@ pub struct FaultData {
     debug_data_buf: [u8; MAX_DEBUG_DATA_LEN],
 }
 
-#[cfg(feature = "ms")]
+#[cfg(feature = "nope")]
+// #[cfg(feature = "ms")]
 impl Debug for FaultData {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
@@ -1095,7 +1096,7 @@ macro_rules! require_l2cap_len {
 ///
 /// For more info see connection parameter update response and command reject in Bluetooth Core v4.0
 /// spec.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct L2CapConnectionUpdateResponse {
     /// The connection handle related to the event
     pub conn_handle: ConnectionHandle,
@@ -1106,7 +1107,7 @@ pub struct L2CapConnectionUpdateResponse {
 
 /// Reasons why an L2CAP command was rejected. see the Bluetooth specification, v4.1, Vol 3, Part A,
 /// Section 4.1.
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub enum L2CapRejectionReason {
     /// The controller sent an unknown command.
     CommandNotUnderstood,
@@ -1131,7 +1132,7 @@ impl TryFrom<u16> for L2CapRejectionReason {
 }
 
 /// Potential results that can be used in the L2CAP connection update response.
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub enum L2CapConnectionUpdateResult {
     /// The update request was rejected. The code indicates the reason for the rejection.
     CommandRejected(L2CapRejectionReason),
@@ -1185,7 +1186,7 @@ fn to_l2cap_connection_update_response(
 
 /// This event is generated when the central device does not respond to the connection update
 /// request within 30 seconds.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct L2CapProcedureTimeout {
     /// The connection handle related to the event.
     pub conn_handle: ConnectionHandle,
@@ -1207,7 +1208,7 @@ fn to_l2cap_procedure_timeout(
 /// [`l2cap_connection_parameter_update_response`](crate::l2cap::Commands::connection_parameter_update_response).
 ///
 /// Defined in Vol 3, Part A, section 4.20 of the Bluetooth specification.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct L2CapConnectionUpdateRequest {
     /// Handle of the connection for which the connection update request has been received.  The
     /// [same handle](crate::l2cap::ConnectionParameterUpdateResponse::conn_handle) has to be
@@ -1247,7 +1248,7 @@ fn to_l2cap_connection_update_request(
 /// procedure timeout has occurred or the pairing has failed. This is to notify the application that
 /// we have paired with a remote device so that it can take further actions or to notify that a
 /// timeout has occurred so that the upper layer can decide to disconnect the link.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct GapPairingComplete {
     /// Connection handle on which the pairing procedure completed
     pub conn_handle: ConnectionHandle,
@@ -1257,7 +1258,7 @@ pub struct GapPairingComplete {
 }
 
 /// Reasons the [GAP Pairing Complete](BlueNRGEvent::GapPairingComplete) event was generated.
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub enum GapPairingStatus {
     /// Pairing with a remote device was successful.
     Success,
@@ -1300,7 +1301,7 @@ fn to_conn_handle(
 
 /// The event is given by the GAP layer to the upper layers when a device is discovered during
 /// scanning as a consequence of one of the GAP procedures started by the upper layers.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct GapDeviceFound {
     /// Type of event
     pub event: GapDeviceFoundEvent,
@@ -1367,7 +1368,7 @@ fn to_gap_device_found(
 
 /// This event is sent by the GAP to the upper layers when a procedure previously started has been
 /// terminated by the upper layer or has completed for any other reason
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct GapProcedureComplete {
     /// Type of procedure that completed
     pub procedure: GapProcedure,
@@ -1409,7 +1410,7 @@ impl PartialEq<NameBuffer> for NameBuffer {
 /// Procedures whose completion may be reported by
 /// [`GapProcedureComplete`](BlueNRGEvent::GapProcedureComplete).
 #[allow(clippy::large_enum_variant)]
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub enum GapProcedure {
     /// See Vol 3, Part C, section 9.2.5.
     LimitedDiscovery,
@@ -1429,7 +1430,7 @@ pub enum GapProcedure {
 }
 
 /// Possible results of a [GAP procedure](BlueNRGEvent::GapProcedureComplete).
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub enum GapProcedureStatus {
     /// BLE Status Success.
     Success,
@@ -1541,7 +1542,7 @@ impl GattAttributeModified {
 
 /// Newtype for an attribute handle. These handles are IDs, not general integers, and should not be
 /// manipulated as such.
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub struct AttributeHandle(pub u16);
 
 // Defines the maximum length of a ATT attribute value field. This is determined by the max packet
@@ -1618,7 +1619,7 @@ fn to_gatt_attribute_modified(
 }
 
 /// This event is generated in response to an Exchange MTU request.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct AttExchangeMtuResponse {
     ///  The connection handle related to the response.
     pub conn_handle: ConnectionHandle,
@@ -1639,7 +1640,7 @@ fn to_att_exchange_mtu_resp(
 
 /// This event is generated in response to a Find Information Request. See Find Information Response
 /// in Bluetooth Core v4.0 spec.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct AttFindInformationResponse {
     /// The connection handle related to the response
     pub conn_handle:   ConnectionHandle,
@@ -1686,7 +1687,7 @@ const MAX_FORMAT128_PAIR_COUNT: usize = 13;
 
 /// One format of the handle-UUID pairs in the [`AttFindInformationResponse`] event. The UUIDs are
 /// 16 bits.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct HandleUuid16Pair {
     /// Attribute handle
     pub handle: AttributeHandle,
@@ -1696,7 +1697,7 @@ pub struct HandleUuid16Pair {
 
 /// One format of the handle-UUID pairs in the [`AttFindInformationResponse`] event. The UUIDs are
 /// 128 bits.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct HandleUuid128Pair {
     /// Attribute handle
     pub handle: AttributeHandle,
@@ -1705,11 +1706,11 @@ pub struct HandleUuid128Pair {
 }
 
 /// Newtype for the 16-bit UUID buffer.
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub struct Uuid16(pub u16);
 
 /// Newtype for the 128-bit UUID buffer.
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub struct Uuid128(pub [u8; 16]);
 
 #[derive(Copy, Clone, Format)]
@@ -1718,6 +1719,7 @@ enum HandleUuidPairs {
     Format128(usize, [HandleUuid128Pair; MAX_FORMAT128_PAIR_COUNT]),
 }
 
+#[cfg(feature = "nope")]
 impl Debug for HandleUuidPairs {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{{")?;
@@ -1903,7 +1905,7 @@ impl Debug for AttFindByTypeValueResponse {
 const MAX_HANDLE_INFO_PAIR_COUNT: usize = 62;
 
 /// Simple container for the handle information returned in [`AttFindByTypeValueResponse`].
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct HandleInfoPair {
     /// Attribute handle
     pub attribute: AttributeHandle,
@@ -1912,7 +1914,7 @@ pub struct HandleInfoPair {
 }
 
 /// Newtype for Group End handles
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub struct GroupEndHandle(pub u16);
 
 /// Iterator into valid [`HandleInfoPair`] structs returned in the [ATT Find By Type Value
@@ -2387,7 +2389,7 @@ fn to_write_permit_request(
 
 /// This event is generated when a GATT client procedure completes either with error or
 /// successfully.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct GattProcedureComplete {
     /// The connection handle for which the GATT procedure has completed.
     pub conn_handle: ConnectionHandle,
@@ -2399,7 +2401,7 @@ pub struct GattProcedureComplete {
 
 /// Allowed status codes for the [GATT Procedure Complete](BlueNRGEvent::GattProcedureComplete)
 /// event.
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub enum GattProcedureStatus {
     /// BLE Status Success
     Success,
@@ -2432,7 +2434,7 @@ fn to_gatt_procedure_complete(
 
 /// The Error Response is used to state that a given request cannot be performed, and to provide the
 /// reason. See the Bluetooth Core Specification, v4.1, Vol 3, Part F, Section 3.4.1.1.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct AttErrorResponse {
     /// The connection handle related to the event.
     pub conn_handle:      ConnectionHandle,
@@ -2448,7 +2450,7 @@ pub struct AttErrorResponse {
 /// 3.3 in the Bluetooth Core Specification, v4.1, Vol 3, Part F, Section 3.4.1.1 and The Bluetooth
 /// Core Specification Supplement, Table 1.1.
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub enum AttError {
     /// The attribute handle given was not valid on this server.
     InvalidHandle                 = 0x01,
@@ -2630,7 +2632,7 @@ impl TryFrom<u8> for AttError {
 /// Possible ATT requests.  See Table 3.37 in the Bluetooth Core Spec v4.1, Vol 3, Part F, Section
 /// 3.4.8.
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Format)]
+#[derive(Copy, Clone, PartialEq, Format)]
 pub enum AttRequest {
     /// Section 3.4.1.1
     ErrorResponse           = 0x01,
@@ -2751,7 +2753,7 @@ fn to_att_error_response(
 /// send the response to the client.
 ///
 /// See the Bluetooth Core v4.1 spec, Vol 3, Part F, section 3.4.4.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct AttReadPermitRequest {
     /// Handle of the connection on which there was the request to read the attribute
     pub conn_handle: ConnectionHandle,
@@ -2798,6 +2800,7 @@ pub struct AttReadMultiplePermitRequest {
 // the packet divided by the length of an attribute handle (2).
 const MAX_ATTRIBUTE_HANDLE_BUFFER_LEN: usize = 125;
 
+#[cfg(feature = "nope")]
 impl Debug for AttReadMultiplePermitRequest {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
@@ -2846,7 +2849,7 @@ fn to_att_read_multiple_permit_request(
 /// The event will be given only if a previous ACI command returned with
 /// [`InsufficientResources`](AttError::InsufficientResources).
 #[cfg(feature = "ms")]
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Format)]
 pub struct GattTxPoolAvailable {
     /// Connection handle on which the GATT procedure is running.
     pub conn_handle:       ConnectionHandle,
@@ -2896,7 +2899,8 @@ pub struct AttPrepareWritePermitRequest {
 #[cfg(feature = "ms")]
 const MAX_PREPARE_WRITE_PERMIT_REQ_VALUE_LEN: usize = 246;
 
-#[cfg(feature = "ms")]
+// #[cfg(feature = "ms")]
+#[cfg(feature = "nope")]
 impl Debug for AttPrepareWritePermitRequest {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(

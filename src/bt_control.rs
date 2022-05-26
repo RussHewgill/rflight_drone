@@ -29,20 +29,16 @@ use bluetooth_hci_defmt::{
     BdAddr, BdAddrType, ConnectionHandle,
 };
 
-use crate::{
-    bluetooth::{
-        ev_command::{GapInit, GattService},
-        gap::{AuthenticationRequirements, DiscoverableParameters, LocalName},
-        gatt::{
-            AddCharacteristicParameters, AddServiceParameters, CharacteristicEvent,
-            CharacteristicHandle, CharacteristicPermission, CharacteristicProperty,
-            CharacteristicValue, EncryptionKeySize, ServiceHandle,
-            UpdateCharacteristicValueParameters,
-        },
-        hal_bt::ConfigData,
+use crate::bluetooth::{
+    ev_command::{GapInit, GattService},
+    gap::{AuthenticationRequirements, DiscoverableParameters, LocalName},
+    gatt::{
+        AddCharacteristicParameters, AddServiceParameters, CharacteristicEvent,
+        CharacteristicHandle, CharacteristicPermission, CharacteristicProperty,
+        CharacteristicValue, EncryptionKeySize, ServiceHandle,
+        UpdateCharacteristicValueParameters,
     },
-    uart::*,
-    uprint, uprintln,
+    hal_bt::ConfigData,
 };
 
 use crate::bluetooth::gap::Commands as GapCommands;
@@ -171,7 +167,8 @@ where
         // block!(self.write_config_data(&ConfigData::public_address(addr).build()))?;
         // block!(self.read_event(uart))?;
 
-        block!(self.le_set_random_address(addr)).unwrap();
+        block!(self.le_set_random_address(addr))
+            .unwrap_or_else(|_| panic!("set_random_address"));
         self.read_event_uart()?;
 
         block!(self.init_gatt()).unwrap();
@@ -193,7 +190,8 @@ where
             offset:                0,
             value:                 BLE_NAME.as_bytes(),
         };
-        block!(self.update_characteristic_value(&ps)).unwrap();
+        block!(self.update_characteristic_value(&ps))
+            .unwrap_or_else(|_| panic!("update_characteristic_value"));
         self.read_event_uart()?;
 
         // block!(self.set_tx_power_level(hal_bt::PowerLevel::DbmNeg2_1))?;
@@ -209,7 +207,8 @@ where
             bonding_required:          true,
             // bonding_required:          false,
         };
-        block!(self.set_authentication_requirement(&requirements)).unwrap();
+        block!(self.set_authentication_requirement(&requirements))
+            .unwrap_or_else(|_| panic!("set_authentication_requirement"));
         self.read_event_uart()?;
 
         let ad_params = AdvertisingParameters {
@@ -227,13 +226,16 @@ where
             advertising_filter_policy:
                 bluetooth_hci_defmt::host::AdvertisingFilterPolicy::AllowConnectionAndScan,
         };
-        block!(self.le_set_advertising_parameters(&ad_params)).unwrap();
+        block!(self.le_set_advertising_parameters(&ad_params))
+            .unwrap_or_else(|_| panic!("set_set_advertising_parameters"));
         self.read_event_uart()?;
 
-        block!(self.le_set_advertising_data(&[])).unwrap();
+        block!(self.le_set_advertising_data(&[]))
+            .unwrap_or_else(|_| panic!("set_set_advertising_data"));
         self.read_event_uart()?;
 
-        block!(self.le_set_scan_response_data(&[])).unwrap();
+        block!(self.le_set_scan_response_data(&[]))
+            .unwrap_or_else(|_| panic!("set_set_scan_response_data"));
         self.read_event_uart()?;
 
         // uart.unpause();
@@ -260,11 +262,13 @@ where
             conn_interval:        (None, None),
         };
 
-        block!(self.set_nondiscoverable()).unwrap();
+        block!(self.set_nondiscoverable())
+            .unwrap_or_else(|_| panic!("set_nondiscoverable"));
         self.read_event_uart()?;
 
         // uart.unpause();
-        block!(self.set_discoverable(&d_params)).unwrap();
+        block!(self.set_discoverable(&d_params))
+            .unwrap_or_else(|_| panic!("set_discoverable"));
         self.read_event_uart()?;
 
         let gatt_event_mask = crate::bluetooth::gatt::Event::all();
@@ -386,6 +390,7 @@ where
     Input: InputPin<Error = GpioError>,
     GpioError: core::fmt::Debug,
 {
+    #[cfg(feature = "nope")]
     pub fn read_events_while_ready(
         &mut self,
         uart: &mut UART,
@@ -400,6 +405,7 @@ where
     }
 
     /// blocks, but doesn't use nb::block!
+    #[cfg(feature = "nope")]
     pub fn _read_event_timeout(
         &mut self,
         timeout: fugit::MicrosDurationU32,
@@ -541,7 +547,9 @@ where
                         // uprint!(uart, "w3");
                     }
                     Err(e) => {
-                        panic!("error 1 = {:?}", e);
+                        // panic!("error 1 = {:?}", e);
+                        // rprintln!("e = {:?}", e);
+                        panic!("error 1");
                     }
                 }
             };
@@ -797,11 +805,13 @@ where
             Event::CommandComplete(params) => match params.return_params {
                 ReturnParameters::Vendor(vs) => Ok(vs),
                 other => {
-                    panic!("event_params_vendor other 0 = {:?}", other);
+                    // panic!("event_params_vendor other 0 = {:?}", other);
+                    panic!("event_params_vendor other");
                 }
             },
             other => {
-                panic!("event_params_vendor other 1 = {:?}", other);
+                // panic!("event_params_vendor other 1 = {:?}", other);
+                panic!("event_params_vendor other 1");
             }
         }
     }
