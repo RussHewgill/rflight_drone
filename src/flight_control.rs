@@ -246,8 +246,56 @@ impl DroneController {
     }
 }
 
-/// update, mix
+/// update
 impl DroneController {
+    // #[cfg(feature = "nope")]
+    pub fn update(
+        &mut self,
+        // inputs: &ControlInputs,
+        inputs: ControlInputs,
+        ahrs_quat: &UQuat,
+        gyro: V3,
+    ) -> MotorOutputs {
+        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
+
+        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.as_f32();
+
+        let err0_roll = i_roll - ahrs_roll;
+        let err0_pitch = i_pitch - ahrs_pitch;
+        let err0_yaw = i_yaw - ahrs_yaw;
+
+        let out0_roll = self.pid_roll_stab.step(err0_roll);
+        let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
+        let out0_yaw = self.pid_yaw_stab.step(err0_yaw);
+
+        // let out0_roll = 0.0;
+        // let out0_pitch = 0.0;
+        // let out0_yaw = 0.0;
+
+        // let err1_roll = out0_roll - gyro.y;
+        // let err1_pitch = out0_pitch - gyro.x;
+        // let err1_yaw = out0_pitch - gyro.z;
+
+        // let out1_roll = self.pid_roll_rate.step(err1_roll);
+        // let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
+        // let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+
+        // self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
+        self.mix(i_throttle, out0_roll, out0_pitch, out0_yaw)
+
+        // MotorOutputs {
+        //     front_left:  0.0,
+        //     front_right: 0.0,
+        //     back_left:   0.0,
+        //     back_right:  0.0,
+        // }
+
+        //
+    }
+
+    #[cfg(feature = "nope")]
+    /// each PID step should take ~6310 ns to run
+    /// total of ~38 us for x6, about 3% of frame budget
     /// XXX: causes stack overflow ??
     pub fn update(
         &mut self,
@@ -279,7 +327,10 @@ impl DroneController {
 
         self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
     }
+}
 
+/// mix
+impl DroneController {
     /// +roll  = left wing up
     /// +pitch = nose up
     /// +yaw   = nose right

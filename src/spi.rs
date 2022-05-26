@@ -770,7 +770,7 @@ mod spi3 {
                 cortex_m::asm::nop();
             }
 
-            // XXX: not needed
+            // // XXX: not needed
             // while self.spi_is_busy() {
             //     cortex_m::asm::nop();
             // }
@@ -790,6 +790,7 @@ mod spi3 {
     }
 
     /// nb
+    #[cfg(feature = "nope")]
     impl Spi3 {
         #[inline(always)]
         pub fn nb_read(&mut self) -> nb::Result<u8, SpiError> {

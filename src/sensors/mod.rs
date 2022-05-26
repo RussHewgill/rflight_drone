@@ -140,7 +140,59 @@ impl Sensors {
     }
 }
 
-/// read data, and swap axes
+impl Sensors {
+    pub fn _read_data_imu(&mut self) -> Option<(V3, V3)> {
+        self.with_spi_imu(|spi, imu| {
+            // while !(imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)) {
+            //     cortex_m::asm::nop();
+            // }
+
+            if !(imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)) {
+                None
+            } else {
+                let (data_gyro, data_acc) = imu.read_data(spi).unwrap();
+                let data_gyro = V3::new(
+                    -data_gyro[1], // pitch
+                    data_gyro[0],  // roll
+                    data_gyro[2],  // yaw
+                );
+                /// roll, pitch, yaw to match na::Quat
+                let data_acc = V3::new(
+                    -data_acc[0], //
+                    data_acc[1],
+                    data_acc[2],
+                );
+                Some((data_gyro, data_acc))
+            }
+        })
+    }
+
+    pub fn _read_data_mag(&mut self) -> Option<V3> {
+        self.with_spi_mag(|spi, mag| {
+            // while !mag.read_new_data_available(spi).unwrap() {
+            //     cortex_m::asm::nop();
+            // }
+
+            if !mag.read_new_data_available(spi).unwrap() {
+                None
+            } else {
+                let mag_data = mag.read_data(spi).unwrap();
+
+                /// from ST firmware
+                /// works correctly with Fusion AHRS
+                let mag_data = V3::new(
+                    -mag_data[1], //
+                    mag_data[0],
+                    mag_data[2],
+                );
+
+                Some(mag_data)
+            }
+        })
+    }
+}
+
+/// read data to SensorData, and swap axes
 impl Sensors {
     pub fn read_data_imu(&mut self, data: &mut SensorData, discard: bool) {
         if let Ok((data_gyro, data_acc)) = self.with_spi_imu(|spi, imu| {
