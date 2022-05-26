@@ -932,6 +932,7 @@ impl GapBondedDevices {
     }
 }
 
+#[cfg(feature = "nope")]
 impl Debug for GapBondedDevices {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{{")?;
@@ -1078,6 +1079,7 @@ pub struct GattHandleValue {
     value_len: usize,
 }
 
+#[cfg(feature = "nope")]
 impl Debug for GattHandleValue {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{{")?;

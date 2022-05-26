@@ -1385,6 +1385,7 @@ pub const MAX_NAME_LEN: usize = 248;
 #[derive(Copy, Clone, Format)]
 pub struct NameBuffer(pub [u8; MAX_NAME_LEN]);
 
+#[cfg(feature = "nope")]
 impl Debug for NameBuffer {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         first_16(&self.0).fmt(f)
@@ -1549,6 +1550,7 @@ pub struct AttributeHandle(pub u16);
 // size (255) less the minimum number of bytes used by other fields in any packet.
 const MAX_ATTRIBUTE_LEN: usize = 248;
 
+#[cfg(feature = "nope")]
 impl Debug for GattAttributeModified {
     #[cfg(feature = "ms")]
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
@@ -1886,6 +1888,7 @@ impl AttFindByTypeValueResponse {
     }
 }
 
+#[cfg(feature = "nope")]
 impl Debug for AttFindByTypeValueResponse {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{{.conn_handle = {:?}, ", self.conn_handle)?;
@@ -1992,6 +1995,7 @@ pub struct AttReadByTypeResponse {
 // the packet.
 const MAX_HANDLE_VALUE_PAIR_BUF_LEN: usize = 249;
 
+#[cfg(feature = "nope")]
 impl Debug for AttReadByTypeResponse {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{{.conn_handle = {:?}, ", self.conn_handle)?;
@@ -2098,6 +2102,7 @@ pub struct AttReadResponse {
 // the packet.
 const MAX_READ_RESPONSE_LEN: usize = 250;
 
+#[cfg(feature = "nope")]
 impl Debug for AttReadResponse {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
@@ -2169,6 +2174,7 @@ impl AttReadByGroupTypeResponse {
     }
 }
 
+#[cfg(feature = "nope")]
 impl Debug for AttReadByGroupTypeResponse {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{{.conn_handle = {:?}, ", self.conn_handle)?;
@@ -2271,6 +2277,7 @@ pub struct AttPrepareWriteResponse {
 // the packet.
 const MAX_WRITE_RESPONSE_VALUE_LEN: usize = 246;
 
+#[cfg(feature = "nope")]
 impl Debug for AttPrepareWriteResponse {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
@@ -2330,6 +2337,7 @@ pub struct AttributeValue {
 // the packet.
 const MAX_ATTRIBUTE_VALUE_LEN: usize = 248;
 
+#[cfg(feature = "nope")]
 impl Debug for AttributeValue {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(

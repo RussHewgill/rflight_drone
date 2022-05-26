@@ -282,15 +282,18 @@ where
                 ReturnParameters::Vendor(vs) => match vs {
                     VReturnParameters::GattAddService(service) => service,
                     other => {
-                        panic!("event_params_vendor other 0 = {:?}", other);
+                        rprintln!("other = {:?}", other);
+                        panic!("event_params_vendor other 0");
                     }
                 },
                 other => {
-                    panic!("event_params_vendor other 1 = {:?}", other);
+                    rprintln!("other = {:?}", other);
+                    panic!("event_params_vendor other 1");
                 }
             },
             other => {
-                panic!("event_params_vendor other 2 = {:?}", other);
+                rprintln!("other = {:?}", other);
+                panic!("event_params_vendor other 2");
             }
         };
         rprintln!("service = {:?}", service);
@@ -422,11 +425,15 @@ where
 
         let c = match self.read_event_params_vendor()? {
             VReturnParameters::GattAddCharacteristic(c) => c,
-            other => unimplemented!("other = {:?}", other),
+            other => {
+                rprintln!("other = {:?}", other);
+                panic!("other");
+            }
         };
 
         if c.status != bluetooth_hci_defmt::Status::Success {
-            panic!("c {} error: {:?}", n, c);
+            rprintln!("c {} error: {:?}", n, c);
+            panic!();
         }
         rprintln!("c {} = {:?}", n, c);
 
