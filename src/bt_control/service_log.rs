@@ -1,4 +1,4 @@
-use bluetooth_hci::{event::command::ReturnParameters, Event};
+use bluetooth_hci_defmt::{event::command::ReturnParameters, Event};
 use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
@@ -295,7 +295,7 @@ where
                 panic!("event_params_vendor other 2 = {:?}", other);
             }
         };
-        rprintln!("service = {:?}", defmt::Debug2Format(&service));
+        rprintln!("service = {:?}", service);
 
         // let params0 = AddCharacteristicParameters {
         //     service_handle:            service.service_handle,
@@ -315,7 +315,7 @@ where
         //     VReturnParameters::GattAddCharacteristic(c) => c,
         //     other => unimplemented!("other = {:?}", other),
         // };
-        // rprintln!("c 0 = {:?}", defmt::Debug2Format(&c0));
+        // rprintln!("c 0 = {:?}", c0);
 
         let handle_quat = self.add_log_char(
             service.service_handle,
@@ -360,7 +360,7 @@ where
         //     VReturnParameters::GattAddCharacteristic(c) => c,
         //     other => unimplemented!("other = {:?}", other),
         // };
-        // rprintln!("c 1 = {:?}", defmt::Debug2Format(&c1));
+        // rprintln!("c 1 = {:?}", c1);
 
         // let params2 = AddCharacteristicParameters {
         //     service_handle:            service.service_handle,
@@ -380,10 +380,10 @@ where
         //     VReturnParameters::GattAddCharacteristic(c) => c,
         //     other => unimplemented!("other = {:?}", other),
         // };
-        // if c2.status != bluetooth_hci::Status::Success {
+        // if c2.status != bluetooth_hci_defmt::Status::Success {
         //     panic!("c2 error: {:?}", c2);
         // }
-        // rprintln!("c 2 = {:?}", defmt::Debug2Format(&c2));
+        // rprintln!("c 2 = {:?}", c2);
 
         let logger = SvLogger {
             service_handle:   service.service_handle,
@@ -427,10 +427,10 @@ where
             other => unimplemented!("other = {:?}", other),
         };
 
-        if c.status != bluetooth_hci::Status::Success {
+        if c.status != bluetooth_hci_defmt::Status::Success {
             panic!("c {} error: {:?}", n, c);
         }
-        rprintln!("c {} = {:?}", n, defmt::Debug2Format(&c));
+        rprintln!("c {} = {:?}", n, c);
 
         Ok(c.characteristic_handle)
     }

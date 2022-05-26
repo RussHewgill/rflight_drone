@@ -1,4 +1,4 @@
-pub use bluetooth_hci::Opcode;
+pub use bluetooth_hci_defmt::Opcode;
 
 const fn ocf(cgid: u16, cid: u16) -> u16 {
     ((cgid & 0b111) << 7) | (cid & 0b111_1111)

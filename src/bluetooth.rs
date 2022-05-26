@@ -40,9 +40,9 @@ use stm32f4xx_hal::{
     timer::{CounterMs, CounterUs, DelayMs, FTimerMs},
 };
 
-use bluetooth_hci::host::uart::{CommandHeader, Hci as HciUart};
-use bluetooth_hci::host::Hci;
-use bluetooth_hci::{host::HciHeader, Controller, Opcode};
+use bluetooth_hci_defmt::host::uart::{CommandHeader, Hci as HciUart};
+use bluetooth_hci_defmt::host::Hci;
+use bluetooth_hci_defmt::{host::HciHeader, Controller, Opcode};
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -137,6 +137,15 @@ pub enum BTError<SpiError, GpioError> {
     /// GPIO errors occur if there is an underlying error resetting the pin, setting the chip select
     /// pin, or reading if data is available.
     Gpio(GpioError),
+}
+
+impl<SpiError, GpioError> defmt::Format for BTError<SpiError, GpioError> {
+    fn format(&self, f: defmt::Formatter) {
+        match self {
+            Self::Spi(spi) => defmt::write!(f, "SpiError: ??"),
+            Self::Gpio(gpio) => defmt::write!(f, "GpioError: ??"),
+        }
+    }
 }
 
 // pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
@@ -483,7 +492,7 @@ where
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         const HEADER_LEN: usize = 4;
         let mut header = [0; HEADER_LEN];
-        bluetooth_hci::host::uart::CommandHeader::new(opcode, params.len())
+        bluetooth_hci_defmt::host::uart::CommandHeader::new(opcode, params.len())
             .copy_into_slice(&mut header);
 
         // rprintln!(
@@ -505,7 +514,7 @@ where
     ) -> nb::Result<(), BTError<SpiError, GpioError>> {
         const HEADER_LEN: usize = 4;
         let mut header = [0; HEADER_LEN];
-        bluetooth_hci::host::uart::CommandHeader::new(opcode, params.len())
+        bluetooth_hci_defmt::host::uart::CommandHeader::new(opcode, params.len())
             .copy_into_slice(&mut header);
 
         let payload = params;
@@ -561,7 +570,7 @@ where
     Input: InputPin<Error = GpioError>,
 {
     type Error = BTError<SpiError, GpioError>;
-    type Header = bluetooth_hci::host::uart::CommandHeader;
+    type Header = bluetooth_hci_defmt::host::uart::CommandHeader;
     type Vendor = BlueNRGTypes;
 
     fn write(&mut self, header: &[u8], payload: &[u8]) -> nb::Result<(), Self::Error> {
@@ -687,12 +696,12 @@ where
     fn read_event2<Vendor, VE>(
         &mut self,
         uart: &mut UART,
-    ) -> nb::Result<bluetooth_hci::Event<Vendor>, BTError<SpiError, GpioError>>
+    ) -> nb::Result<bluetooth_hci_defmt::Event<Vendor>, BTError<SpiError, GpioError>>
     where
-        Vendor: bluetooth_hci::event::VendorEvent<Error = VE>,
+        Vendor: bluetooth_hci_defmt::event::VendorEvent<Error = VE>,
         VE: core::fmt::Debug,
     {
-        use bluetooth_hci::Controller;
+        use bluetooth_hci_defmt::Controller;
         const MAX_EVENT_LENGTH: usize = 255;
         const PACKET_HEADER_LENGTH: usize = 1;
         const EVENT_PACKET_HEADER_LENGTH: usize = 3;
@@ -729,7 +738,7 @@ where
         }
 
         Ok(
-            bluetooth_hci::event::Event::new(bluetooth_hci::event::Packet(
+            bluetooth_hci_defmt::event::Event::new(bluetooth_hci::event::Packet(
                 &buf[PACKET_HEADER_LENGTH..EVENT_PACKET_HEADER_LENGTH + param_len],
             ))
             .unwrap(),
@@ -740,17 +749,17 @@ where
         &mut self,
         uart: &mut UART,
     ) -> nb::Result<
-        bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
+        bluetooth_hci_defmt::host::uart::Packet<BlueNRGEvent>,
         BTError<SpiError, GpioError>,
     > {
-        use bluetooth_hci::Controller;
+        use bluetooth_hci_defmt::Controller;
 
         const PACKET_TYPE_HCI_EVENT: u8 = 0x04;
 
         loop {
             match self.peek(0) {
                 Ok(PACKET_TYPE_HCI_EVENT) => {
-                    return Ok(bluetooth_hci::host::uart::Packet::Event(
+                    return Ok(bluetooth_hci_defmt::host::uart::Packet::Event(
                         // self.read_event2(uart).unwrap(),
                         self.read_event2(uart).unwrap(),
                     ));
@@ -771,7 +780,7 @@ where
 
 /// Specify vendor-specific extensions for the BlueNRG.
 pub struct BlueNRGTypes;
-impl bluetooth_hci::Vendor for BlueNRGTypes {
+impl bluetooth_hci_defmt::Vendor for BlueNRGTypes {
     type Status = self::events::Status;
     type Event = self::events::BlueNRGEvent;
 }
@@ -800,7 +809,9 @@ pub trait LocalVersionInfoExt {
     fn bluenrg_version(&self) -> Version;
 }
 
-impl<VS> LocalVersionInfoExt for bluetooth_hci::event::command::LocalVersionInfo<VS> {
+impl<VS> LocalVersionInfoExt
+    for bluetooth_hci_defmt::event::command::LocalVersionInfo<VS>
+{
     fn bluenrg_version(&self) -> Version {
         Version {
             hw_version: (self.hci_revision >> 8) as u8,

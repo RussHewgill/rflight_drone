@@ -6,7 +6,7 @@ use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 
 // use rtt_target::rprintln;
-use defmt::println as rprintln;
+use defmt::{println as rprintln, Format};
 
 use stm32f4::stm32f401::{RCC, SPI1, TIM2};
 use stm32f4xx_hal::{
@@ -19,7 +19,7 @@ use stm32f4xx_hal::{
     timer::{CounterMs, DelayMs, SysDelay},
 };
 
-use bluetooth_hci::{
+use bluetooth_hci_defmt::{
     host::Hci,
     host::{
         uart::{CommandHeader, Hci as HciUart},
@@ -53,8 +53,8 @@ use crate::bluetooth::gap;
 use crate::bluetooth::gatt;
 use crate::bluetooth::hal_bt;
 
-use bluetooth_hci::event::command::ReturnParameters;
-use bluetooth_hci::event::{Event, VendorEvent};
+use bluetooth_hci_defmt::event::command::ReturnParameters;
+use bluetooth_hci_defmt::event::{Event, VendorEvent};
 
 use crate::bluetooth::ev_command::ReturnParameters as VReturnParameters;
 use crate::bluetooth::{events::BlueNRGEvent, BTError, BluetoothSpi};
@@ -93,7 +93,7 @@ pub type BTSpi = Spi1<
 
 pub type BTController = BluetoothSpi<Pin<'B', 0, Output>, Pin<'B', 2, Output>, PA4>;
 
-pub type BTEvent = bluetooth_hci::event::Event<BlueNRGEvent>;
+pub type BTEvent = bluetooth_hci_defmt::event::Event<BlueNRGEvent>;
 
 mod uuids {
     pub const fn uuid_from_hex(uuid: u128) -> crate::bluetooth::gatt::Uuid {
@@ -214,18 +214,18 @@ where
 
         let ad_params = AdvertisingParameters {
             advertising_interval:      AdvertisingInterval::for_type(
-                bluetooth_hci::host::AdvertisingType::ConnectableUndirected,
+                bluetooth_hci_defmt::host::AdvertisingType::ConnectableUndirected,
             )
             .with_range(
                 core::time::Duration::from_millis(200),
                 core::time::Duration::from_millis(200),
             )
             .unwrap(),
-            own_address_type:          bluetooth_hci::host::OwnAddressType::Random,
-            peer_address:              bluetooth_hci::BdAddrType::Random(addr),
-            advertising_channel_map:   bluetooth_hci::host::Channels::CH_37,
+            own_address_type:          bluetooth_hci_defmt::host::OwnAddressType::Random,
+            peer_address:              bluetooth_hci_defmt::BdAddrType::Random(addr),
+            advertising_channel_map:   bluetooth_hci_defmt::host::Channels::CH_37,
             advertising_filter_policy:
-                bluetooth_hci::host::AdvertisingFilterPolicy::AllowConnectionAndScan,
+                bluetooth_hci_defmt::host::AdvertisingFilterPolicy::AllowConnectionAndScan,
         };
         block!(self.le_set_advertising_parameters(&ad_params)).unwrap();
         self.read_event_uart()?;
@@ -245,15 +245,15 @@ where
 
         let d_params = DiscoverableParameters {
             advertising_type:
-                bluetooth_hci::host::AdvertisingType::ConnectableUndirected,
+                bluetooth_hci_defmt::host::AdvertisingType::ConnectableUndirected,
             // advertising_interval: None,
             advertising_interval: Some((
                 core::time::Duration::from_millis(200),
                 core::time::Duration::from_millis(200),
             )),
-            address_type:         bluetooth_hci::host::OwnAddressType::Random,
+            address_type:         bluetooth_hci_defmt::host::OwnAddressType::Random,
             filter_policy:
-                bluetooth_hci::host::AdvertisingFilterPolicy::AllowConnectionAndScan,
+                bluetooth_hci_defmt::host::AdvertisingFilterPolicy::AllowConnectionAndScan,
             local_name:           Some(LocalName::Complete(&dev_name[..])),
             advertising_data:     &[],
             // conn_interval:        (Some(core::time::Duration::from_millis(5000)), None),
@@ -271,8 +271,10 @@ where
         block!(self.set_gatt_event_mask(gatt_event_mask))?;
         self.read_event_uart()?;
 
-        let event_mask = bluetooth_hci::host::EventFlags::all();
-        block!(bluetooth_hci::host::Hci::set_event_mask(self, event_mask))?;
+        let event_mask = bluetooth_hci_defmt::host::EventFlags::all();
+        block!(bluetooth_hci_defmt::host::Hci::set_event_mask(
+            self, event_mask
+        ))?;
         self.read_event_uart()?;
 
         let gap_event_mask = crate::bluetooth::gap::EventFlags::all();
@@ -402,8 +404,10 @@ where
         &mut self,
         timeout: fugit::MicrosDurationU32,
         uart: &mut UART,
-    ) -> Result<Option<bluetooth_hci::Event<BlueNRGEvent>>, BTError<SpiError, GpioError>>
-    {
+    ) -> Result<
+        Option<bluetooth_hci_defmt::Event<BlueNRGEvent>>,
+        BTError<SpiError, GpioError>,
+    > {
         use stm32f4xx_hal::timer::Event as TimerEvent;
 
         self.delay.clear_interrupt(TimerEvent::Update);
@@ -413,7 +417,7 @@ where
                 Ok(p) => {
                     self.delay.cancel().unwrap();
                     self.delay.clear_interrupt(TimerEvent::Update);
-                    let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                    let bluetooth_hci_defmt::host::uart::Packet::Event(e) = p;
                     break Ok(Some(e));
                 }
                 Err(nb::Error::WouldBlock) => {
@@ -425,13 +429,13 @@ where
                 }
                 Err(nb::Error::Other(e)) => {
                     match e {
-                        bluetooth_hci::host::uart::Error::Comm(e) => {
+                        bluetooth_hci_defmt::host::uart::Error::Comm(e) => {
                             uprintln!(uart, "error 0 = {:?}", e);
                         }
-                        bluetooth_hci::host::uart::Error::BadPacketType(e) => {
+                        bluetooth_hci_defmt::host::uart::Error::BadPacketType(e) => {
                             uprintln!(uart, "error 1 = {:?}", e);
                         }
-                        bluetooth_hci::host::uart::Error::BLE(e) => {
+                        bluetooth_hci_defmt::host::uart::Error::BLE(e) => {
                             uprintln!(uart, "error 2 = {:?}", e);
                         }
                     }
@@ -444,20 +448,21 @@ where
 
     pub fn _read_event(
         &mut self,
-    ) -> Result<bluetooth_hci::Event<BlueNRGEvent>, BTError<SpiError, GpioError>> {
+    ) -> Result<bluetooth_hci_defmt::Event<BlueNRGEvent>, BTError<SpiError, GpioError>>
+    {
         //
 
         let x: Result<
-            bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-            bluetooth_hci::host::uart::Error<
+            bluetooth_hci_defmt::host::uart::Packet<BlueNRGEvent>,
+            bluetooth_hci_defmt::host::uart::Error<
                 BTError<SpiError, GpioError>,
                 crate::bluetooth::events::BlueNRGError,
             >,
         > = block!(self.read());
 
         // let x: Result<
-        //     bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-        //     bluetooth_hci::host::uart::Error<
+        //     bluetooth_hci_defmt::host::uart::Packet<BlueNRGEvent>,
+        //     bluetooth_hci_defmt::host::uart::Error<
         //         BTError<SpiError, GpioError>,
         //         crate::bluetooth::events::BlueNRGError,
         //     >,
@@ -478,23 +483,24 @@ where
 
         match x {
             Ok(p) => {
-                let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                let bluetooth_hci_defmt::host::uart::Packet::Event(e) = p;
                 return Ok(e);
             }
             Err(e) => {
-                let e: bluetooth_hci::host::uart::Error<
+                let e: bluetooth_hci_defmt::host::uart::Error<
                     BTError<SpiError, GpioError>,
                     crate::bluetooth::events::BlueNRGError,
                 > = e;
                 match e {
-                    bluetooth_hci::host::uart::Error::Comm(e) => {
-                        rprintln!("error 0 = {:?}", defmt::Debug2Format(&e));
+                    bluetooth_hci_defmt::host::uart::Error::Comm(e) => {
+                        rprintln!("error 0 = {:?}", e);
+                        // rprintln!("error 0 = {:?}", e);
                     }
-                    bluetooth_hci::host::uart::Error::BadPacketType(e) => {
-                        rprintln!("error 1 = {:?}", defmt::Debug2Format(&e));
+                    bluetooth_hci_defmt::host::uart::Error::BadPacketType(e) => {
+                        rprintln!("error 1 = {:?}", e);
                     }
-                    bluetooth_hci::host::uart::Error::BLE(e) => {
-                        rprintln!("error 2 = {:?}", defmt::Debug2Format(&e));
+                    bluetooth_hci_defmt::host::uart::Error::BLE(e) => {
+                        rprintln!("error 2 = {:?}", e);
                     }
                 }
                 unimplemented!()
@@ -506,12 +512,12 @@ where
         &mut self,
         timeout: Option<fugit::MicrosDurationU32>,
     ) -> Result<TimeoutResult, BTError<SpiError, GpioError>> {
-        use bluetooth_hci::Controller;
+        use bluetooth_hci_defmt::Controller;
         use stm32f4xx_hal::timer::Event as TimerEvent;
 
         let x: Result<
-            bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-            bluetooth_hci::host::uart::Error<
+            bluetooth_hci_defmt::host::uart::Packet<BlueNRGEvent>,
+            bluetooth_hci_defmt::host::uart::Error<
                 BTError<SpiError, GpioError>,
                 crate::bluetooth::events::BlueNRGError,
             >,
@@ -552,7 +558,7 @@ where
 
         let e = match x {
             Ok(p) => {
-                let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                let bluetooth_hci_defmt::host::uart::Packet::Event(e) = p;
                 e
             }
             _ => unimplemented!(),
@@ -567,7 +573,8 @@ where
             Event::Vendor(crate::bluetooth::events::BlueNRGEvent::HalInitialized(
                 reason,
             )) => {
-                rprintln!("bt restarted, reason = {:?}", defmt::Debug2Format(&reason));
+                // rprintln!("bt restarted, reason = {:?}", reason);
+                rprintln!("bt restarted, reason = {:?}", reason);
             }
             Event::CommandComplete(params) => {
                 // Self::handle_event_command_complete(uart, params.return_params);
@@ -579,26 +586,23 @@ where
                     ReturnParameters::Vendor(
                         VReturnParameters::GattUpdateCharacteristicValue(status),
                     ) => {
-                        if status != bluetooth_hci::Status::Success {
-                            rprintln!("status 0 = {:?}", defmt::Debug2Format(&status));
+                        if status != bluetooth_hci_defmt::Status::Success {
+                            rprintln!("status 0 = {:?}", status);
                         } else {
-                            // rprintln!("status 1 = {:?}", defmt::Debug2Format(&status));
+                            // rprintln!("status 1 = {:?}", status);
                         }
                     }
                     ReturnParameters::Vendor(
                         VReturnParameters::GattUpdateLongCharacteristicValue(status),
                     ) => {
-                        if status != bluetooth_hci::Status::Success {
-                            rprintln!("status 0 = {:?}", defmt::Debug2Format(&status));
+                        if status != bluetooth_hci_defmt::Status::Success {
+                            rprintln!("status 0 = {:?}", status);
                         } else {
-                            // rprintln!("status 1 = {:?}", defmt::Debug2Format(&status));
+                            // rprintln!("status 1 = {:?}", status);
                         }
                     }
                     _ => {
-                        rprintln!(
-                            "return_params = {:?}",
-                            defmt::Debug2Format(&params.return_params)
-                        );
+                        rprintln!("return_params = {:?}", params.return_params);
                     }
                 }
             }
@@ -606,7 +610,7 @@ where
             //     unimplemented!()
             // }
             ev => {
-                rprintln!("unhandled event = {:?}", defmt::Debug2Format(&ev));
+                rprintln!("unhandled event = {:?}", ev);
             }
         }
 
@@ -616,8 +620,8 @@ where
     #[cfg(feature = "nope")]
     pub fn ignore_event(&mut self) -> Result<(), BTError<SpiError, GpioError>> {
         let x: Result<
-            bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-            bluetooth_hci::host::uart::Error<
+            bluetooth_hci_defmt::host::uart::Packet<BlueNRGEvent>,
+            bluetooth_hci_defmt::host::uart::Error<
                 BTError<SpiError, GpioError>,
                 crate::bluetooth::events::BlueNRGError,
             >,
@@ -625,7 +629,7 @@ where
 
         match x {
             Ok(p) => {
-                let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                let bluetooth_hci_defmt::host::uart::Packet::Event(e) = p;
                 // uprintln!(uart, "event = {:?}", &e);
                 match e {
                     Event::ConnectionComplete(params) => {
@@ -649,18 +653,18 @@ where
             }
 
             Err(e) => {
-                let e: bluetooth_hci::host::uart::Error<
+                let e: bluetooth_hci_defmt::host::uart::Error<
                     BTError<SpiError, GpioError>,
                     crate::bluetooth::events::BlueNRGError,
                 > = e;
                 match e {
-                    bluetooth_hci::host::uart::Error::Comm(e) => {
+                    bluetooth_hci_defmt::host::uart::Error::Comm(e) => {
                         // uprintln!(uart, "error 0 = {:?}", e);
                     }
-                    bluetooth_hci::host::uart::Error::BadPacketType(e) => {
+                    bluetooth_hci_defmt::host::uart::Error::BadPacketType(e) => {
                         // uprintln!(uart, "error 1 = {:?}", e);
                     }
-                    bluetooth_hci::host::uart::Error::BLE(e) => {
+                    bluetooth_hci_defmt::host::uart::Error::BLE(e) => {
                         // uprintln!(uart, "error 2 = {:?}", e);
                     }
                 }
@@ -675,8 +679,8 @@ where
         // uart: &mut UART,
     ) -> Result<(), BTError<SpiError, GpioError>> {
         let x: Result<
-            bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-            bluetooth_hci::host::uart::Error<
+            bluetooth_hci_defmt::host::uart::Packet<BlueNRGEvent>,
+            bluetooth_hci_defmt::host::uart::Error<
                 BTError<SpiError, GpioError>,
                 crate::bluetooth::events::BlueNRGError,
             >,
@@ -684,7 +688,7 @@ where
 
         match x {
             Ok(p) => {
-                let bluetooth_hci::host::uart::Packet::Event(e) = p;
+                let bluetooth_hci_defmt::host::uart::Packet::Event(e) = p;
                 // uprintln!(uart, "event = {:?}", &e);
                 match e {
                     Event::ConnectionComplete(params) => {
@@ -693,10 +697,7 @@ where
                     Event::Vendor(
                         crate::bluetooth::events::BlueNRGEvent::HalInitialized(reason),
                     ) => {
-                        rprintln!(
-                            "bt restarted, reason = {:?}",
-                            defmt::Debug2Format(&reason)
-                        );
+                        rprintln!("bt restarted, reason = {:?}", reason);
                     }
                     Event::CommandComplete(params) => {
                         Self::handle_event_command_complete(params.return_params);
@@ -705,25 +706,25 @@ where
                     //     unimplemented!()
                     // }
                     ev => {
-                        rprintln!("unhandled event = {:?}", defmt::Debug2Format(&ev));
+                        rprintln!("unhandled event = {:?}", ev);
                     }
                 }
             }
 
             Err(e) => {
-                let e: bluetooth_hci::host::uart::Error<
+                let e: bluetooth_hci_defmt::host::uart::Error<
                     BTError<SpiError, GpioError>,
                     crate::bluetooth::events::BlueNRGError,
                 > = e;
                 match e {
-                    bluetooth_hci::host::uart::Error::Comm(e) => {
-                        rprintln!("error 0 = {:?}", defmt::Debug2Format(&e));
+                    bluetooth_hci_defmt::host::uart::Error::Comm(e) => {
+                        rprintln!("error 0 = {:?}", e);
                     }
-                    bluetooth_hci::host::uart::Error::BadPacketType(e) => {
-                        rprintln!("error 1 = {:?}", defmt::Debug2Format(&e));
+                    bluetooth_hci_defmt::host::uart::Error::BadPacketType(e) => {
+                        rprintln!("error 1 = {:?}", e);
                     }
-                    bluetooth_hci::host::uart::Error::BLE(e) => {
-                        rprintln!("error 2 = {:?}", defmt::Debug2Format(&e));
+                    bluetooth_hci_defmt::host::uart::Error::BLE(e) => {
+                        rprintln!("error 2 = {:?}", e);
                     }
                 }
             }
@@ -758,14 +759,14 @@ where
             ReturnParameters::Vendor(VReturnParameters::GattInit(status)) => match status
             {
                 _ => {
-                    rprintln!("status = {:?}", defmt::Debug2Format(&status));
+                    rprintln!("status = {:?}", status);
                 }
             },
             ReturnParameters::ReadLocalVersionInformation(v) => {
-                rprintln!("v = {:?}", defmt::Debug2Format(&v));
+                rprintln!("v = {:?}", v);
             }
             ps => {
-                rprintln!("Other: return_params = {:?}", defmt::Debug2Format(&ps));
+                rprintln!("Other: return_params = {:?}", ps);
             }
         }
     }
@@ -775,7 +776,7 @@ where
         // timeout: Option<fugit::MillisDurationU32>,
         // uart: &mut UART,
     ) -> Result<
-        bluetooth_hci::event::command::ReturnParameters<BlueNRGEvent>,
+        bluetooth_hci_defmt::event::command::ReturnParameters<BlueNRGEvent>,
         BTError<SpiError, GpioError>,
     > {
         match self._read_event()? {
@@ -840,7 +841,7 @@ where
 // {
 //     match block!(bt.read()) {
 //         // Ok(Packet::Event(event)) => f(&event),
-//         Ok(bluetooth_hci::host::uart::Packet::Event(event)) => f(&event),
+//         Ok(bluetooth_hci_defmt::host::uart::Packet::Event(event)) => f(&event),
 //         Err(e) => {
 //             uprintln!(uart, "err = {:?}", e);
 //             None
@@ -853,7 +854,7 @@ pub fn gen_bd_addr() -> BdAddr {
     let waf_num = device_id.waf_num();
     let lot_num = device_id.lot_num().as_bytes();
     /// 51:0B:30:0B:28:C0 on test board
-    let addr = bluetooth_hci::BdAddr([
+    let addr = bluetooth_hci_defmt::BdAddr([
         (lot_num[0].overflowing_shr(24).0) & 0xFF,
         (waf_num) & 0xFF,
         (lot_num[2].overflowing_shr(8).0) & 0xFF,

@@ -59,7 +59,9 @@ byteorder = { version = "1.4.3", default_features=false }
 
 micromath = "2.0.0"
 
-bluetooth-hci = "0.1.0"
+# bluetooth-hci = "0.1.0"
+bluetooth-hci-defmt = { version = "0.1.0", path = "../builds/bluetooth-hci" }
+
 # bluenrg = { version = "0.1.1", path = "../builds/bluenrg" }
 # bluenrg = { version = "0.1.0", git = "https://github.com/danielgallagher0/bluenrg" }
 

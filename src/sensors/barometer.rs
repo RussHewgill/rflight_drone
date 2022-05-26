@@ -6,12 +6,14 @@ use stm32f4xx_hal::{
     prelude::*,
 };
 
+use defmt::Format;
+
 use crate::spi::{Spi3, SpiError};
 
 const SPI_READ: u8 = 0x80; // 0x01 << 7
 const SPI_WRITE: u8 = 0x00;
 
-#[derive(Debug)]
+#[derive(Debug, Format)]
 pub struct Barometer<CS> {
     pub cs: CS,
 }
@@ -171,7 +173,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Format)]
 #[repr(u8)]
 pub enum BaroDataRate {
     PowerDown = 0b000,
@@ -189,7 +191,7 @@ impl BaroDataRate {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug)]
+#[derive(Debug, Format)]
 #[repr(u8)]
 pub enum BaroRegister {
     WHO_AM_I     = 0x0F,

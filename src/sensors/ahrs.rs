@@ -340,7 +340,7 @@ mod fusion {
 
             // /// equal to 3rd column of rotation matrix representation scaled by 0.5
             // let half_gravity2 = self.quat.to_rotation_matrix().matrix().column(2) * 0.5;
-            // rprintln!("half_gravity2 = {:?}", defmt::Debug2Format(&half_gravity2));
+            // rprintln!("half_gravity2 = {:?}", half_gravity2);
 
             let mut half_acc_feedback = V3::zeros();
             self.acc_ignored = true;
@@ -406,7 +406,7 @@ mod fusion {
 
                 // /// equal to 2nd column of rotation matrix representation scaled by 0.5
                 // let half_west2 = self.quat.to_rotation_matrix().matrix().column(1) * 0.5;
-                // rprintln!("half_west2 = {:?}", defmt::Debug2Format(&half_west2));
+                // rprintln!("half_west2 = {:?}", half_west2);
 
                 // Calculate magnetometer feedback scaled by 0.5
                 self.half_mag_feedback =

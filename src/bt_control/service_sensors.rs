@@ -120,7 +120,7 @@ where
                 panic!("event_params_vendor other 2 = {:?}", other);
             }
         };
-        rprintln!("sensor service = {:?}", defmt::Debug2Format(&service));
+        rprintln!("sensor service = {:?}", service);
 
         let params0 = AddCharacteristicParameters {
             service_handle:            service.service_handle,
@@ -143,7 +143,7 @@ where
             VReturnParameters::GattAddCharacteristic(c) => c,
             other => unimplemented!("other = {:?}", other),
         };
-        rprintln!("sensor c = {:?}", defmt::Debug2Format(&c));
+        rprintln!("sensor c = {:?}", c);
 
         let sensors = SvSensors {
             sens_service_handle: service.service_handle,

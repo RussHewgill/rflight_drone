@@ -4,7 +4,7 @@
 //! commands.  These commands are defined for the BlueNRG controller, but are not standard HCI
 //! commands.
 
-use bluetooth_hci as hci;
+use bluetooth_hci_defmt as hci;
 
 use byteorder::{ByteOrder, LittleEndian};
 use core::convert::{TryFrom, TryInto};
@@ -12,11 +12,13 @@ use core::fmt::{Debug, Formatter, Result as FmtResult};
 use core::time::Duration;
 use hci::{require_len, require_len_at_least};
 
+use defmt::Format;
+
 /// Vendor-specific commands that may generate the [Command
 /// Complete](hci::event::command::ReturnParameters::Vendor) event. If the commands have defined
 /// return parameters, they are included in the enum.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Format)]
 pub enum ReturnParameters {
     /// Parameters returned by the [HAL Get Firmware
     /// Revision](crate::hal::Commands::get_firmware_revision) command.
@@ -516,7 +518,7 @@ fn to_status(
 
 /// Parameters returned by the [HAL Get Firmware
 /// Revision](crate::hal::Commands::get_firmware_revision) command.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Format)]
 pub struct HalFirmwareRevision {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -539,7 +541,7 @@ fn to_hal_firmware_revision(
 
 /// Parameters returned by the [HAL Read Config Data](crate::hal::Commands::read_config_data)
 /// command.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Format)]
 pub struct HalConfigData {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -557,7 +559,7 @@ pub struct HalConfigData {
 
 /// Potential values that can be fetched by [HAL Read Config
 /// Data](crate::hal::Commands::read_config_data).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Format)]
 pub enum HalConfigParameter {
     /// Bluetooth public address. Corresponds to
     /// [PublicAddress](crate::hal::ConfigParameter::PublicAddress).
@@ -619,7 +621,7 @@ fn to_hal_config_parameter(
 
 /// Parameters returned by the [HAL Get Tx Test Packet
 /// Count](crate::hal::Commands::get_tx_test_packet_count) command.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Format)]
 pub struct HalTxTestPacketCount {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -640,7 +642,7 @@ fn to_hal_tx_test_packet_count(
 }
 
 /// Parameters returned by the [HAL Get Link Status](crate::hal::Commands::get_link_status) command.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Format)]
 pub struct HalLinkStatus {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -650,7 +652,7 @@ pub struct HalLinkStatus {
 }
 
 /// State of a client connection.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub struct ClientStatus {
     /// Link state for the client.
     pub state: LinkState,
@@ -660,7 +662,7 @@ pub struct ClientStatus {
 }
 
 /// Potential states for a connection.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub enum LinkState {
     /// Idle
     Idle,
@@ -727,7 +729,7 @@ fn to_hal_link_status(
 
 /// Parameters returned by the [HAL Get Anchor Period](crate::hal::Commands::get_anchor_period)
 /// command.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Format)]
 pub struct HalAnchorPeriod {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -756,7 +758,7 @@ fn to_hal_anchor_period(
 }
 
 /// Parameters returned by the [GAP Init](crate::gap::Commands::init) command.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct GapInit {
     /// Did the command fail, and if so, how?
     ///
@@ -796,7 +798,7 @@ fn to_gap_init(
 
 /// Parameters returned by the [GAP Get Security Level](crate::gap::Commands::get_security_level)
 /// command.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct GapSecurityLevel {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -815,7 +817,7 @@ pub struct GapSecurityLevel {
 }
 
 /// Options for pass key generation.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub enum PassKeyRequirement {
     /// A pass key is not required.
     NotRequired,
@@ -872,7 +874,7 @@ fn to_gap_security_level(
 #[cfg(feature = "ms")]
 /// Parameters returned by the [GAP Resolve Private
 /// Address](crate::gap::Commands::resolve_private_address) command.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct GapResolvePrivateAddress {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -910,7 +912,7 @@ fn to_gap_resolve_private_address(
 
 /// Parameters returned by the [GAP Get Bonded Devices](crate::gap::Commands::get_bonded_devices)
 /// command.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Format)]
 pub struct GapBondedDevices {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -988,7 +990,7 @@ fn to_gap_bonded_devices(
 
 /// Parameters returned by the [GATT Add Service](crate::gatt::Commands::add_service) and [GATT
 /// Include Service](crate::gatt::Commands::include_service) commands.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct GattService {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -1015,7 +1017,7 @@ fn to_gatt_service(
 
 /// Parameters returned by the [GATT Add Characteristic](crate::gatt::Commands::add_characteristic)
 /// command.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct GattCharacteristic {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -1040,7 +1042,7 @@ fn to_gatt_characteristic(
 
 /// Parameters returned by the [GATT Add Characteristic
 /// Descriptor](crate::gatt::Commands::add_characteristic_descriptor) command.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct GattCharacteristicDescriptor {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,
@@ -1067,7 +1069,7 @@ fn to_gatt_characteristic_descriptor(
 
 /// Parameters returned by the [GATT Read Handle Value](crate::gatt::Commands::read_handle_value)
 /// command.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Format)]
 pub struct GattHandleValue {
     /// Did the command fail, and if so, how?
     pub status: hci::Status<crate::bluetooth::events::Status>,

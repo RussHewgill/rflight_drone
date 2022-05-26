@@ -1,4 +1,4 @@
-use bluetooth_hci::ConnectionHandle;
+use bluetooth_hci_defmt::ConnectionHandle;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 
 use crate::bt_control::BTEvent;
@@ -9,8 +9,8 @@ use crate::flight_control::{ControlInputs, DroneController, IdPID};
 use crate::motors::MotorsPWM;
 use crate::pid::PIDParam;
 
-use bluetooth_hci::event::command::ReturnParameters;
-use bluetooth_hci::event::{Event, VendorEvent};
+use bluetooth_hci_defmt::event::command::ReturnParameters;
+use bluetooth_hci_defmt::event::{Event, VendorEvent};
 
 use defmt::println as rprintln;
 
@@ -35,7 +35,7 @@ impl BTState {
         }
     }
 
-    // fn new_conn(self, st: bluetooth_hci::event::ConnectionComplete<_>) -> Self {
+    // fn new_conn(self, st: bluetooth_hci_defmt::event::ConnectionComplete<_>) -> Self {
     //     Self::Connected(st.conn_handle)
     // }
 
@@ -45,28 +45,22 @@ impl BTState {
     ) -> Option<ConnectionChange> {
         match event {
             Event::LeConnectionComplete(status) => {
-                if status.status == bluetooth_hci::Status::Success {
+                if status.status == bluetooth_hci_defmt::Status::Success {
                     rprintln!("new connection established 0");
                     *self = Self::Connected(status.conn_handle);
                     return Some(ConnectionChange::NewConnection(status.conn_handle));
                 } else {
-                    rprintln!(
-                        "Connection Complete, but status = {:?}",
-                        defmt::Debug2Format(&status.status)
-                    );
+                    rprintln!("Connection Complete, but status = {:?}", status.status);
                     return None;
                 }
             }
             Event::ConnectionComplete(status) => {
-                if status.status == bluetooth_hci::Status::Success {
+                if status.status == bluetooth_hci_defmt::Status::Success {
                     rprintln!("new connection established 1");
                     *self = Self::Connected(status.conn_handle);
                     return Some(ConnectionChange::NewConnection(status.conn_handle));
                 } else {
-                    rprintln!(
-                        "Connection Complete, but status = {:?}",
-                        defmt::Debug2Format(&status.status)
-                    );
+                    rprintln!("Connection Complete, but status = {:?}", status.status);
                     return None;
                 }
             }
@@ -74,13 +68,13 @@ impl BTState {
                 *self = Self::Disconnected;
             }
             Event::Vendor(BlueNRGEvent::HalInitialized(reason)) => {
-                rprintln!("bt restarted, reason = {:?}", defmt::Debug2Format(&reason));
+                rprintln!("bt restarted, reason = {:?}", reason);
             }
             Event::CommandComplete(params) => {
-                rprintln!("command complete: {:?}", defmt::Debug2Format(&params));
+                rprintln!("command complete: {:?}", params);
             }
             _ => {
-                rprintln!("unhandled event = {:?}", defmt::Debug2Format(&event));
+                rprintln!("unhandled event = {:?}", event);
             }
         }
         None

@@ -71,7 +71,7 @@ use crate::bluetooth::{
     events::BlueNRGEvent, gap::Commands as GapCommands, gatt::Commands as GattCommands,
     hal_bt::Commands as HalCommands,
 };
-use bluetooth_hci::{host::uart::Hci as HciUart, host::Hci};
+use bluetooth_hci_defmt::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
 // #[cfg(feature = "nope")]
@@ -109,7 +109,7 @@ mod app {
         utils::*,
     };
 
-    use bluetooth_hci::host::{
+    use bluetooth_hci_defmt::host::{
         uart::Hci as HciUart, ConnectionIntervalBuilder, ExpectedConnectionLength, Hci,
     };
 
@@ -181,7 +181,8 @@ mod app {
         match bt.init_bt() {
             Ok(()) => {}
             e => {
-                rprintln!("init_bt error = {:?}", defmt::Debug2Format(&e));
+                // rprintln!("init_bt error = {:?}", e);
+                rprintln!("init_bt error ???");
             }
         }
         // bt.unpause_interrupt(&mut exti);
@@ -549,11 +550,11 @@ mod app {
                 loop {
                     let event: BTEvent = match bt._read_event() {
                         Ok(ev) => {
-                            rprintln!("ev = {:?}", defmt::Debug2Format(&ev));
+                            rprintln!("ev = {:?}", ev);
                             ev
                         }
                         Err(e) => {
-                            rprintln!("read event error = {:?}", defmt::Debug2Format(&e));
+                            rprintln!("read event error = {:?}", e);
                             unimplemented!()
                         }
                     };
@@ -632,7 +633,7 @@ mod app {
         utils::*,
     };
 
-    use bluetooth_hci::host::{uart::Hci as HciUart, Hci};
+    use bluetooth_hci_defmt::host::{uart::Hci as HciUart, Hci};
 
     use nalgebra as na;
 
@@ -934,10 +935,10 @@ fn main_bluetooth() -> ! {
 
     // bt.pause_interrupt(&mut exti);
 
-    // use bluetooth_hci::host::HciHeader;
+    // use bluetooth_hci_defmt::host::HciHeader;
     // let mut header: [u8; 4] = [0; 4];
-    // let opcode = bluetooth_hci::Opcode::new(0x04, 0x01);
-    // bluetooth_hci::host::uart::CommandHeader::new(opcode, 0).copy_into_slice(&mut header);
+    // let opcode = bluetooth_hci_defmt::Opcode::new(0x04, 0x01);
+    // bluetooth_hci_defmt::host::uart::CommandHeader::new(opcode, 0).copy_into_slice(&mut header);
     // let header: &[u8] = &header;
     // uprintln!(uart, "header[0] = {:#0x}", header[0]);
     // uprintln!(uart, "header[1] = {:#0x}", header[1]);
@@ -961,8 +962,8 @@ fn main_bluetooth() -> ! {
         while bt.data_ready().unwrap() {
             // match bt.read()
             let x: stm32f4xx_hal::nb::Result<
-                bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-                bluetooth_hci::host::uart::Error<
+                bluetooth_hci_defmt::host::uart::Packet<BlueNRGEvent>,
+                bluetooth_hci_defmt::host::uart::Error<
                     BTError<SpiError, Infallible>,
                     crate::bluetooth::events::BlueNRGError,
                 >,
@@ -1044,8 +1045,8 @@ fn main_bluetooth() -> ! {
             loop {
                 // match bt.read()
                 let x: stm32f4xx_hal::nb::Result<
-                    bluetooth_hci::host::uart::Packet<BlueNRGEvent>,
-                    bluetooth_hci::host::uart::Error<
+                    bluetooth_hci_defmt::host::uart::Packet<BlueNRGEvent>,
+                    bluetooth_hci_defmt::host::uart::Error<
                         BTError<SpiError, Infallible>,
                         crate::bluetooth::events::BlueNRGError,
                     >,

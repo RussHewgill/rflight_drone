@@ -1,7 +1,7 @@
 //! GAP commands and types needed for those commands.
 
 use bitflags::bitflags;
-use bluetooth_hci as hci;
+use bluetooth_hci_defmt as hci;
 use byteorder;
 use embedded_hal as hal;
 
@@ -51,9 +51,9 @@ pub trait Commands {
     /// - [`BadAdvertisingType`](Error::BadAdvertisingType) if
     ///   [`advertising_type`](DiscoverableParameters::advertising_type) is one of the disallowed
     ///   types:
-    ///   [ConnectableDirectedHighDutyCycle](bluetooth_hci::host::AdvertisingType::ConnectableDirectedHighDutyCycle)
+    ///   [ConnectableDirectedHighDutyCycle](bluetooth_hci_defmt::host::AdvertisingType::ConnectableDirectedHighDutyCycle)
     ///   or
-    ///   [ConnectableDirectedLowDutyCycle](bluetooth_hci::host::AdvertisingType::ConnectableDirectedLowDutyCycle).
+    ///   [ConnectableDirectedLowDutyCycle](bluetooth_hci_defmt::host::AdvertisingType::ConnectableDirectedLowDutyCycle).
     /// - [`BadAdvertisingInterval`](Error::BadAdvertisingInterval) if
     ///   [`advertising_interval`](DiscoverableParameters::advertising_interval) is inverted.
     ///   That is, if the min is greater than the max.
@@ -86,9 +86,9 @@ pub trait Commands {
     /// - [`BadAdvertisingType`](Error::BadAdvertisingType) if
     ///   [`advertising_type`](DiscoverableParameters::advertising_type) is one of the disallowed
     ///   types:
-    ///   [ConnectableDirectedHighDutyCycle](bluetooth_hci::host::AdvertisingType::ConnectableDirectedHighDutyCycle)
+    ///   [ConnectableDirectedHighDutyCycle](bluetooth_hci_defmt::host::AdvertisingType::ConnectableDirectedHighDutyCycle)
     ///   or
-    ///   [ConnectableDirectedLowDutyCycle](bluetooth_hci::host::AdvertisingType::ConnectableDirectedLowDutyCycle).
+    ///   [ConnectableDirectedLowDutyCycle](bluetooth_hci_defmt::host::AdvertisingType::ConnectableDirectedLowDutyCycle).
     /// - [`BadAdvertisingInterval`](Error::BadAdvertisingInterval) if
     ///   [`advertising_interval`](DiscoverableParameters::advertising_interval) is inverted.
     ///   That is, if the min is greater than the max.
@@ -125,9 +125,9 @@ pub trait Commands {
     /// - [`BadAdvertisingType`](Error::BadAdvertisingType) if
     ///   [`advertising_type`](DiscoverableParameters::advertising_type) is one of the disallowed
     ///   types:
-    ///   [ConnectableUndirected](bluetooth_hci::host::AdvertisingType::ConnectableUndirected),
-    ///   [ScannableUndirected](bluetooth_hci::host::AdvertisingType::ScannableUndirected), or
-    ///   [NonConnectableUndirected](bluetooth_hci::host::AdvertisingType::NonConnectableUndirected),
+    ///   [ConnectableUndirected](bluetooth_hci_defmt::host::AdvertisingType::ConnectableUndirected),
+    ///   [ScannableUndirected](bluetooth_hci_defmt::host::AdvertisingType::ScannableUndirected), or
+    ///   [NonConnectableUndirected](bluetooth_hci_defmt::host::AdvertisingType::NonConnectableUndirected),
     /// - (`ms` feature only) [`BadAdvertisingInterval`](Error::BadAdvertisingInterval) if
     ///   [`advertising_interval`](DiscoverableParameters::advertising_interval) is
     ///   out of range (20 ms to 10.24 s) or inverted (the min is greater than the max).
@@ -1362,9 +1362,9 @@ pub struct DiscoverableParameters<'a, 'b> {
     /// Advertising method for the device.
     ///
     /// Must be
-    /// [ConnectableUndirected](bluetooth_hci::host::AdvertisingType::ConnectableUndirected),
-    /// [ScannableUndirected](bluetooth_hci::host::AdvertisingType::ScannableUndirected), or
-    /// [NonConnectableUndirected](bluetooth_hci::host::AdvertisingType::NonConnectableUndirected).
+    /// [ConnectableUndirected](bluetooth_hci_defmt::host::AdvertisingType::ConnectableUndirected),
+    /// [ScannableUndirected](bluetooth_hci_defmt::host::AdvertisingType::ScannableUndirected), or
+    /// [NonConnectableUndirected](bluetooth_hci_defmt::host::AdvertisingType::NonConnectableUndirected).
     pub advertising_type: AdvertisingType,
 
     /// Range of advertising for non-directed advertising.
@@ -1527,9 +1527,9 @@ pub struct DirectConnectableParameters {
     /// Advertising method for the device.
     ///
     /// Must be
-    /// [ConnectableDirectedHighDutyCycle](bluetooth_hci::host::AdvertisingType::ConnectableDirectedHighDutyCycle),
+    /// [ConnectableDirectedHighDutyCycle](bluetooth_hci_defmt::host::AdvertisingType::ConnectableDirectedHighDutyCycle),
     /// or
-    /// [ConnectableDirectedLowDutyCycle](bluetooth_hci::host::AdvertisingType::ConnectableDirectedLowDutyCycle).
+    /// [ConnectableDirectedLowDutyCycle](bluetooth_hci_defmt::host::AdvertisingType::ConnectableDirectedLowDutyCycle).
     pub advertising_type: AdvertisingType,
 
     /// Initiator's Bluetooth address.

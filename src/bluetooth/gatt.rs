@@ -1,6 +1,6 @@
 //! GATT commands and types needed for those commands.
 
-use bluetooth_hci as hci;
+use bluetooth_hci_defmt as hci;
 use byteorder;
 use embedded_hal as hal;
 
@@ -15,6 +15,8 @@ use stm32f4xx_hal::spi::Error as SpiError;
 
 use bitflags::bitflags;
 use byteorder::{ByteOrder, LittleEndian};
+
+use defmt::Format;
 
 use crate::{
     impl_params, impl_validate_variable_length_params, impl_value_params,
@@ -1306,7 +1308,7 @@ where
 /// Before some commands are sent to the controller, the parameters are validated. This type
 /// enumerates the potential validation errors. Must be specialized on the types of communication
 /// errors.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub enum Error<E> {
     /// For the [Add Characteristic Descriptor](Commands::add_characteristic_descriptor) command:
     /// the [descriptor value](AddDescriptorParameters::descriptor_value) is longer than the
@@ -1340,7 +1342,7 @@ fn rewrap_error<E>(e: nb::Error<E>) -> nb::Error<Error<E>> {
 }
 
 /// Parameters for the [GATT Add Service](Commands::add_service) command.
-#[derive(Debug)]
+#[derive(Debug, Format)]
 pub struct AddServiceParameters {
     /// UUID of the service
     pub uuid: Uuid,
@@ -1369,7 +1371,7 @@ impl AddServiceParameters {
 }
 
 /// Types of UUID
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub enum Uuid {
     /// 16-bit UUID
     Uuid16(u16),
@@ -1402,7 +1404,7 @@ impl Uuid {
 }
 
 /// Types of GATT services
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 #[repr(u8)]
 pub enum ServiceType {
     /// Primary service
@@ -1439,7 +1441,7 @@ impl IncludeServiceParameters {
 }
 
 /// Handle for GATT Services.
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Format)]
 pub struct ServiceHandle(pub u16);
 
 /// Two ordered points that represent a range. The points may be identical to represent a range with
@@ -1465,14 +1467,14 @@ impl<T: PartialOrd> Range<T> {
 }
 
 /// Potential errors that can occer when creating a [Range].
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub enum RangeError {
     /// The beginning of the range came after the end.
     Inverted,
 }
 
 /// Parameters for the [GATT Add Characteristic](Commands::add_characteristic) command.
-#[derive(Debug)]
+#[derive(Debug, Format)]
 pub struct AddCharacteristicParameters {
     /// Handle of the service to which the characteristic has to be added
     pub service_handle: ServiceHandle,
@@ -1540,6 +1542,7 @@ bitflags! {
     /// Available [properties](AddCharacteristicParameters::characteristic_properties) for
     /// characteristics. Defined in Volume 3, Part G, Section 3.3.3.1 of Bluetooth Specification
     /// 4.1.
+    #[derive(Format)]
     pub struct CharacteristicProperty: u8 {
         /// If set, permits broadcasts of the Characteristic Value using Server Characteristic
         /// Configuration Descriptor. If set, the Server Characteristic Configuration Descriptor
@@ -1585,6 +1588,7 @@ bitflags! {
 bitflags! {
     /// [Permissions](AddCharacteristicParameter::security_permissions) available for
     /// characteristics.
+    #[derive(Format)]
     pub struct CharacteristicPermission: u8 {
         /// No security.
         const NONE = 0x00;
@@ -1611,6 +1615,7 @@ bitflags! {
 
 bitflags! {
     /// Which events may be generated when a characteristic is accessed.
+    #[derive(Format)]
     pub struct CharacteristicEvent: u8 {
         /// No events.
         const NONE = 0x00;
@@ -1629,7 +1634,7 @@ bitflags! {
 }
 
 /// Encryption key size, in bytes.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub struct EncryptionKeySize(u8);
 
 impl EncryptionKeySize {
@@ -1661,7 +1666,7 @@ impl EncryptionKeySize {
 }
 
 /// Errors that can occur when creating an [`EncryptionKeySize`].
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub enum EncryptionKeySizeError {
     /// The provided size was less than the minimum allowed size.
     TooShort,
@@ -1670,7 +1675,7 @@ pub enum EncryptionKeySizeError {
 }
 
 /// Handle for GATT characteristics.
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Format)]
 pub struct CharacteristicHandle(pub u16);
 
 /// Parameters for the [GATT Add Characteristic Descriptor](Commands::add_characteristic_descriptor)
@@ -1800,7 +1805,7 @@ bitflags! {
 }
 
 /// Handle for GATT characteristic descriptors.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Format)]
 pub struct DescriptorHandle(pub u16);
 
 /// Parameters for the [Update Characteristic Value](Commands::update_characteristic_value)

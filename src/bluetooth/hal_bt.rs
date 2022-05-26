@@ -1,6 +1,6 @@
 //! Vendor-specific HCI commands and types needed for those commands.
 
-use bluetooth_hci as hci;
+use bluetooth_hci_defmt as hci;
 use byteorder;
 use embedded_hal as hal;
 
