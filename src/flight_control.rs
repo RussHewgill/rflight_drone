@@ -347,7 +347,7 @@ impl DroneController {
             .unwrap();
 
         if excess_output > 1.0 {
-            return self.mix(throttle - (excess_output - 1.0), roll, pitch, yaw);
+            // return self.mix(throttle - (excess_output - 1.0), roll, pitch, yaw);
         }
 
         MotorOutputs {

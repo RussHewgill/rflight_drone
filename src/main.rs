@@ -294,13 +294,12 @@ mod app {
         (shared, local, init::Monotonics(mono))
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    //     binds = TIM3,
-    //     shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
-    //     local = [tim3, sensors],
-    //     priority = 4
-    // )]
+    #[task(
+        binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
+        local = [tim3, sensors],
+        priority = 4
+    )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -405,8 +404,8 @@ mod app {
                 /// update PIDs
                 let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
 
-                // /// apply mixed PID outputs to motors
-                // motor_outputs.apply(motors);
+                /// apply mixed PID outputs to motors
+                motor_outputs.apply(motors);
 
                 // let (roll, pitch, yaw) = fd.get_euler_angles();
                 // rprintln!(
@@ -491,14 +490,14 @@ mod app {
         main_loop::spawn().unwrap();
     }
 
-    // #[cfg(feature = "nope")]
-    #[task(
-        binds = TIM3,
-        // shared = [bt, exti, dwt, inputs, controller],
-        shared = [bt, exti, dwt, ahrs, sens_data, flight_data, motors, tim9_flag, inputs, controller],
-        local = [x: f32 = 0.0, tim3, sensors],
-        priority = 3)
-    ]
+    #[cfg(feature = "nope")]
+    // #[task(
+    //     // binds = TIM3,
+    //     // shared = [bt, exti, dwt, inputs, controller],
+    //     shared = [bt, exti, dwt, ahrs, sens_data, flight_data, motors, tim9_flag, inputs, controller],
+    //     local = [x: f32 = 0.0, tim3, sensors],
+    //     priority = 3)
+    // ]
     fn bt_test(mut cx: bt_test::Context) {
         #[cfg(feature = "nope")]
         (cx.shared.bt, cx.shared.exti, cx.shared.controller).lock(
