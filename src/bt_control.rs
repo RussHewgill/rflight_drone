@@ -243,6 +243,34 @@ where
         self.read_event_uart()?;
         // uart.pause();
 
+        self.begin_advertise()?;
+
+        let gatt_event_mask = crate::bluetooth::gatt::Event::all();
+        block!(self.set_gatt_event_mask(gatt_event_mask))?;
+        self.read_event_uart()?;
+
+        let event_mask = bluetooth_hci_defmt::host::EventFlags::all();
+        block!(bluetooth_hci_defmt::host::Hci::set_event_mask(
+            self, event_mask
+        ))?;
+        self.read_event_uart()?;
+
+        let gap_event_mask = crate::bluetooth::gap::EventFlags::all();
+        block!(self.set_gap_event_mask(gap_event_mask))?;
+        self.read_event_uart()?;
+
+        self.init_services()?;
+
+        // block!(self.get_security_level())?;
+        // self.read_event_uart()?;
+
+        // block!(self.read_bd_addr()).unwrap();
+        // block!(self.read_event(uart))?;
+
+        Ok(())
+    }
+
+    pub fn begin_advertise(&mut self) -> nb::Result<(), BTError<SpiError, GpioError>> {
         let dev_name: &'static [u8; 7] = b"DRN1120";
 
         let d_params = DiscoverableParameters {
@@ -270,56 +298,6 @@ where
         block!(self.set_discoverable(&d_params))
             .unwrap_or_else(|_| panic!("set_discoverable"));
         self.read_event_uart()?;
-
-        let gatt_event_mask = crate::bluetooth::gatt::Event::all();
-        block!(self.set_gatt_event_mask(gatt_event_mask))?;
-        self.read_event_uart()?;
-
-        let event_mask = bluetooth_hci_defmt::host::EventFlags::all();
-        block!(bluetooth_hci_defmt::host::Hci::set_event_mask(
-            self, event_mask
-        ))?;
-        self.read_event_uart()?;
-
-        let gap_event_mask = crate::bluetooth::gap::EventFlags::all();
-        block!(self.set_gap_event_mask(gap_event_mask))?;
-        self.read_event_uart()?;
-
-        self.init_services()?;
-
-        // block!(self.get_security_level())?;
-        // self.read_event_uart()?;
-
-        // block!(self.read_bd_addr()).unwrap();
-        // block!(self.read_event(uart))?;
-
-        // let conn_handle: ConnectionHandle = match self._read_event(uart)? {
-        //     Event::LeConnectionComplete(conn) => conn.conn_handle,
-        //     _ => unimplemented!(),
-        // };
-        // uprintln!(uart, "conn = {:?}", conn_handle);
-
-        // let xs = [1];
-        // let val = UpdateCharacteristicValueParameters {
-        //     // conn_handle,
-        //     service_handle: console_service.0,
-        //     characteristic_handle: console_service.1,
-        //     offset: 0,
-        //     value: &xs,
-        // };
-        // // block!(self.write_characteristic_value(&val)).unwrap();
-        // block!(self.update_characteristic_value(&val)).unwrap();
-        // block!(self.read_event(uart))?;
-
-        // block!(self.read_event(uart))?;
-        // block!(self.read_event(uart))?;
-
-        // loop {
-        //     block!(self.read_event(uart))?;
-        //     if false {
-        //         break;
-        //     }
-        // }
 
         Ok(())
     }

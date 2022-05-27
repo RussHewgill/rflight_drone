@@ -473,6 +473,10 @@ mod app {
                             // bt.unpause_interrupt(exti);
                             // // rprintln!("1");
 
+                            for id in [IdPID::RollRate] {
+                                bt.log_write_pid(id, &controller[id]).unwrap();
+                            }
+
                             // #[cfg(feature = "nope")]
                             // for id in IdPID::ITER {
                             //     bt.log_write_pid(id, &controller[id]).unwrap();
@@ -663,29 +667,31 @@ mod app {
                         }
                     };
 
-                    /// TODO: update connection params
-                    match bt.state.handle_connect_disconnect(&event) {
-                        Some(ConnectionChange::NewConnection(conn_handle)) => {
-                            // let conn_interval = ConnectionIntervalBuilder::new()
-                            //     .with_latency()
-                            //     .build()
-                            //     .unwrap();
-                            // let params = ConnectionUpdateParameters {
-                            //     conn_handle,
-                            //     conn_interval,
-                            //     expected_connection_length:
-                            //         ExpectedConnectionLength::new(
-                            //             core::time::Duration::from_secs_f32(1.0),
-                            //             core::time::Duration::from_secs_f32(1200.0), // 20 minutes
-                            //         )
-                            //         .unwrap(),
-                            // };
-                            // // block!(bt.le_connection_update(params)).unwrap();
-                            // block!(bt.(params)).unwrap();
-                            // bt.read_event_uart().unwrap();
-                        }
-                        _ => {}
-                    }
+                    // /// TODO: update connection params
+                    // match bt.state.handle_connect_disconnect(&event) {
+                    //     Some(ConnectionChange::NewConnection(conn_handle)) => {
+                    //         // let conn_interval = ConnectionIntervalBuilder::new()
+                    //         //     .with_latency()
+                    //         //     .build()
+                    //         //     .unwrap();
+                    //         // let params = ConnectionUpdateParameters {
+                    //         //     conn_handle,
+                    //         //     conn_interval,
+                    //         //     expected_connection_length:
+                    //         //         ExpectedConnectionLength::new(
+                    //         //             core::time::Duration::from_secs_f32(1.0),
+                    //         //             core::time::Duration::from_secs_f32(1200.0), // 20 minutes
+                    //         //         )
+                    //         //         .unwrap(),
+                    //         // };
+                    //         // // block!(bt.le_connection_update(params)).unwrap();
+                    //         // block!(bt.(params)).unwrap();
+                    //         // bt.read_event_uart().unwrap();
+                    //     }
+                    //     _ => {}
+                    // }
+
+                    bt.handle_connect_disconnect(&event);
 
                     bt.handle_input(motors, inputs, controller, &event);
 

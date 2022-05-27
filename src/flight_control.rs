@@ -335,6 +335,17 @@ impl DroneController {
     /// +pitch = nose up
     /// +yaw   = nose right
     pub fn mix(&self, throttle: f32, roll: f32, pitch: f32, yaw: f32) -> MotorOutputs {
+        self._mix(throttle, roll, pitch, yaw, true)
+    }
+
+    pub fn _mix(
+        &self,
+        throttle: f32,
+        roll: f32,
+        pitch: f32,
+        yaw: f32,
+        once: bool,
+    ) -> MotorOutputs {
         let front_left = throttle - yaw + pitch + roll; // M3
         let front_right = throttle + yaw + pitch - roll; // M2
         let back_left = throttle + yaw - pitch + roll; // M4
@@ -346,8 +357,8 @@ impl DroneController {
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap();
 
-        if excess_output > 1.0 {
-            // return self.mix(throttle - (excess_output - 1.0), roll, pitch, yaw);
+        if once && excess_output > 1.0 {
+            return self._mix(throttle - (excess_output - 1.0), roll, pitch, yaw, false);
         }
 
         MotorOutputs {

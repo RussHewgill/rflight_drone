@@ -1509,7 +1509,7 @@ fn to_gap_reconnection_address(
 /// - write characteristic value
 /// - write long characteristic value
 /// - reliable write
-#[derive(Copy, Clone, Format)]
+#[derive(Copy, Clone)]
 pub struct GattAttributeModified {
     /// The connection handle which modified the attribute
     pub conn_handle: ConnectionHandle,
@@ -1549,6 +1549,20 @@ pub struct AttributeHandle(pub u16);
 // Defines the maximum length of a ATT attribute value field. This is determined by the max packet
 // size (255) less the minimum number of bytes used by other fields in any packet.
 const MAX_ATTRIBUTE_LEN: usize = 248;
+
+impl defmt::Format for GattAttributeModified {
+    fn format(&self, f: defmt::Formatter) {
+        defmt::write!(
+            f,
+            "{{conn_handle: {:?}, attr_handle: {:?}, offset: {}, continued: {}, data: {:?}}}",
+            self.conn_handle,
+            self.attr_handle,
+            self.offset,
+            self.continued,
+            first_16(self.data()),
+        )
+    }
+}
 
 #[cfg(feature = "nope")]
 impl Debug for GattAttributeModified {

@@ -34,7 +34,15 @@ impl BTState {
             _ => false,
         }
     }
+}
 
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
+where
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+    Input: InputPin<Error = GpioError>,
+    GpioError: core::fmt::Debug,
+{
     // fn new_conn(self, st: bluetooth_hci_defmt::event::ConnectionComplete<_>) -> Self {
     //     Self::Connected(st.conn_handle)
     // }
@@ -47,7 +55,7 @@ impl BTState {
             Event::LeConnectionComplete(status) => {
                 if status.status == bluetooth_hci_defmt::Status::Success {
                     rprintln!("new connection established 0");
-                    *self = Self::Connected(status.conn_handle);
+                    self.state = BTState::Connected(status.conn_handle);
                     return Some(ConnectionChange::NewConnection(status.conn_handle));
                 } else {
                     rprintln!("Connection Complete, but status = {:?}", status.status);
@@ -57,7 +65,7 @@ impl BTState {
             Event::ConnectionComplete(status) => {
                 if status.status == bluetooth_hci_defmt::Status::Success {
                     rprintln!("new connection established 1");
-                    *self = Self::Connected(status.conn_handle);
+                    self.state = BTState::Connected(status.conn_handle);
                     return Some(ConnectionChange::NewConnection(status.conn_handle));
                 } else {
                     rprintln!("Connection Complete, but status = {:?}", status.status);
@@ -65,7 +73,9 @@ impl BTState {
                 }
             }
             Event::DisconnectionComplete(status) => {
-                *self = Self::Disconnected;
+                rprintln!("disconnected, reason = {:?}", status.reason);
+                self.state = BTState::Disconnected;
+                self.begin_advertise().unwrap();
             }
             Event::Vendor(BlueNRGEvent::HalInitialized(reason)) => {
                 rprintln!("bt restarted, reason = {:?}", reason);
