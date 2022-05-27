@@ -287,7 +287,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -414,6 +414,7 @@ mod app {
                 //     r(rad_to_deg(pitch)),
                 //     r(rad_to_deg(yaw)),
                 // );
+
                 *tim9_flag = true;
                 // rprintln!("timer_sensors lock 1");
             });
@@ -473,13 +474,18 @@ mod app {
                             // bt.unpause_interrupt(exti);
                             // // rprintln!("1");
 
+                            // rprintln!("writing PID");
                             for id in [IdPID::RollRate] {
+                                bt.pause_interrupt(exti);
                                 bt.log_write_pid(id, &controller[id]).unwrap();
+                                bt.unpause_interrupt(exti);
                             }
 
                             // #[cfg(feature = "nope")]
                             // for id in IdPID::ITER {
+                            //     bt.pause_interrupt(exti);
                             //     bt.log_write_pid(id, &controller[id]).unwrap();
+                            //     bt.unpause_interrupt(exti);
                             // }
 
                             // //
