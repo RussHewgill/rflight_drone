@@ -404,6 +404,13 @@ mod fusion {
                 };
                 // print_v3("half_west = ", half_west, 4);
 
+                let q = self.quat.as_ref();
+                let h = q * (Quaternion::from_parts(0.0, mag) * q.conjugate());
+                let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
+
+                // rprintln!("half_west = {:?}", half_west);
+                // rprintln!("b         = {:?}", b);
+
                 // /// equal to 2nd column of rotation matrix representation scaled by 0.5
                 // let half_west2 = self.quat.to_rotation_matrix().matrix().column(1) * 0.5;
                 // rprintln!("half_west2 = {:?}", half_west2);

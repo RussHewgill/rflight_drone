@@ -333,7 +333,7 @@ fn init_bt(
     bt
 }
 
-fn init_leds(pb4: Pin<'B', 4, Alternate<0>>, pb5: PB5) -> LEDs {
+pub fn init_leds(pb4: Pin<'B', 4, Alternate<0>>, pb5: PB5) -> LEDs {
     let mut led1_pin = pb5
         .into_push_pull_output()
         .speed(Speed::High)

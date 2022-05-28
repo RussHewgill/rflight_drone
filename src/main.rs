@@ -233,10 +233,16 @@ mod app {
         ahrs.cfg_acc_rejection = 10.0;
         ahrs.cfg_mag_rejection = 20.0;
 
+        // ahrs.calibration.hard_iron_offset = V3::new(
+        //     -1.2428659, //
+        //     -1.3962219, //
+        //     1.879177,
+        // );
+
         ahrs.calibration.hard_iron_offset = V3::new(
-            -1.2428659, //
-            -1.3962219, //
-            1.879177,
+            -5.1751766, //
+            -0.5539105, //
+            3.117466,
         );
 
         // /// complementary
@@ -363,14 +369,15 @@ mod app {
 
                     // print_v3("mag0 = ", mag0, 6);
 
-                    let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-                    rprintln!(
-                        "heading = {:?}, mag(x,y,z) = ({:?}, {:?}, {:?})",
-                        round_to(heading, 1),
-                        round_to(mag.x, 6),
-                        round_to(mag.y, 6),
-                        round_to(mag.z, 6),
-                    );
+                    // use na::RealField;
+                    // let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+                    // rprintln!(
+                    //     "heading = {:?}, mag(x,y,z) = ({:?}, {:?}, {:?})",
+                    //     round_to(heading, 1),
+                    //     round_to(mag.x, 6),
+                    //     round_to(mag.y, 6),
+                    //     round_to(mag.z, 6),
+                    // );
 
                     // /// expected magnetic field:
                     // /// Declination (+E) = 15.9 deg
@@ -407,12 +414,41 @@ mod app {
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);
 
-                // let (roll, pitch, yaw) = fd.get_euler_angles();
+                let (roll, pitch, yaw) = fd.get_euler_angles();
+                rprintln!(
+                    "(r,p,y) = {:?}, {:?}, {:?}",
+                    r(rad_to_deg(roll)),
+                    r(rad_to_deg(pitch)),
+                    r(rad_to_deg(yaw)),
+                );
+
+                use na::{ComplexField, RealField};
+                let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
+
+                fn f(x: f32) -> f32 {
+                    (x * 10.0).round() / 10.0
+                }
+
                 // rprintln!(
-                //     "(r,p,y) = {:?}, {:?}, {:?}",
-                //     r(rad_to_deg(roll)),
-                //     r(rad_to_deg(pitch)),
-                //     r(rad_to_deg(yaw)),
+                //     "heading = {=f32:04}, yaw = {=f32:04}",
+                //     f(heading),
+                //     f(rad_to_deg(yaw))
+                // );
+
+                // fn f(x: f32) -> (i32, u32) {
+                //     let x = (x * 10.0).round() as i32;
+                //     let d = x % 10;
+                //     let x = x / 10;
+                //     (x, d as u32)
+                // }
+                // let heading = f(heading);
+                // let yaw = f(yaw);
+                // rprintln!(
+                //     "heading = {=i32}.{=u32}, yaw = {=i32}.{=u32}",
+                //     heading.0,
+                //     heading.1,
+                //     yaw.0,
+                //     yaw.1
                 // );
 
                 *tim9_flag = true;
@@ -450,36 +486,26 @@ mod app {
                     *cx.local.counter = 0;
                     (flight_data, sens_data, bt, exti, controller).lock(
                         |fd, sd, bt, exti, controller| {
-                            // (flight_data, sens_data, bt, exti).lock(|fd, sd, bt, exti| {
-                            bt.pause_interrupt(exti);
-                            bt.log_write_quat(&fd.quat).unwrap();
-                            bt.unpause_interrupt(exti);
-
-                            // let (roll, pitch, yaw) = fd.get_euler_angles();
-
-                            // rprintln!(
-                            //     "(r,p,y) = {:?}, {:?}, {:?}",
-                            //     r(rad_to_deg(roll)),
-                            //     r(rad_to_deg(pitch)),
-                            //     r(rad_to_deg(yaw)),
-                            // );
-
-                            // let gyro0 = sd.imu_gyro.read_and_reset();
-                            // let acc0 = sd.imu_acc.read_and_reset();
-                            // let mag0 = sd.magnetometer.read_and_reset();
-
-                            // // rprintln!("0");
                             // bt.pause_interrupt(exti);
-                            // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                            // bt.log_write_quat(&fd.quat).unwrap();
                             // bt.unpause_interrupt(exti);
-                            // // rprintln!("1");
 
-                            // rprintln!("writing PID");
-                            for id in [IdPID::RollRate] {
-                                bt.pause_interrupt(exti);
-                                bt.log_write_pid(id, &controller[id]).unwrap();
-                                bt.unpause_interrupt(exti);
-                            }
+                            let gyro0 = sd.imu_gyro.read_and_reset();
+                            let acc0 = sd.imu_acc.read_and_reset();
+                            let mag0 = sd.magnetometer.read_and_reset();
+
+                            // rprintln!("0");
+                            bt.pause_interrupt(exti);
+                            bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                            bt.unpause_interrupt(exti);
+                            // rprintln!("1");
+
+                            // // rprintln!("writing PID");
+                            // for id in [IdPID::RollRate] {
+                            //     bt.pause_interrupt(exti);
+                            //     bt.log_write_pid(id, &controller[id]).unwrap();
+                            //     bt.unpause_interrupt(exti);
+                            // }
 
                             // #[cfg(feature = "nope")]
                             // for id in IdPID::ITER {
@@ -743,6 +769,7 @@ mod app {
         bluetooth::gap::Commands as GapCommands,
         bluetooth::gatt::Commands as GattCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
+        init::init_leds,
         sensors::ahrs::{FlightData, AHRS},
         sensors::{SensorData, Sensors, UQuat},
         time::MonoTimer,
@@ -855,7 +882,9 @@ mod app {
         let v = adc.sample();
         rprintln!("v = {:?}", v);
 
-        return (Shared {}, Local {}, init::Monotonics());
+        // let mut leds = init_leds(gb.pb4, gb.pb5);
+
+        // return (Shared {}, Local {}, init::Monotonics());
 
         motors.set_armed(true);
 
