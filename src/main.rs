@@ -233,12 +233,6 @@ mod app {
         ahrs.cfg_acc_rejection = 10.0;
         ahrs.cfg_mag_rejection = 20.0;
 
-        // ahrs.calibration.hard_iron_offset = V3::new(
-        //     -1.2428659, //
-        //     -1.3962219, //
-        //     1.879177,
-        // );
-
         ahrs.calibration.hard_iron_offset = V3::new(
             -5.1751766, //
             -0.5539105, //
@@ -432,7 +426,17 @@ mod app {
 
                 let heading2 = rad_to_deg(f32::atan2(yh, xh));
 
-                // rprintln!("heading  = {:?}\nheading2 = {:?}", heading, heading2);
+                // let heading2 = AhrsFusion::compass_calc_heading(acc, mag);
+
+                // let heading2 =
+                // let heading2 = rad_to_deg()
+
+                rprintln!(
+                    "yaw = {:?}\nheading  = {:?}\nheading2 = {:?}",
+                    rad_to_deg(yaw),
+                    heading,
+                    heading2
+                );
 
                 // let q = fd.quat.as_ref();
 

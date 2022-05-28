@@ -180,19 +180,12 @@ impl AHRS for AhrsFusion {
             )
         };
 
-        // print_v3("half_gravity = ", half_gravity, 4);
-        // print_v3("acc          = ", acc * 0.5, 4);
-        // print_v3("diff         = ", acc * 0.5 - half_gravity, 4);
-        // rprintln!("diff.mag = {:?}", (acc * 0.5 - half_gravity).magnitude());
-
         // /// equal to 3rd column of rotation matrix representation scaled by 0.5
         // let half_grav2 = self.quat.to_rotation_matrix().matrix().transpose()
         //     .column(2) * 0.5;
 
         // rprintln!("half_gravity  = {:?}", defmt::Debug2Format(&half_gravity));
         // rprintln!("half_gravity2 = {:?}", defmt::Debug2Format(&half_gravity2));
-
-        // assert_eq!(half_gravity, half_gravity2);
 
         let mut half_acc_feedback = V3::zeros();
         self.acc_ignored = true;
@@ -208,7 +201,7 @@ impl AHRS for AhrsFusion {
                 self.acc_rejection_timeout = true;
             }
 
-            // Calculate accelerometer feedback scaled by 0.5
+            /// Calculate accelerometer feedback scaled by 0.5
             self.half_acc_feedback = acc.normalize().cross(&half_gravity);
 
             /// Ignore accelerometer if acceleration distortion detected
@@ -221,11 +214,6 @@ impl AHRS for AhrsFusion {
                 if self.acc_rejection_timer >= 10 {
                     self.acc_rejection_timer -= 10;
                 }
-                // self.acc_rejection_timer -= if self.acc_rejection_timer >= 10 {
-                //     10
-                // } else {
-                //     0
-                // };
             } else {
                 rprintln!("ignoring acc, distorted");
                 self.acc_rejection_timer += 1;
@@ -237,6 +225,9 @@ impl AHRS for AhrsFusion {
         /// Calculate magnetometer feedback
         if mag != V3::zeros() {
             self.mag_rejection_timeout = false;
+
+            /// TODO: tilt-compensate mag ??
+
             /// Set to compass heading if magnetic rejection times out
             if self.mag_rejection_timer >= self.cfg_rejection_timeout {
                 rprintln!("mag timeout, setting to compass heading");
@@ -267,11 +258,11 @@ impl AHRS for AhrsFusion {
             // rprintln!("half_west  = {:?}", defmt::Debug2Format(&half_west));
             // rprintln!("half_west2 = {:?}", defmt::Debug2Format(&half_west2));
 
-            // Calculate magnetometer feedback scaled by 0.5
+            /// Calculate magnetometer feedback scaled by 0.5
             self.half_mag_feedback =
                 half_gravity.cross(&mag).normalize().cross(&half_west);
 
-            // Ignore magnetometer if magnetic distortion detected
+            /// Ignore magnetometer if magnetic distortion detected
             if self.initializing
                 || self.half_mag_feedback.norm_squared() <= self.cfg_mag_rejection
             {
@@ -301,8 +292,6 @@ impl AHRS for AhrsFusion {
 
         let v = Quaternion::from_parts(0.0, v);
         self.quat = UQuat::from_quaternion(*self.quat + (*self.quat * v));
-
-        // self.quat = UQuat::from_quaternion(*self.quat + quat_mult_vec(*self.quat, v));
 
         if self.is_acc_warning() {
             rprintln!("acc warning");
@@ -473,6 +462,7 @@ mod calibration {
             );
         }
 
+        #[cfg(feature = "nope")]
         pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
             if !self.initializing {
                 return;

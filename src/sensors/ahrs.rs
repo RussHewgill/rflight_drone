@@ -3,6 +3,7 @@ use nalgebra::{Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
 mod complementary;
 mod fusion;
+mod kalman;
 
 use crate::math::*;
 use defmt::println as rprintln;
@@ -11,6 +12,7 @@ use super::{Rot3, UQuat, V3};
 
 pub use self::complementary::*;
 pub use self::fusion::*;
+pub use self::kalman::*;
 // pub use self::madgwick_prev::*;
 
 pub trait AHRS {

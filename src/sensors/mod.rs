@@ -106,16 +106,6 @@ impl Sensors {
     }
 }
 
-// /// set offsets
-// impl Sensors {
-//     pub fn set_offsets(&mut self) {
-//         unimplemented!()
-//     }
-//     pub fn set_offset_gyro(&mut self, gyro: V3) {
-//         unimplemented!()
-//     }
-// }
-
 /// with_spi
 impl Sensors {
     pub fn with_spi_imu<F, T>(&mut self, f: F) -> T
@@ -140,6 +130,7 @@ impl Sensors {
     }
 }
 
+/// read data directly
 impl Sensors {
     pub fn _read_data_imu(&mut self) -> Option<(V3, V3)> {
         self.with_spi_imu(|spi, imu| {
@@ -248,12 +239,12 @@ impl Sensors {
                 mag_data[2],
             );
 
-            // /// from datasheets
-            // let mag_data = [
+            // /// from datasheets, wrong ??
+            // let mag_data = V3::new(
             //     mag_data[0], //
             //     -mag_data[1],
             //     mag_data[2],
-            // ];
+            // );
 
             data.magnetometer.update(mag_data);
         } else {
