@@ -431,8 +431,8 @@ mod app {
                 let yh = mag.y * roll.cos() + mag.z * roll.sin();
 
                 let heading2 = rad_to_deg(f32::atan2(yh, xh));
-                rprintln!("heading  = {:?}\nheading2 = {:?}", heading, heading2);
-                // rprintln!("heading2 = {:?}", heading2);
+
+                // rprintln!("heading  = {:?}\nheading2 = {:?}", heading, heading2);
 
                 // let q = fd.quat.as_ref();
 

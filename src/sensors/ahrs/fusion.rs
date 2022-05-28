@@ -44,7 +44,7 @@ pub struct AhrsFusion {
 
 /// new, reset
 impl AhrsFusion {
-    pub const INIT_TIME: f32 = 3.0;
+    pub const INIT_PERIOD: f32 = 3.0;
 
     pub const INITIAL_GAIN: f32 = 10.0;
 
@@ -52,6 +52,11 @@ impl AhrsFusion {
 
     pub fn new(sample_rate: HertzU32, gain: f32) -> Self {
         let delta_time = 1.0 / (sample_rate.to_Hz() as f32);
+
+        // rprintln!("delta_time = {:?}", delta_time);
+        // let step = (Self::INITIAL_GAIN - gain) / Self::INIT_PERIOD;
+        // rprintln!("step = {:?}", step);
+
         let mut offset = FusionOffset::default();
         offset.init(sample_rate);
 
@@ -76,7 +81,8 @@ impl AhrsFusion {
 
             initializing: true,
             ramped_gain: Self::INITIAL_GAIN,
-            ramped_gain_step: (Self::INITIAL_GAIN - gain) / Self::INIT_TIME,
+            // ramped_gain_step: (Self::INITIAL_GAIN - gain) / Self::INIT_TIME,
+            ramped_gain_step: (Self::INITIAL_GAIN - gain) / Self::INIT_PERIOD,
 
             half_acc_feedback: V3::zeros(),
             half_mag_feedback: V3::zeros(),
@@ -91,6 +97,8 @@ impl AhrsFusion {
     }
 
     pub fn reset(&mut self) {
+        // defmt::debug!("AHRS Fusion resetting");
+        rprintln!("AHRS Fusion resetting");
         // self.offset.reset();
         self.quat = UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0));
         self.altitude = 0.0;
@@ -151,7 +159,8 @@ impl AHRS for AhrsFusion {
         /// converge on good quat over 3 seconds
         if self.initializing {
             // rprintln!("initializing");
-            self.ramped_gain -= self.ramped_gain * self.delta_time;
+            self.ramped_gain -= self.ramped_gain_step * self.delta_time;
+            // rprintln!("initializing, ramped_gain = {:?}", self.ramped_gain);
             if self.ramped_gain < self.cfg_gain {
                 rprintln!("AhrsFusion: initializing complete");
                 self.ramped_gain = self.cfg_gain;
@@ -160,25 +169,30 @@ impl AHRS for AhrsFusion {
             }
         }
 
-        // /// Calculate direction of gravity indicated by algorithm
-        // /// third column of transposed rotation matrix scaled by 0.5
-        // let half_gravity = {
-        //     let q = self.quat.coords;
-        //     V3::new(
-        //         q.x * q.z - q.w * q.y,
-        //         q.w * q.x + q.y * q.z,
-        //         q.w * q.w - 0.5 + q.z * q.z,
-        //     )
-        // };
+        /// Calculate direction of gravity indicated by algorithm
+        /// third column of transposed rotation matrix scaled by 0.5
+        let half_gravity = {
+            let q = self.quat.coords;
+            V3::new(
+                q.x * q.z - q.w * q.y,
+                q.w * q.x + q.y * q.z,
+                q.w * q.w - 0.5 + q.z * q.z,
+            )
+        };
 
         // print_v3("half_gravity = ", half_gravity, 4);
         // print_v3("acc          = ", acc * 0.5, 4);
         // print_v3("diff         = ", acc * 0.5 - half_gravity, 4);
         // rprintln!("diff.mag = {:?}", (acc * 0.5 - half_gravity).magnitude());
 
-        /// equal to 3rd column of rotation matrix representation scaled by 0.5
-        let half_gravity = self.quat.to_rotation_matrix().matrix().column(2) * 0.5;
-        // rprintln!("half_gravity2 = {:?}", half_gravity2);
+        // /// equal to 3rd column of rotation matrix representation scaled by 0.5
+        // let half_grav2 = self.quat.to_rotation_matrix().matrix().transpose()
+        //     .column(2) * 0.5;
+
+        // rprintln!("half_gravity  = {:?}", defmt::Debug2Format(&half_gravity));
+        // rprintln!("half_gravity2 = {:?}", defmt::Debug2Format(&half_gravity2));
+
+        // assert_eq!(half_gravity, half_gravity2);
 
         let mut half_acc_feedback = V3::zeros();
         self.acc_ignored = true;
@@ -246,12 +260,12 @@ impl AHRS for AhrsFusion {
             // let h = q * (Quaternion::from_parts(0.0, mag) * q.conjugate());
             // let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
 
-            // rprintln!("half_west = {:?}", half_west);
-            // rprintln!("b         = {:?}", b);
+            // /// equal to 2nd column of rotation matrix representation scaled by 0.5
+            // let half_west2 = self.quat.to_rotation_matrix().matrix().transpose()
+            //     .column(1) * 0.5;
 
-            /// equal to 2nd column of rotation matrix representation scaled by 0.5
-            let half_west = self.quat.to_rotation_matrix().matrix().column(1) * 0.5;
-            // rprintln!("half_west2 = {:?}", half_west2);
+            // rprintln!("half_west  = {:?}", defmt::Debug2Format(&half_west));
+            // rprintln!("half_west2 = {:?}", defmt::Debug2Format(&half_west2));
 
             // Calculate magnetometer feedback scaled by 0.5
             self.half_mag_feedback =
