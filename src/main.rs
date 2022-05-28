@@ -415,40 +415,40 @@ mod app {
                 motor_outputs.apply(motors);
 
                 let (roll, pitch, yaw) = fd.get_euler_angles();
-                rprintln!(
-                    "(r,p,y) = {:?}, {:?}, {:?}",
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
-                );
+
+                // rprintln!(
+                //     "(r,p,y) = {:?}, {:?}, {:?}",
+                //     r(rad_to_deg(roll)),
+                //     r(rad_to_deg(pitch)),
+                //     r(rad_to_deg(yaw)),
+                // );
 
                 use na::{ComplexField, RealField};
                 let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
 
-                fn f(x: f32) -> f32 {
-                    (x * 10.0).round() / 10.0
-                }
+                let xh = mag.x * pitch.cos() + mag.y * pitch.sin() * roll.sin()
+                    - mag.z * roll.cos() * pitch.sin();
+                let yh = mag.y * roll.cos() + mag.z * roll.sin();
+
+                let heading2 = rad_to_deg(f32::atan2(yh, xh));
+                rprintln!("heading  = {:?}\nheading2 = {:?}", heading, heading2);
+                // rprintln!("heading2 = {:?}", heading2);
+
+                // let q = fd.quat.as_ref();
+
+                // use na::{Quaternion, Vector2};
+                // let h = q * (Quaternion::from_parts(0.0, mag) * q.conjugate());
+                // let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
+                // let b = UQuat::from_quaternion(b);
+
+                // fn f(x: f32) -> f32 {
+                //     (x * 10.0).round() / 10.0
+                // }
 
                 // rprintln!(
                 //     "heading = {=f32:04}, yaw = {=f32:04}",
                 //     f(heading),
                 //     f(rad_to_deg(yaw))
-                // );
-
-                // fn f(x: f32) -> (i32, u32) {
-                //     let x = (x * 10.0).round() as i32;
-                //     let d = x % 10;
-                //     let x = x / 10;
-                //     (x, d as u32)
-                // }
-                // let heading = f(heading);
-                // let yaw = f(yaw);
-                // rprintln!(
-                //     "heading = {=i32}.{=u32}, yaw = {=i32}.{=u32}",
-                //     heading.0,
-                //     heading.1,
-                //     yaw.0,
-                //     yaw.1
                 // );
 
                 *tim9_flag = true;
