@@ -17,6 +17,11 @@ pub struct AhrsExtKalman {
     gain: f32,
 
     pp: Mat4,
+
+    /// Gravitational Reference Vector
+    a_ref: V3,
+    /// Magnetic Reference Vector, normalized
+    m_ref: V3,
 }
 
 /// new
@@ -30,32 +35,124 @@ impl AhrsExtKalman {
             gain,
 
             pp: Mat4::identity(),
+
+            /// NED
+            a_ref: V3::new(0.0, 0.0, -9.81),
+            m_ref: V3::zeros(),
         }
+    }
+    pub fn set_mag_ref(&mut self, m_ref: V3) {
+        self.m_ref = m_ref.normalize();
     }
 }
 
 /// omega, dfdq, dhdq, f, h
 impl AhrsExtKalman {
     fn omega(x: V3) -> Mat4 {
-        unimplemented!()
+        Mat4::from([
+            [0.0, -x[0], -x[1], -x[2]],
+            [x[0], 0.0, x[2], -x[1]],
+            [x[1], -x[2], 0.0, x[0]],
+            [x[2], x[1], -x[0], 0.0],
+        ])
     }
 
+    /// omega: Angular velocity in rad/s.
+    /// dt: Time step, in seconds, between consecutive Quaternions.
     fn dfdq(omega: V3, dt: f32) -> Mat4 {
-        unimplemented!()
+        let x = 0.5 * dt * omega;
+        Mat4::identity() + Self::omega(x)
     }
 
-    fn dhdq(quat: UQuat, normal_mode: bool) -> na::Matrix6x4<f32> {
-        unimplemented!()
+    fn dhdq(&self, quat: UQuat, normal_mode: bool) -> na::Matrix6x4<f32> {
+        if !normal_mode {
+            panic!();
+        }
+
+        let v = na::Vector6::new(
+            self.a_ref.x,
+            self.a_ref.y,
+            self.a_ref.z,
+            self.m_ref.x,
+            self.m_ref.y,
+            self.m_ref.z,
+        );
+
+        let q = quat.coords;
+
+        let hh = na::Matrix4x6::from([
+            [
+                -q.x * v[2] + q.x * v[1],
+                q.x * v[1] + q.x * v[2],
+                -q.x * v[2] + q.x * v[1] - 2.0 * q.x * v[0],
+                q.x * v[1] + q.x * v[2] - 2.0 * q.x * v[0],
+            ],
+            [
+                q.x * v[2] - q.x * v[0],
+                q.x * v[2] - 2.0 * q.x * v[1] + q.x * v[0],
+                q.x * v[0] + q.x * v[2],
+                -q.x * v[0] + q.x * v[2] - 2.0 * q.x * v[1],
+            ],
+            [
+                -q.x * v[1] + q.x * v[0],
+                -q.x * v[1] - 2.0 * q.x * v[2] + q.x * v[0],
+                q.x * v[0] - 2.0 * q.x * v[2] + q.x * v[1],
+                q.x * v[0] + q.x * v[1],
+            ],
+            [
+                -q.x * v[5] + q.x * v[4],
+                q.x * v[4] + q.x * v[5],
+                -q.x * v[5] + q.x * v[4] - 2.0 * q.x * v[3],
+                q.x * v[4] + q.x * v[5] - 2.0 * q.x * v[3],
+            ],
+            [
+                q.x * v[5] - q.x * v[3],
+                q.x * v[5] - 2.0 * q.x * v[4] + q.x * v[3],
+                q.x * v[3] + q.x * v[5],
+                -q.x * v[3] + q.x * v[5] - 2.0 * q.x * v[4],
+            ],
+            [
+                -q.x * v[4] + q.x * v[3],
+                -q.x * v[4] - 2.0 * q.x * v[5] + q.x * v[3],
+                q.x * v[3] - 2.0 * q.x * v[5] + q.x * v[4],
+                q.x * v[3] + q.x * v[4],
+            ],
+        ]);
+
+        2.0 * hh.transpose()
     }
 
-    fn f(quat: UQuat, omega: V3, dt: f32) -> Mat4 {
-        unimplemented!()
+    fn f(quat: UQuat, omega: V3, dt: f32) -> UQuat {
+        let omega_t = Self::omega(omega);
+        let m: Mat4 = Mat4::identity() + 0.5 * dt * omega_t;
+        let x = m * quat.coords;
+        UQuat::from_quaternion(Quaternion::from(x))
     }
 
     // fn h(quat: UQuat) -> (V3, V3) {
-    fn h(quat: UQuat) -> na::Vector6<f32> {
-        unimplemented!()
+    fn h(&self, quat: UQuat) -> na::Vector6<f32> {
+        // gx(0.5−q2y−q2z)+gy(qwqz+qxqy)+gz(qxqz−qwqy)
+        // gx(qxqy−qwqz)+gy(0.5−q2x−q2z)+gz(qwqx+qyqz)
+        // gx(qwqy+qxqz)+gy(qyqz−qwqx)+gz(0.5−q2x−q2y)
+        // rx(0.5−q2y−q2z)+ry(qwqz+qxqy)+rz(qxqz−qwqy)
+        // rx(qxqy−qwqz)+ry(0.5−q2x−q2z)+rz(qwqx+qyqz)
+        // rx(qwqy+qxqz)+ry(qyqz−qwqx)+rz(0.5−q2x−q2y)
+
+        let c = quat.to_rotation_matrix().transpose();
+
+        let a = c * self.a_ref;
+        let m = c * self.m_ref;
+
+        na::Vector6::new(
+            a.x, a.y, a.z, //
+            m.x, m.y, m.z, //
+        )
     }
+
+    // /// Direction Cosine Matrix from given quaternion.
+    // fn q2r(q: UQuat) -> () {
+    //     unimplemented!()
+    // }
 }
 
 impl AHRS for AhrsExtKalman {
@@ -64,6 +161,7 @@ impl AHRS for AhrsExtKalman {
 
         /// Predicted State
         let q_t = Self::f(self.quat, gyro, self.delta_time);
+
         /// Linearized Fundamental Matrix
         let f = Self::dfdq(gyro, self.delta_time);
 
@@ -97,13 +195,13 @@ impl AHRS for AhrsExtKalman {
 
         /// Expected Measurement function
         // let (y_acc, y_mag) = Self::h(self.quat);
-        let y: na::Vector6<f32> = Self::h(self.quat);
+        let y: na::Vector6<f32> = self.h(q_t);
 
         /// Innovation (Measurement Residual)
         let v: na::Vector6<f32> = z - y;
 
         /// Linearized Measurement Matrix
-        let hh: na::Matrix6x4<f32> = Self::dhdq(self.quat, true);
+        let hh: na::Matrix6x4<f32> = self.dhdq(q_t, true);
 
         // TODO: self.rr
         /// Measurement Prediction Covariance

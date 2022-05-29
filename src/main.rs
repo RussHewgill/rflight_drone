@@ -253,6 +253,13 @@ mod app {
             3.117466,
         );
 
+        /// NED
+        ahrs.ahrs.set_mag_ref(V3::new(
+            17611.0, //
+            5026.6,  //
+            50522.0, //
+        ));
+
         // /// complementary
         // let gain = 0.1;
         // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32), gain);
@@ -268,14 +275,9 @@ mod app {
         //     core::mem::size_of::<PID>()
         // );
 
-        // rprintln!(
-        //     "core::mem::size_of::<DroneController>() = {:?}",
-        //     core::mem::size_of::<DroneController>()
-        // );
-
-        /// start timer
-        tim3.start(sensor_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start timer
+        // tim3.start(sensor_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -301,7 +303,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -508,16 +510,20 @@ mod app {
                 let acc = sd.imu_acc.read_and_reset();
                 let mag = sd.magnetometer.read_and_reset();
 
+                // print_v3("mag   = ", mag, 6);
+                // print_v3("mag_n = ", mag.normalize(), 6);
+                // print_v3("m_ref = ", m_ref.normalize(), 6);
+
                 ahrs.update(gyro, acc, mag);
 
                 /// update FlightData
                 fd.update(ahrs);
 
-                /// update PIDs
-                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+                // /// update PIDs
+                // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
 
-                /// apply mixed PID outputs to motors
-                motor_outputs.apply(motors);
+                // /// apply mixed PID outputs to motors
+                // motor_outputs.apply(motors);
 
                 let (roll, pitch, yaw) = fd.get_euler_angles();
                 rprintln!(
