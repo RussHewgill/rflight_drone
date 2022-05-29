@@ -7,7 +7,8 @@ use super::{Rot3, UQuat, AHRS, V3};
 use crate::{math::*, utils::print_v3};
 use defmt::println as rprintln;
 
-pub use self::{calibration::*, offset::*};
+pub use self::calibration::*;
+use self::offset::FusionOffset;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AhrsFusion {
@@ -57,8 +58,8 @@ impl AhrsFusion {
         // let step = (Self::INITIAL_GAIN - gain) / Self::INIT_PERIOD;
         // rprintln!("step = {:?}", step);
 
-        let mut offset = FusionOffset::default();
-        offset.init(sample_rate);
+        // let mut offset = FusionOffset::default();
+        let offset = FusionOffset::init(sample_rate);
 
         let calibration = FusionCalibration::new(delta_time);
 
@@ -514,7 +515,7 @@ mod calibration {
     }
 }
 
-mod offset {
+pub mod offset {
     use core::f32::consts::PI;
 
     use fugit::HertzU32;
@@ -541,14 +542,16 @@ mod offset {
         /// Threshold in degrees / second
         const THRESHOLD: f32 = 3.0;
 
-        pub fn init(&mut self, sample_rate: HertzU32) {
-            self.filter_coef =
+        pub fn init(sample_rate: HertzU32) -> Self {
+            let mut out = Self::default();
+            out.filter_coef =
                 2.0 * PI * Self::CUTOFF_FREQ * (1.0 / sample_rate.raw() as f32);
             // rprintln!("self.filter_coef = {:?}", self.filter_coef);
-            self.timeout = Self::TIMEOUT * sample_rate.raw();
+            out.timeout = Self::TIMEOUT * sample_rate.raw();
             // rprintln!("self.timeout = {:?}", self.timeout);
-            self.timer = 0;
-            self.gyro_offset = V3::zeros();
+            out.timer = 0;
+            out.gyro_offset = V3::zeros();
+            out
         }
 
         pub fn update(&mut self, gyro: V3) -> V3 {
@@ -588,6 +591,7 @@ mod offset {
 }
 
 // #[cfg(feature = "nope")]
+#[cfg(feature = "nope")]
 mod mag_offset {
     use core::f32::consts::PI;
 

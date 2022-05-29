@@ -127,7 +127,8 @@ mod app {
         dwt:           Dwt,
         exti:          EXTI,
         // ahrs:        AhrsComplementary,
-        ahrs:          AhrsFusion,
+        // ahrs:          AhrsFusion,
+        ahrs:          AhrsController<AhrsExtKalman>,
         // ahrs:        AhrsMadgwick,
         sens_data:     SensorData,
         flight_data:   FlightData,
@@ -224,14 +225,27 @@ mod app {
         //     pid_throttle,
         // );
 
-        /// Fusion
-        let mut ahrs = AhrsFusion::new(
+        // /// Fusion
+        // let mut ahrs = AhrsFusion::new(
+        //     sensor_period,
+        //     // 0.5,
+        //     7.5,
+        // );
+        // ahrs.cfg_acc_rejection = 10.0;
+        // ahrs.cfg_mag_rejection = 20.0;
+        // ahrs.calibration.hard_iron_offset = V3::new(
+        //     -5.1751766, //
+        //     -0.5539105, //
+        //     3.117466,
+        // );
+
+        /// Kalman
+        let mut ahrs_kalman = AhrsExtKalman::new(
             sensor_period,
-            // 0.5,
-            7.5,
+            0.5, // XXX: ???
         );
-        ahrs.cfg_acc_rejection = 10.0;
-        ahrs.cfg_mag_rejection = 20.0;
+
+        let mut ahrs = AhrsController::new(ahrs_kalman, sensor_period);
 
         ahrs.calibration.hard_iron_offset = V3::new(
             -5.1751766, //
@@ -294,12 +308,14 @@ mod app {
         (shared, local, init::Monotonics(mono))
     }
 
-    #[task(
-        binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
-        local = [tim3, sensors],
-        priority = 4
-    )]
+    /// fusion
+    #[cfg(feature = "nope")]
+    // #[task(
+    //     binds = TIM3,
+    //     shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
+    //     local = [tim3, sensors],
+    //     priority = 4
+    // )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
         cx.local
             .tim3
@@ -431,12 +447,12 @@ mod app {
                 // let heading2 =
                 // let heading2 = rad_to_deg()
 
-                rprintln!(
-                    "yaw = {:?}\nheading  = {:?}\nheading2 = {:?}",
-                    rad_to_deg(yaw),
-                    heading,
-                    heading2
-                );
+                // rprintln!(
+                //     "yaw = {:?}\nheading  = {:?}\nheading2 = {:?}",
+                //     rad_to_deg(yaw),
+                //     heading,
+                //     heading2
+                // );
 
                 // let q = fd.quat.as_ref();
 
@@ -457,6 +473,61 @@ mod app {
 
                 *tim9_flag = true;
                 // rprintln!("timer_sensors lock 1");
+            });
+    }
+
+    #[task(
+        binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
+        local = [tim3, sensors],
+        priority = 4
+    )]
+    fn timer_sensors(mut cx: timer_sensors::Context) {
+        cx.local
+            .tim3
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+
+        /// update sensors, ahrs
+        (
+            cx.shared.ahrs,
+            cx.shared.sens_data,
+            cx.shared.flight_data,
+            cx.shared.tim9_flag,
+            cx.shared.motors,
+            cx.shared.inputs,
+            cx.shared.controller,
+        )
+            .lock(|ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
+                /// Read sensor data
+                cx.local.sensors.read_data_mag(sd);
+                cx.local.sensors.read_data_imu(sd, false);
+                cx.local.sensors.read_data_baro(sd);
+
+                /// update AHRS
+                let gyro = sd.imu_gyro.read_and_reset();
+                let acc = sd.imu_acc.read_and_reset();
+                let mag = sd.magnetometer.read_and_reset();
+
+                ahrs.update(gyro, acc, mag);
+
+                /// update FlightData
+                fd.update(ahrs);
+
+                /// update PIDs
+                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+
+                /// apply mixed PID outputs to motors
+                motor_outputs.apply(motors);
+
+                let (roll, pitch, yaw) = fd.get_euler_angles();
+                rprintln!(
+                    "(r,p,y) = {:?}, {:?}, {:?}",
+                    r(rad_to_deg(roll)),
+                    r(rad_to_deg(pitch)),
+                    r(rad_to_deg(yaw)),
+                );
+
+                *tim9_flag = true;
             });
     }
 

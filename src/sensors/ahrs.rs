@@ -1,3 +1,4 @@
+use fugit::HertzU32;
 // use ahrs::{Ahrs, Madgwick};
 use nalgebra::{Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
@@ -10,6 +11,7 @@ use defmt::println as rprintln;
 
 use super::{Rot3, UQuat, V3};
 
+pub use self::calibration::*;
 pub use self::complementary::*;
 pub use self::fusion::*;
 pub use self::kalman::*;
@@ -21,6 +23,61 @@ pub trait AHRS {
     fn get_quat(&self) -> &UQuat;
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct AhrsController<A: AHRS> {
+    pub ahrs: A,
+
+    pub calibration: SensorCalibration,
+}
+
+/// new, update
+impl<A: AHRS> AhrsController<A> {
+    pub fn new(ahrs: A, sample_rate: HertzU32) -> Self {
+        Self {
+            ahrs,
+            calibration: SensorCalibration::init(sample_rate),
+        }
+    }
+
+    pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+        let gyro = self.calibration.offset.update(gyro);
+        let mag = self.calibration.calibrate_mag(mag);
+
+        self.ahrs.update(gyro, acc, mag);
+    }
+}
+
+mod calibration {
+    use fugit::HertzU32;
+
+    use crate::sensors::V3;
+
+    use super::offset::FusionOffset;
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct SensorCalibration {
+        pub offset: FusionOffset,
+
+        pub hard_iron_offset: V3,
+    }
+
+    /// init
+    impl SensorCalibration {
+        pub fn init(sample_rate: HertzU32) -> Self {
+            Self {
+                offset:           FusionOffset::init(sample_rate),
+                hard_iron_offset: V3::zeros(),
+            }
+        }
+    }
+
+    impl SensorCalibration {
+        pub fn calibrate_mag(&self, mag: V3) -> V3 {
+            mag - self.hard_iron_offset
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct FlightData {
     /// Rotation using North-West-Up convention
@@ -28,9 +85,14 @@ pub struct FlightData {
 }
 
 impl FlightData {
-    pub fn update<T: AHRS>(&mut self, ahrs: &T) {
-        self.quat = *ahrs.get_quat();
+    // pub fn update<T: AHRS>(&mut self, ahrs: &T) {
+    //     self.quat = *ahrs.get_quat();
+    // }
+
+    pub fn update<A: AHRS>(&mut self, ahrs: &AhrsController<A>) {
+        self.quat = *ahrs.ahrs.get_quat();
     }
+
     /// roll, pitch, yaw
     pub fn get_euler_angles(&self) -> (f32, f32, f32) {
         self.quat.euler_angles()
