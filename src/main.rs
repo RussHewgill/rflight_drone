@@ -126,9 +126,9 @@ mod app {
     struct Shared {
         dwt:           Dwt,
         exti:          EXTI,
-        // ahrs:        AhrsComplementary,
+        ahrs:          AhrsController<AhrsComplementary>,
         // ahrs:          AhrsFusion,
-        ahrs:          AhrsController<AhrsExtKalman>,
+        // ahrs:          AhrsController<AhrsExtKalman>,
         // ahrs:        AhrsMadgwick,
         sens_data:     SensorData,
         flight_data:   FlightData,
@@ -239,13 +239,17 @@ mod app {
         //     3.117466,
         // );
 
-        /// Kalman
-        let mut ahrs_kalman = AhrsExtKalman::new(
-            sensor_period,
-            0.5, // XXX: ???
-        );
+        // /// Kalman
+        // let mut ahrs_alg = AhrsExtKalman::new(
+        //     sensor_period,
+        //     0.5, // XXX: ???
+        // );
 
-        let mut ahrs = AhrsController::new(ahrs_kalman, sensor_period);
+        /// complementary
+        let gain = 0.1;
+        let ahrs_alg = AhrsComplementary::new(sensor_period, gain);
+
+        let mut ahrs = AhrsController::new(ahrs_alg, sensor_period);
 
         ahrs.calibration.hard_iron_offset = V3::new(
             -5.1751766, //
@@ -253,16 +257,12 @@ mod app {
             3.117466,
         );
 
-        /// NED
-        ahrs.ahrs.set_mag_ref(V3::new(
-            17611.0, //
-            5026.6,  //
-            50522.0, //
-        ));
-
-        // /// complementary
-        // let gain = 0.1;
-        // let ahrs = AhrsComplementary::new(1.0 / (sensor_period.raw() as f32), gain);
+        // /// NED
+        // ahrs.ahrs.set_mag_ref(V3::new(
+        //     17611.0, //
+        //     5026.6,  //
+        //     50522.0, //
+        // ));
 
         // /// Madgwick
         // let ahrs = AhrsMadgwick::new(1.0 / (sensor_period.raw() as f32), 40.0);
@@ -275,9 +275,63 @@ mod app {
         //     core::mem::size_of::<PID>()
         // );
 
-        // /// start timer
-        // tim3.start(sensor_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // let x = [
+        //     [
+        //         2.7047464e22,
+        //         2.7049155e22,
+        //         -3.2639588e19,
+        //         -1.0439563e21,
+        //         -1.1739202e21,
+        //         -1.15805125e21,
+        //     ],
+        //     [
+        //         9.5763435e22,
+        //         9.57694e22,
+        //         -1.1556275e20,
+        //         -3.6961988e21,
+        //         -4.156345e21,
+        //         -4.1001607e21,
+        //     ],
+        //     [
+        //         -1.915943e23,
+        //         -1.9160624e23,
+        //         2.3120689e20,
+        //         7.3950007e21,
+        //         8.3156175e21,
+        //         8.203209e21,
+        //     ],
+        //     [
+        //         -8.078624e20,
+        //         -8.079129e20,
+        //         9.748889e17,
+        //         3.1181213e19,
+        //         3.5063017e19,
+        //         3.4589035e19,
+        //     ],
+        //     [
+        //         -1.1207773e22,
+        //         -1.1208471e22,
+        //         1.3525009e19,
+        //         4.3258848e20,
+        //         4.864422e20,
+        //         4.798666e20,
+        //     ],
+        //     [
+        //         1.5305465e22,
+        //         1.5306419e22,
+        //         -1.8469909e19,
+        //         -5.9074786e20,
+        //         -6.6429115e20,
+        //         -6.553114e20,
+        //     ],
+        // ];
+        // let m = na::Matrix6::from(x).transpose();
+        // let m2 = m.try_inverse();
+        // rprintln!("m2 = {:?}", defmt::Debug2Format(&m2));
+
+        /// start timer
+        tim3.start(sensor_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let shared = Shared {
             dwt,
@@ -510,6 +564,13 @@ mod app {
                 let acc = sd.imu_acc.read_and_reset();
                 let mag = sd.magnetometer.read_and_reset();
 
+                // let m_ref = V3::new(
+                //     17611.0, //
+                //     5026.6,  //
+                //     50522.0, //
+                // );
+
+                // let mag = mag - ahrs.calibration.hard_iron_offset;
                 // print_v3("mag   = ", mag, 6);
                 // print_v3("mag_n = ", mag.normalize(), 6);
                 // print_v3("m_ref = ", m_ref.normalize(), 6);

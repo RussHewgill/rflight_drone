@@ -47,6 +47,7 @@ impl AhrsExtKalman {
 }
 
 /// omega, dfdq, dhdq, f, h
+#[cfg(feature = "nope")]
 impl AhrsExtKalman {
     fn omega(x: V3) -> Mat4 {
         Mat4::from([
@@ -155,6 +156,22 @@ impl AhrsExtKalman {
     // }
 }
 
+impl AhrsExtKalman {
+    fn update_strapdown_equations_NED(&mut self) {
+        unimplemented!()
+    }
+}
+
+impl AHRS for AhrsExtKalman {
+    fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+        unimplemented!()
+    }
+    fn get_quat(&self) -> &UQuat {
+        &self.quat
+    }
+}
+
+#[cfg(feature = "nope")]
 impl AHRS for AhrsExtKalman {
     fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
         /// * Prediction
@@ -208,16 +225,23 @@ impl AHRS for AhrsExtKalman {
         // let ss = h * pp_t * hh.transpose() + self.rr;
         let ss: na::Matrix6<f32> = hh * pp_t * hh.transpose();
 
+        let ss2 = if let Some(m) = ss.try_inverse() {
+            m
+        } else {
+            // ss.try_inverse().unwrap()
+            rprintln!("can't invert ss = {:?}", defmt::Debug2Format(&ss));
+            return;
+        };
+
         /// Kalman Gain
-        let kk: na::Matrix4x6<f32> = pp_t * hh.transpose() * ss.try_inverse().unwrap();
+        // let kk: na::Matrix4x6<f32> = pp_t * hh.transpose() * ss.try_inverse().unwrap();
+        let kk: na::Matrix4x6<f32> = pp_t * hh.transpose() * ss2;
 
         self.pp = (Mat4::identity() - kk * hh) * pp_t;
 
-        // let q = q_t + kk * v;
+        // let q = q_t.coords + kk * v;
 
-        // self.quat =
-
-        unimplemented!()
+        self.quat = UQuat::from_quaternion(q_t.as_ref() + Quaternion::from(kk * v));
     }
 
     fn get_quat(&self) -> &UQuat {

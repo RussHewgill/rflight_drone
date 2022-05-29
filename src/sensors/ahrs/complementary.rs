@@ -1,3 +1,4 @@
+use fugit::HertzU32;
 use nalgebra::{
     self as na, ComplexField, Quaternion, RealField, Rotation3, UnitQuaternion, Vector2,
     Vector3,
@@ -10,14 +11,14 @@ use defmt::println as rprintln;
 #[derive(Debug, Clone, Copy)]
 pub struct AhrsComplementary {
     quat:           UQuat,
-    // delta_time: f32,
     pub delta_time: f32,
     gain:           f32,
 }
 
 /// new
 impl AhrsComplementary {
-    pub fn new(delta_time: f32, gain: f32) -> Self {
+    pub fn new(sample_rate: HertzU32, gain: f32) -> Self {
+        let delta_time = 1.0 / (sample_rate.to_Hz() as f32);
         Self {
             quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
             delta_time,
@@ -36,6 +37,7 @@ impl AHRS for AhrsComplementary {
         self.quat = UQuat::from_euler_angles(roll, pitch, 0.0);
     }
 
+    #[cfg(feature = "nope")]
     fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
         let q_omega = self.attitude_propagation(gyro);
 
@@ -65,11 +67,26 @@ impl AHRS for AhrsComplementary {
         self.quat = q_omega;
     }
 
+    fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+        let q_omega = self.attitude_propagation(gyro);
+
+        let q_am = self.am_estimation(acc, mag);
+
+        let q = if (q_omega.coords + q_am.coords).norm() < f32::sqrt(2.0) {
+            (1.0 - self.gain) * q_omega.coords - self.gain * q_am.coords
+        } else {
+            (1.0 - self.gain) * q_omega.coords + self.gain * q_am.coords
+        };
+
+        self.quat = UQuat::from_quaternion(q.into());
+    }
+
     fn get_quat(&self) -> &UQuat {
         &self.quat
     }
 }
 
+/// attitude_propagation, am_estimation
 impl AhrsComplementary {
     pub fn attitude_propagation(&self, gyro: V3) -> UQuat {
         let w: V3 = -0.5 * self.delta_time * gyro;
@@ -87,6 +104,25 @@ impl AhrsComplementary {
         UQuat::from_quaternion(q_omega)
     }
 
+    pub fn am_estimation(&self, acc: V3, mag: V3) -> UQuat {
+        // let na = acc.normalize();
+        let nm = mag.normalize();
+
+        let r_z = acc.normalize();
+
+        let r_y = r_z.cross(&nm).normalize();
+        let r_x = r_y.cross(&r_z).normalize();
+
+        let r = na::Matrix3::from([
+            [r_x.x, r_x.y, r_x.z],
+            [r_y.x, r_y.y, r_y.z],
+            [r_z.x, r_z.y, r_z.z],
+        ]);
+
+        UQuat::from_rotation_matrix(&na::Rotation3::from_matrix(&r))
+    }
+
+    #[cfg(feature = "nope")]
     pub fn am_estimation(&self, acc: V3, mag: V3) -> UQuat {
         // m /= np.linalg.norm(m)
 

@@ -40,7 +40,8 @@ impl<A: AHRS> AhrsController<A> {
     }
 
     pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
-        let gyro = self.calibration.offset.update(gyro);
+        /// XXX: ??
+        // let gyro = self.calibration.offset.update(gyro);
         let mag = self.calibration.calibrate_mag(mag);
 
         self.ahrs.update(gyro, acc, mag);
