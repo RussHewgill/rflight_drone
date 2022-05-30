@@ -7,7 +7,7 @@ use super::{Rot3, UQuat, AHRS, V3};
 use crate::{math::*, utils::print_v3};
 use defmt::println as rprintln;
 
-pub use self::calibration::*;
+// pub use self::calibration::*;
 use super::offset::FusionOffset;
 
 #[derive(Debug, Clone, Copy)]
@@ -156,6 +156,8 @@ impl AhrsFusion {
 
 impl AHRS for AhrsFusion {
     fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+        // let mag = mag.normalize();
+
         /// converge on good quat over 3 seconds
         if self.initializing {
             // rprintln!("initializing");
@@ -225,6 +227,9 @@ impl AHRS for AhrsFusion {
         /// Calculate magnetometer feedback
         if mag != V3::zeros() {
             self.mag_rejection_timeout = false;
+
+            /// XXX: is this needed?
+            // let mag = mag.normalize();
 
             /// TODO: tilt-compensate mag ??
 
@@ -366,6 +371,7 @@ impl AhrsFusion {
     // }
 }
 
+#[cfg(feature = "nope")]
 mod calibration {
     use nalgebra::{self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 

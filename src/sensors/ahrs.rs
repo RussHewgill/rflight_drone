@@ -140,7 +140,7 @@ pub mod offset {
                 return gyro;
             }
 
-            // rprintln!("Adjusting gyro offset");
+            rprintln!("Adjusting gyro offset");
             // Adjust offset if timer has elapsed
             self.gyro_offset += gyro * self.filter_coef;
 
