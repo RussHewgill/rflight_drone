@@ -234,7 +234,8 @@ mod app {
         // let ahrs_alg = AhrsComplementary::new(sensor_period, gain);
 
         // /// Madgwick
-        // let ahrs_alg = AhrsMadgwick::new(sensor_period, 40.0);
+        // let beta = 40.0; // XXX: ??
+        // let ahrs_alg = AhrsMadgwick::new(sensor_period, beta);
 
         // /// Mahony
         // let ahrs_alg = AhrsMahony::new(sensor_period);

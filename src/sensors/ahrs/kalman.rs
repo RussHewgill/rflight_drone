@@ -166,8 +166,8 @@ impl AHRS for AhrsExtKalman {
     fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
         unimplemented!()
     }
-    fn get_quat(&self) -> &UQuat {
-        &self.quat
+    fn get_quat(&self) -> UQuat {
+        self.quat
     }
 }
 

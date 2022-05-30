@@ -22,7 +22,7 @@ pub use self::mahony::*;
 pub trait AHRS {
     fn update(&mut self, gyro: V3, acc: V3, mag: V3);
 
-    fn get_quat(&self) -> &UQuat;
+    fn get_quat(&self) -> UQuat;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -43,7 +43,7 @@ impl<A: AHRS> AhrsController<A> {
 
     pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
         /// XXX: ???
-        let gyro = self.calibration.offset.update(gyro);
+        // let gyro = self.calibration.offset.update(gyro);
         let mag = self.calibration.calibrate_mag(mag);
 
         self.ahrs.update(gyro, acc, mag);
@@ -140,7 +140,7 @@ pub mod offset {
                 return gyro;
             }
 
-            rprintln!("Adjusting gyro offset");
+            // rprintln!("Adjusting gyro offset");
             // Adjust offset if timer has elapsed
             self.gyro_offset += gyro * self.filter_coef;
 
@@ -168,7 +168,7 @@ impl FlightData {
     // }
 
     pub fn update<A: AHRS>(&mut self, ahrs: &AhrsController<A>) {
-        self.quat = *ahrs.ahrs.get_quat();
+        self.quat = ahrs.ahrs.get_quat();
     }
 
     /// roll, pitch, yaw
@@ -537,7 +537,7 @@ mod madgwick_prev {
             let h = q * (Quaternion::from_parts(0.0, mag) * q.conjugate());
             let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
 
-            // Gradient descent algorithm corrective step
+            /// Gradient descent algorithm corrective step
             let f = Vector6::new(
                 2.0 * (q[0] * q[2] - q[3] * q[1]) - acc[0],
                 2.0 * (q[3] * q[0] + q[1] * q[2]) - acc[1],
@@ -606,8 +606,8 @@ mod madgwick_prev {
             // Some(&self.quat)
         }
 
-        fn get_quat(&self) -> &UQuat {
-            &self.quat
+        fn get_quat(&self) -> UQuat {
+            self.quat
         }
     }
 }
@@ -700,8 +700,8 @@ mod mahony {
             }
         }
 
-        fn get_quat(&self) -> &UQuat {
-            &self.quat
+        fn get_quat(&self) -> UQuat {
+            self.quat
         }
     }
 

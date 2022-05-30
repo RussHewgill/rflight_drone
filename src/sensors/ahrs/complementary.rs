@@ -81,8 +81,8 @@ impl AHRS for AhrsComplementary {
         self.quat = UQuat::from_quaternion(q.into());
     }
 
-    fn get_quat(&self) -> &UQuat {
-        &self.quat
+    fn get_quat(&self) -> UQuat {
+        self.quat
     }
 }
 

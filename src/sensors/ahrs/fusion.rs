@@ -177,7 +177,7 @@ impl AHRS for AhrsFusion {
             let q = self.quat.coords;
             V3::new(
                 q.x * q.z - q.w * q.y,
-                q.w * q.x + q.y * q.z,
+                q.y * q.z + q.w * q.x,
                 q.w * q.w - 0.5 + q.z * q.z,
             )
         };
@@ -194,7 +194,7 @@ impl AHRS for AhrsFusion {
         /// Calculate accelerometer feedback
         if acc != V3::zeros() {
             /// Enter acceleration recovery state if acceleration rejection times out
-            if self.acc_rejection_timer >= self.cfg_rejection_timeout {
+            if self.acc_rejection_timer > self.cfg_rejection_timeout {
                 rprintln!("acc recovery");
                 let q = self.quat;
                 self.reset();
@@ -229,12 +229,12 @@ impl AHRS for AhrsFusion {
             self.mag_rejection_timeout = false;
 
             /// XXX: is this needed?
-            // let mag = mag.normalize();
+            let mag = mag.normalize();
 
             /// TODO: tilt-compensate mag ??
 
             /// Set to compass heading if magnetic rejection times out
-            if self.mag_rejection_timer >= self.cfg_rejection_timeout {
+            if self.mag_rejection_timer > self.cfg_rejection_timeout {
                 rprintln!("mag timeout, setting to compass heading");
                 self.set_heading(Self::compass_calc_heading(acc, mag));
                 self.mag_rejection_timer = 0;
@@ -255,6 +255,16 @@ impl AHRS for AhrsFusion {
             // let q = self.quat.as_ref();
             // let h = q * (Quaternion::from_parts(0.0, mag) * q.conjugate());
             // let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
+
+            // let b = UQuat::from_quaternion(b);
+            // use crate::utils::r;
+            // let (roll, pitch, yaw) = b.euler_angles();
+            // rprintln!(
+            //     "(r,p,y) = {:?}, {:?}, {:?}",
+            //     r(rad_to_deg(roll)),
+            //     r(rad_to_deg(pitch)),
+            //     r(rad_to_deg(yaw)),
+            // );
 
             // /// equal to 2nd column of rotation matrix representation scaled by 0.5
             // let half_west2 = self.quat.to_rotation_matrix().matrix().transpose()
@@ -314,8 +324,8 @@ impl AHRS for AhrsFusion {
         //
     }
 
-    fn get_quat(&self) -> &UQuat {
-        &self.quat
+    fn get_quat(&self) -> UQuat {
+        self.quat.conjugate()
     }
 }
 
