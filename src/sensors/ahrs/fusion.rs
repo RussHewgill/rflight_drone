@@ -228,8 +228,15 @@ impl AHRS for AhrsFusion {
         if mag != V3::zeros() {
             self.mag_rejection_timeout = false;
 
-            /// XXX: is this needed?
-            let mag = mag.normalize();
+            // /// XXX: is this needed?
+            // let mag = mag.normalize();
+
+            #[rustfmt::skip]
+            let mag = V3::new(
+                mag.x,
+                mag.y,
+                -mag.z,
+            );
 
             /// TODO: tilt-compensate mag ??
 
@@ -293,8 +300,14 @@ impl AHRS for AhrsFusion {
         }
 
         /// Convert gyroscope to radians per second scaled by 0.5
-        let half_gyro = gyro * deg_to_rad(0.5);
+        // let half_gyro = gyro * deg_to_rad(0.5);
+        let half_gyro = gyro * 0.5 * (PI / 180.0);
         // print_v3("half_gyro  = ", half_gyro, 3);
+
+        // rprintln!(
+        //     "half_mag_feedback = {:?}",
+        //     defmt::Debug2Format(&half_mag_feedback)
+        // );
 
         /// Apply feedback to gyroscope
         let adjusted_half_gyro =
@@ -325,7 +338,8 @@ impl AHRS for AhrsFusion {
     }
 
     fn get_quat(&self) -> UQuat {
-        self.quat.conjugate()
+        // self.quat.conjugate()
+        self.quat
     }
 }
 
