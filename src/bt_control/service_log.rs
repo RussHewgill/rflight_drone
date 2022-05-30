@@ -132,25 +132,25 @@ where
             panic!("no logger?");
         };
 
-        // let mut data = [0u8; 36];
-        // /// gyro
-        // data[0..4].copy_from_slice(&gyro.x.to_be_bytes());
-        // data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
-        // data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
-        // /// acc
-        // data[12..16].copy_from_slice(&acc.x.to_be_bytes());
-        // data[16..20].copy_from_slice(&acc.y.to_be_bytes());
-        // data[20..24].copy_from_slice(&acc.z.to_be_bytes());
-        // /// mag
-        // data[24..28].copy_from_slice(&mag.x.to_be_bytes());
-        // data[28..32].copy_from_slice(&mag.y.to_be_bytes());
-        // data[32..36].copy_from_slice(&mag.z.to_be_bytes());
-
-        let mut data = [0u8; 12];
+        let mut data = [0u8; 36];
+        /// gyro
+        data[0..4].copy_from_slice(&gyro.x.to_be_bytes());
+        data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
+        data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
+        /// acc
+        data[12..16].copy_from_slice(&acc.x.to_be_bytes());
+        data[16..20].copy_from_slice(&acc.y.to_be_bytes());
+        data[20..24].copy_from_slice(&acc.z.to_be_bytes());
         /// mag
-        data[0..4].copy_from_slice(&mag.x.to_be_bytes());
-        data[4..8].copy_from_slice(&mag.y.to_be_bytes());
-        data[8..12].copy_from_slice(&mag.z.to_be_bytes());
+        data[24..28].copy_from_slice(&mag.x.to_be_bytes());
+        data[28..32].copy_from_slice(&mag.y.to_be_bytes());
+        data[32..36].copy_from_slice(&mag.z.to_be_bytes());
+
+        // let mut data = [0u8; 12];
+        // /// mag
+        // data[0..4].copy_from_slice(&mag.x.to_be_bytes());
+        // data[4..8].copy_from_slice(&mag.y.to_be_bytes());
+        // data[8..12].copy_from_slice(&mag.z.to_be_bytes());
 
         // data[36..40].copy_from_slice(&baro.to_be_bytes());
 
@@ -329,7 +329,7 @@ where
         let handle_sens = self.add_log_char(
             service.service_handle,
             UUID_LOG_SENS_CHAR,
-            18,
+            40,
             CharacteristicProperty::NOTIFY | CharacteristicProperty::READ,
             1,
         )?;

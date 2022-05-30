@@ -293,7 +293,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -495,26 +495,20 @@ mod app {
                 cx.local.sensors.read_data_imu(sd, false);
                 cx.local.sensors.read_data_baro(sd);
 
-                /// update AHRS
-                let gyro = sd.imu_gyro.read_and_reset();
-                let acc = sd.imu_acc.read_and_reset();
-                let mag = sd.magnetometer.read_and_reset();
-
-                // let m_ref = V3::new(
-                //     17611.0, //
-                //     5026.6,  //
-                //     50522.0, //
-                // );
+                // /// update AHRS
+                // let gyro = sd.imu_gyro.read_and_reset();
+                // let acc = sd.imu_acc.read_and_reset();
+                // let mag = sd.magnetometer.read_and_reset();
 
                 // let mag = mag - ahrs.calibration.hard_iron_offset;
                 // print_v3("mag   = ", mag, 6);
                 // print_v3("mag_n = ", mag.normalize(), 6);
                 // print_v3("m_ref = ", m_ref.normalize(), 6);
 
-                ahrs.update(gyro, acc, mag);
+                // ahrs.update(gyro, acc, mag);
 
-                /// update FlightData
-                fd.update(ahrs);
+                // /// update FlightData
+                // fd.update(ahrs);
 
                 // /// update PIDs
                 // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
@@ -522,13 +516,13 @@ mod app {
                 // /// apply mixed PID outputs to motors
                 // motor_outputs.apply(motors);
 
-                let (roll, pitch, yaw) = fd.get_euler_angles();
-                rprintln!(
-                    "(r,p,y) = {:?}, {:?}, {:?}",
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
-                );
+                // let (roll, pitch, yaw) = fd.get_euler_angles();
+                // rprintln!(
+                //     "(r,p,y) = {:?}, {:?}, {:?}",
+                //     r(rad_to_deg(roll)),
+                //     r(rad_to_deg(pitch)),
+                //     r(rad_to_deg(yaw)),
+                // );
 
                 *tim9_flag = true;
             });
