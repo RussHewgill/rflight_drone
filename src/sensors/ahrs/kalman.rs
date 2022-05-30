@@ -157,7 +157,7 @@ impl AhrsExtKalman {
 }
 
 impl AhrsExtKalman {
-    fn update_strapdown_equations_NED(&mut self) {
+    fn update_strapdown_equations_ned(&mut self) {
         unimplemented!()
     }
 }

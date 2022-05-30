@@ -126,10 +126,11 @@ mod app {
     struct Shared {
         dwt:           Dwt,
         exti:          EXTI,
-        ahrs:          AhrsController<AhrsComplementary>,
-        // ahrs:          AhrsFusion,
+        // ahrs:          AhrsController<AhrsComplementary>,
+        // ahrs:          AhrsController<AhrsMahony>,
+        ahrs:          AhrsController<AhrsFusion>,
         // ahrs:          AhrsController<AhrsExtKalman>,
-        // ahrs:        AhrsMadgwick,
+        // ahrs:          AhrsController<AhrsMadgwick>,
         sens_data:     SensorData,
         flight_data:   FlightData,
         bt:            BTController,
@@ -207,32 +208,15 @@ mod app {
 
         let controller = DroneController::new_default_params();
 
-        // let pid_stab_roll = PID::new(0.0, 0.0, 0.0);
-        // let pid_rate_roll = PID::new(0.0, 0.0, 0.0);
-        // let pid_stab_pitch = PID::new(0.0, 0.0, 0.0);
-        // let pid_rate_pitch = PID::new(0.0, 0.0, 0.0);
-        // let pid_stab_yaw = PID::new(0.0, 0.0, 0.0);
-        // let pid_rate_yaw = PID::new(0.0, 0.0, 0.0);
-        // let pid_throttle = PID::new(0.0, 0.0, 0.0);
+        /// Fusion
+        let mut ahrs_alg = AhrsFusion::new(
+            sensor_period,
+            // 0.5,
+            7.5,
+        );
+        ahrs_alg.cfg_acc_rejection = 10.0;
+        ahrs_alg.cfg_mag_rejection = 20.0;
 
-        // let controller = DroneController::new(
-        //     pid_stab_roll,
-        //     pid_rate_roll,
-        //     pid_stab_pitch,
-        //     pid_rate_pitch,
-        //     pid_stab_yaw,
-        //     pid_rate_yaw,
-        //     pid_throttle,
-        // );
-
-        // /// Fusion
-        // let mut ahrs = AhrsFusion::new(
-        //     sensor_period,
-        //     // 0.5,
-        //     7.5,
-        // );
-        // ahrs.cfg_acc_rejection = 10.0;
-        // ahrs.cfg_mag_rejection = 20.0;
         // ahrs.calibration.hard_iron_offset = V3::new(
         //     -5.1751766, //
         //     -0.5539105, //
@@ -245,9 +229,18 @@ mod app {
         //     0.5, // XXX: ???
         // );
 
-        /// complementary
-        let gain = 0.1;
-        let ahrs_alg = AhrsComplementary::new(sensor_period, gain);
+        // /// complementary
+        // let gain = 0.1;
+        // let ahrs_alg = AhrsComplementary::new(sensor_period, gain);
+
+        // /// Madgwick
+        // let ahrs_alg = AhrsMadgwick::new(sensor_period, 40.0);
+
+        // /// ST ahrs
+        // let ahrs_alg = AhrsST::new(sensor_period);
+
+        // /// Mahony
+        // let ahrs_alg = AhrsMahony::new(sensor_period);
 
         let mut ahrs = AhrsController::new(ahrs_alg, sensor_period);
 
@@ -264,9 +257,6 @@ mod app {
         //     50522.0, //
         // ));
 
-        // /// Madgwick
-        // let ahrs = AhrsMadgwick::new(1.0 / (sensor_period.raw() as f32), 40.0);
-
         // let interval = (((1.0 / main_period.raw() as f32) * 1000.0) as u32).millis();
         // uprintln!(uart, "interval = {:?}", interval);
 
@@ -274,60 +264,6 @@ mod app {
         //     "core::mem::size_of::<PID>() = {:?}",
         //     core::mem::size_of::<PID>()
         // );
-
-        // let x = [
-        //     [
-        //         2.7047464e22,
-        //         2.7049155e22,
-        //         -3.2639588e19,
-        //         -1.0439563e21,
-        //         -1.1739202e21,
-        //         -1.15805125e21,
-        //     ],
-        //     [
-        //         9.5763435e22,
-        //         9.57694e22,
-        //         -1.1556275e20,
-        //         -3.6961988e21,
-        //         -4.156345e21,
-        //         -4.1001607e21,
-        //     ],
-        //     [
-        //         -1.915943e23,
-        //         -1.9160624e23,
-        //         2.3120689e20,
-        //         7.3950007e21,
-        //         8.3156175e21,
-        //         8.203209e21,
-        //     ],
-        //     [
-        //         -8.078624e20,
-        //         -8.079129e20,
-        //         9.748889e17,
-        //         3.1181213e19,
-        //         3.5063017e19,
-        //         3.4589035e19,
-        //     ],
-        //     [
-        //         -1.1207773e22,
-        //         -1.1208471e22,
-        //         1.3525009e19,
-        //         4.3258848e20,
-        //         4.864422e20,
-        //         4.798666e20,
-        //     ],
-        //     [
-        //         1.5305465e22,
-        //         1.5306419e22,
-        //         -1.8469909e19,
-        //         -5.9074786e20,
-        //         -6.6429115e20,
-        //         -6.553114e20,
-        //     ],
-        // ];
-        // let m = na::Matrix6::from(x).transpose();
-        // let m2 = m.try_inverse();
-        // rprintln!("m2 = {:?}", defmt::Debug2Format(&m2));
 
         /// start timer
         tim3.start(sensor_period).unwrap();

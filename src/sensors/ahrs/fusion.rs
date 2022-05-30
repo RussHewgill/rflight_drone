@@ -19,8 +19,8 @@ pub struct AhrsFusion {
     alt_ref_temperature: f32,
     altitude:            f32,
 
-    pub offset:      FusionOffset,
-    pub calibration: FusionCalibration,
+    // pub offset: FusionOffset,
+    // pub calibration: FusionCalibration,
 
     // prev_acc: V3,
     pub cfg_gain:              f32,
@@ -59,9 +59,9 @@ impl AhrsFusion {
         // rprintln!("step = {:?}", step);
 
         // let mut offset = FusionOffset::default();
-        let offset = FusionOffset::init(sample_rate);
+        // let offset = FusionOffset::init(sample_rate);
 
-        let calibration = FusionCalibration::new(delta_time);
+        // let calibration = FusionCalibration::new(delta_time);
 
         Self {
             quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
@@ -71,9 +71,8 @@ impl AhrsFusion {
             alt_ref_temperature: 0.0,
             altitude: 0.0,
 
-            offset,
-            calibration,
-
+            // offset,
+            // calibration,
             cfg_gain: gain,
             cfg_acc_rejection: 10.0,
             cfg_mag_rejection: 20.0,

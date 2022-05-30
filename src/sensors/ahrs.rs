@@ -15,7 +15,9 @@ pub use self::calibration::*;
 pub use self::complementary::*;
 pub use self::fusion::*;
 pub use self::kalman::*;
-// pub use self::madgwick_prev::*;
+pub use self::madgwick_prev::*;
+// pub use self::st_ahrs::*;
+pub use self::mahony::*;
 
 pub trait AHRS {
     fn update(&mut self, gyro: V3, acc: V3, mag: V3);
@@ -40,7 +42,7 @@ impl<A: AHRS> AhrsController<A> {
     }
 
     pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
-        /// XXX: ??
+        /// XXX: ???
         // let gyro = self.calibration.offset.update(gyro);
         let mag = self.calibration.calibrate_mag(mag);
 
@@ -408,24 +410,28 @@ mod fusion {
     }
 }
 
-#[cfg(feature = "nope")]
+// #[cfg(feature = "nope")]
 mod madgwick_prev {
+    use core::f32::consts::PI;
+
+    use fugit::HertzU32;
     use nalgebra::{Matrix6, Quaternion, UnitQuaternion, Vector2, Vector3, Vector6};
 
     use super::{UQuat, AHRS, V3};
     use defmt::println as rprintln;
 
     pub struct AhrsMadgwick {
-        sample_period: f32,
-        beta:          f32,
-        quat:          UQuat,
+        delta_time: f32,
+        beta:       f32,
+        quat:       UQuat,
     }
 
     /// new
     impl AhrsMadgwick {
-        pub fn new(sample_period: f32, beta: f32) -> Self {
+        pub fn new(sample_rate: HertzU32, beta: f32) -> Self {
+            let delta_time = 1.0 / (sample_rate.to_Hz() as f32);
             Self {
-                sample_period,
+                delta_time,
                 beta,
                 quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
             }
@@ -513,12 +519,14 @@ mod madgwick_prev {
 
             let step = (j_t * f).normalize();
 
+            // let gyro = gyro * (PI / 180.0);
+
             // Compute rate of change for quaternion
             let q_dot = q * Quaternion::from_parts(0.0, gyro) * 0.5
                 - Quaternion::new(step[0], step[1], step[2], step[3]) * self.beta;
 
             // Integrate to yield quaternion
-            self.quat = UnitQuaternion::from_quaternion(q + q_dot * self.sample_period);
+            self.quat = UnitQuaternion::from_quaternion(q + q_dot * self.delta_time);
 
             // Some(&self.quat)
         }
@@ -527,12 +535,186 @@ mod madgwick_prev {
             &self.quat
         }
     }
+}
 
-    impl Default for AhrsMadgwick {
-        fn default() -> Self {
-            let sample_period = 1.0 / 256.0;
-            let beta = 0.1;
-            Self::new(sample_period, beta)
+mod mahony {
+    use core::f32::consts::PI;
+
+    use fugit::HertzU32;
+    use nalgebra::{
+        self as na, Matrix6, Quaternion, UnitQuaternion, Vector2, Vector3, Vector6,
+    };
+
+    use super::{UQuat, AHRS, V3};
+    use defmt::println as rprintln;
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct AhrsMahony {
+        delta_time: f32,
+        quat:       UQuat,
+
+        kp: f32,
+        ki: f32,
+
+        b: V3,
+    }
+
+    /// new
+    impl AhrsMahony {
+        pub fn new(sample_rate: HertzU32) -> Self {
+            let delta_time = 1.0 / (sample_rate.to_Hz() as f32);
+            Self {
+                delta_time,
+                quat: UQuat::default(),
+
+                kp: 0.0,
+                ki: 0.0,
+
+                b: V3::default(),
+            }
+        }
+    }
+
+    impl AHRS for AhrsMahony {
+        fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+            let acc_n = acc.norm();
+            if acc_n > 0.0 {
+                let mag_n = mag.norm();
+                if !(mag_n > 0.0) {
+                    self.update_no_mag(gyro, acc);
+                    return;
+                }
+
+                let rr = self.quat.to_rotation_matrix();
+
+                /// earth gravity normalized
+                let g_ref = V3::new(0.0, 0.0, 1.0);
+
+                /// expected gravity
+                let v_a = rr.transpose() * g_ref;
+
+                /// Rotate magnetic field to inertial frame
+                let h = rr * mag;
+
+                let v_m = rr.transpose()
+                    * V3::new(0.0, na::Vector2::new(h[0], h[1]).norm(), h[2]);
+                let v_m = v_m / v_m.norm();
+
+                /// ECF
+
+                /// Cost function (eqs. 32c and 48a)
+                let omega_mes = acc.cross(&v_a) + mag.cross(&v_m);
+
+                /// Estimated change in Gyro bias
+                let b_dot = -self.ki * omega_mes;
+
+                /// Estimated Gyro bias (eq. 48c)
+                self.b += b_dot * self.delta_time;
+
+                /// Gyro correction
+                let omega = gyro - self.b + self.kp * omega_mes;
+
+                let p = Quaternion::from_parts(0.0, omega);
+
+                let q_dot = 0.5 * self.quat.as_ref() * p;
+
+                self.quat =
+                    UQuat::from_quaternion(self.quat.as_ref() + q_dot * self.delta_time);
+
+                //
+            }
+        }
+
+        fn get_quat(&self) -> &UQuat {
+            &self.quat
+        }
+    }
+
+    impl AhrsMahony {
+        pub fn update_no_mag(&mut self, gyro: V3, acc: V3) {
+            unimplemented!()
+        }
+    }
+}
+
+#[cfg(feature = "nope")]
+mod st_ahrs {
+    use core::f32::consts::PI;
+
+    use fugit::HertzU32;
+    use nalgebra::{Matrix6, Quaternion, UnitQuaternion, Vector2, Vector3, Vector6};
+
+    use super::{UQuat, AHRS, V3};
+    use defmt::println as rprintln;
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct AhrsST {
+        delta_time: f32,
+        quat:       UQuat,
+
+        kp: f32,
+        ki: f32,
+
+        e_int: V3,
+        g:     V3,
+    }
+
+    /// new
+    impl AhrsMahony {
+        pub fn new(sample_rate: HertzU32) -> Self {
+            let delta_time = 1.0 / (sample_rate.to_Hz() as f32);
+            Self {
+                delta_time,
+                quat: UQuat::default(),
+
+                kp: 0.4, // Norm, Big = 10.0
+                ki: 0.1,
+
+                e_int: V3::default(),
+                g: V3::default(),
+            }
+        }
+    }
+
+    impl AHRS for AhrsMahony {
+        fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+            /// convert to rad/s
+            let gyro = gyro * (PI / 180.0);
+
+            let qs = self.quat.coords;
+            let (q0, q1, q2, q3) = (qs[0], qs[1], qs[2], qs[3]);
+
+            let acc_n = acc.normalize();
+
+            /// estimated direction of gravity and flux (v and w)
+            let vx = 2.0 * (q1 * q3 - q0 * q2);
+            let vy = 2.0 * (q0 * q1 + q2 * q3);
+            let vz = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
+
+            let ex = acc.y * vz - acc.z * vy;
+            let ey = acc.z * vx - acc.x * vz;
+            let ez = acc.x * vy - acc.y * vx;
+            let e = V3::new(ex, ey, ez);
+
+            /// integral error scaled integral gain
+            self.e_int = self.e_int + e * self.ki * self.delta_time;
+
+            /// adjusted gyroscope measurements
+            self.g = self.g + self.kp * e + self.e_int;
+
+            /// integrate quaternion rate and normalise
+            let half_t = 0.5 * self.delta_time;
+
+            let q0 = q0 + (-q1 * self.g.x - q2 * self.g.y - q3 * self.g.z) * half_t;
+            let q1 = q1 + (q0 * self.g.x + q2 * self.g.z - q3 * self.g.y) * half_t;
+            let q2 = q2 + (q0 * self.g.y - q1 * self.g.z + q3 * self.g.x) * half_t;
+            let q3 = q3 + (q0 * self.g.z + q1 * self.g.y - q2 * self.g.x) * half_t;
+
+            self.quat = UQuat::from_quaternion([q0, q1, q2, q3].into());
+        }
+
+        fn get_quat(&self) -> &UQuat {
+            &self.quat
         }
     }
 }
