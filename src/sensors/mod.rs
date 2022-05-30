@@ -231,17 +231,11 @@ impl Sensors {
         }) {
             //
 
-            // /// from ST firmware
-            // /// works correctly with Fusion AHRS
-            // let mag_data = V3::new(
-            //     -mag_data[1], //
-            //     mag_data[0],
-            //     mag_data[2],
-            // );
-
+            /// from ST firmware
+            /// works correctly with Fusion AHRS
             let mag_data = V3::new(
-                mag_data[1], //
-                -mag_data[0],
+                -mag_data[1], //
+                mag_data[0],
                 mag_data[2],
             );
 

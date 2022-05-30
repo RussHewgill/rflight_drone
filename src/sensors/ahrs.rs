@@ -43,7 +43,7 @@ impl<A: AHRS> AhrsController<A> {
 
     pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
         /// XXX: ???
-        // let gyro = self.calibration.offset.update(gyro);
+        let gyro = self.calibration.offset.update(gyro);
         let mag = self.calibration.calibrate_mag(mag);
 
         self.ahrs.update(gyro, acc, mag);
@@ -77,6 +77,81 @@ mod calibration {
     impl SensorCalibration {
         pub fn calibrate_mag(&self, mag: V3) -> V3 {
             mag - self.hard_iron_offset
+        }
+    }
+}
+
+pub mod offset {
+    use core::f32::consts::PI;
+
+    use fugit::HertzU32;
+    use nalgebra::{self as na, Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
+
+    use super::{Rot3, UQuat, AHRS, V3};
+    use defmt::println as rprintln;
+
+    #[derive(Debug, Default, Clone, Copy)]
+    pub struct FusionOffset {
+        filter_coef: f32,
+        timeout:     u32,
+        timer:       u32,
+        gyro_offset: V3,
+    }
+
+    impl FusionOffset {
+        /// Cutoff freq in Hz
+        const CUTOFF_FREQ: f32 = 0.02;
+
+        /// Timeout in seconds
+        const TIMEOUT: u32 = 5;
+
+        /// Threshold in degrees / second
+        const THRESHOLD: f32 = 3.0;
+
+        pub fn init(sample_rate: HertzU32) -> Self {
+            let mut out = Self::default();
+            out.filter_coef =
+                2.0 * PI * Self::CUTOFF_FREQ * (1.0 / sample_rate.raw() as f32);
+            // rprintln!("self.filter_coef = {:?}", self.filter_coef);
+            out.timeout = Self::TIMEOUT * sample_rate.raw();
+            // rprintln!("self.timeout = {:?}", self.timeout);
+            out.timer = 0;
+            out.gyro_offset = V3::zeros();
+            out
+        }
+
+        pub fn update(&mut self, gyro: V3) -> V3 {
+            let gyro = gyro - self.gyro_offset;
+
+            /// Reset timer if gyroscope not stationary
+            if gyro.x > Self::THRESHOLD
+                || gyro.y > Self::THRESHOLD
+                || gyro.z > Self::THRESHOLD
+            {
+                // rprintln!("gyro not stationary, resetting timer");
+                self.timer = 0;
+                return gyro;
+            }
+
+            /// Increment timer while gyroscope stationary
+            if self.timer < self.timeout {
+                self.timer += 1;
+                // rprintln!("gyro stationary, ticking: {:?}", self.timer);
+                return gyro;
+            }
+
+            // rprintln!("Adjusting gyro offset");
+            // Adjust offset if timer has elapsed
+            self.gyro_offset += gyro * self.filter_coef;
+
+            // rprintln!(
+            //     "offset = {=f32:08}, {=f32:08}, {=f32:08}",
+            //     self.gyro_offset.x,
+            //     self.gyro_offset.y,
+            //     self.gyro_offset.z
+            // );
+
+            gyro
         }
     }
 }

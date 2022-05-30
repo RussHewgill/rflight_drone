@@ -236,11 +236,11 @@ mod app {
         // /// Madgwick
         // let ahrs_alg = AhrsMadgwick::new(sensor_period, 40.0);
 
-        // /// ST ahrs
-        // let ahrs_alg = AhrsST::new(sensor_period);
-
         // /// Mahony
         // let ahrs_alg = AhrsMahony::new(sensor_period);
+
+        // /// ST ahrs
+        // let ahrs_alg = AhrsST::new(sensor_period);
 
         let mut ahrs = AhrsController::new(ahrs_alg, sensor_period);
 
