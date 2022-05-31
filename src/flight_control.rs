@@ -132,23 +132,60 @@ impl DroneController {
         let mut pid_altitude_stab = PID::new(0.0, 0.0, 0.0);
         let mut pid_altitude_rate = PID::new(0.0, 0.0, 0.0);
 
+        #[cfg(feature = "nope")]
         /// starting point
         {
-            pid_roll_rate.kp = 1.0;
-            pid_roll_rate.ki = 0.0;
-            pid_roll_rate.kd = 0.0;
-            pid_roll_rate.i_limit = 0.0;
+            //
+
+            // pid_roll_rate.kp = 1.0;
+            // pid_roll_rate.ki = 0.0;
+            // pid_roll_rate.kd = 0.0;
+            // pid_roll_rate.i_limit = 0.0;
 
             // pid_roll_stab.kp = 1.0;
             // pid_roll_stab.ki = 0.0;
             // pid_roll_stab.kd = 0.0;
             // pid_roll_stab.i_limit = 0.0;
 
+            pid_yaw_rate.kp = 0.002105;
+
+            pid_yaw_stab.kp = 0.474;
+
             // /// PID and roll should be the same
             // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
             // pid_roll_stab.copy_settings_to(&mut pid_pitch_stab);
 
             //
+        }
+
+        // #[cfg(feature = "nope")]
+        /// ST values, divided by 1900 (from PWM)
+        {
+            pid_roll_stab.kp = 0.001579; // kp1
+            pid_roll_stab.i_limit = 0.001053; // XXX: ST firmware says this is 5 degrees ??
+
+            pid_roll_rate.kp = 0.04211; // kp2
+            pid_roll_rate.ki = 0.04211; // ki2
+            pid_roll_rate.kd = 0.005263; // kd2
+            pid_roll_rate.i_limit = 0.01053;
+
+            // pid_pitch_stab.kp = pid_roll_stab.kp;
+            // pid_pitch_stab.ki = pid_roll_stab.ki;
+            // pid_pitch_stab.i_limit = pid_roll_stab.i_limit;
+
+            // pid_pitch_rate.kp = pid_roll_rate.kp;
+            // pid_pitch_rate.ki = pid_roll_rate.ki;
+            // pid_pitch_rate.kd = pid_roll_rate.kd;
+            // pid_pitch_rate.i_limit = pid_roll_rate.i_limit;
+
+            // pid_yaw_stab.kp = 0.002105;
+            // pid_yaw_stab.ki = 0.0;
+            // pid_yaw_stab.i_limit = 0.001053;
+
+            // pid_yaw_rate.kp = 0.4737;
+            // pid_yaw_rate.ki = 0.001579;
+            // pid_yaw_rate.kd = 0.001579;
+            // pid_yaw_rate.i_limit = 0.001053;
         }
 
         #[cfg(feature = "nope")]
@@ -304,6 +341,8 @@ impl DroneController {
         let out1_roll = self.pid_roll_rate.step(err1_roll);
         let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
         let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+
+        rprintln!("out0, out1 = {=f32:08}, {=f32:08}", out0_yaw, out1_yaw);
 
         // rprintln!(
         //     "out1_roll, out1_pitch, out1_yaw = {:?}, {:?}, {:?}",

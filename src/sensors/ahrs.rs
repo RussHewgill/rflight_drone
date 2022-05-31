@@ -42,9 +42,12 @@ impl<A: AHRS> AhrsController<A> {
     }
 
     pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
-        /// XXX: ???
-        // let gyro = self.calibration.offset.update(gyro);
+        let gyro = self.calibration.calibrate_gyro(gyro);
+        let acc = self.calibration.calibrate_acc(acc);
         let mag = self.calibration.calibrate_mag(mag);
+
+        /// automatic gyro correction
+        let gyro = self.calibration.offset.update(gyro);
 
         self.ahrs.update(gyro, acc, mag);
     }
@@ -52,8 +55,9 @@ impl<A: AHRS> AhrsController<A> {
 
 mod calibration {
     use fugit::HertzU32;
+    use nalgebra as na;
 
-    use crate::sensors::V3;
+    use crate::sensors::{Rot3, V3};
 
     use super::offset::FusionOffset;
 
@@ -61,7 +65,17 @@ mod calibration {
     pub struct SensorCalibration {
         pub offset: FusionOffset,
 
-        pub hard_iron_offset: V3,
+        /// gyro
+        pub gyro_misalignment: Rot3,
+        pub gyro_sens:         V3,
+        pub gyro_offset:       V3,
+        /// acc
+        pub acc_misalignment:  Rot3,
+        pub acc_sens:          V3,
+        pub acc_offset:        V3,
+        /// mag
+        pub soft_iron_rot:     Option<Rot3>,
+        pub hard_iron_offset:  V3,
     }
 
     /// init
@@ -69,14 +83,54 @@ mod calibration {
         pub fn init(sample_rate: HertzU32) -> Self {
             Self {
                 offset:           FusionOffset::init(sample_rate),
-                hard_iron_offset: V3::zeros(),
+
+                /// gyro
+                gyro_misalignment: Rot3::default(),
+                gyro_sens: V3::new(1.0, 1.0, 1.0),
+                gyro_offset: V3::default(),
+                /// acc
+                acc_misalignment: Rot3::default(),
+                acc_sens: V3::new(1.0, 1.0, 1.0),
+                acc_offset: V3::default(),
+                /// mag
+                // soft_iron_rot: Rot3::default(),
+                soft_iron_rot: None,
+                hard_iron_offset: V3::default(),
             }
         }
     }
 
+    /// apply calibration
     impl SensorCalibration {
+        pub fn calibrate_gyro(&self, uncalibrated: V3) -> V3 {
+            Self::_calibrate_imu(
+                uncalibrated,
+                self.gyro_misalignment,
+                self.gyro_sens,
+                self.gyro_offset,
+            )
+        }
+        pub fn calibrate_acc(&self, uncalibrated: V3) -> V3 {
+            Self::_calibrate_imu(
+                uncalibrated,
+                self.acc_misalignment,
+                self.acc_sens,
+                self.acc_offset,
+            )
+        }
+
         pub fn calibrate_mag(&self, mag: V3) -> V3 {
             mag - self.hard_iron_offset
+        }
+
+        fn _calibrate_imu(
+            uncalibrated: V3,
+            misalignment: na::Rotation3<f32>,
+            sensitivity: V3,
+            offset: V3,
+        ) -> V3 {
+            let v: V3 = (uncalibrated - offset).component_mul(&sensitivity);
+            misalignment * v
         }
     }
 }

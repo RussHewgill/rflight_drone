@@ -251,6 +251,8 @@ mod app {
             3.117466,
         );
 
+        // ahrs.calibration.gyr
+
         // /// NED
         // ahrs.ahrs.set_mag_ref(V3::new(
         //     17611.0, //
@@ -524,16 +526,25 @@ mod app {
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);
 
+                let (roll, pitch, yaw) = fd.get_euler_angles();
                 rprintln!(
-                    "{=f32:08}, {=f32:08}\n{=f32:08}, {=f32:08}",
+                    "{=f32:08}, {=f32:08}\n{=f32:08}, {=f32:08}\n(r,p,y) = {=f32:08}, {=f32:08}, {=f32:08}",
                     r(motor_outputs.front_left),
                     r(motor_outputs.front_right),
                     r(motor_outputs.back_left),
                     r(motor_outputs.back_right),
+                    r(rad_to_deg(roll)),
+                    r(rad_to_deg(pitch)),
+                    r(rad_to_deg(yaw)),
                 );
 
-                // rprintln!("motor_outputs = {:?}", motor_outputs);
-                // // rprintln!("inputs = {:?}", inputs);
+                // rprintln!(
+                //     "{=f32:08}, {=f32:08}\n{=f32:08}, {=f32:08}",
+                //     r(motor_outputs.front_left),
+                //     r(motor_outputs.front_right),
+                //     r(motor_outputs.back_left),
+                //     r(motor_outputs.back_right),
+                // );
 
                 // let (roll, pitch, yaw) = fd.get_euler_angles();
                 // rprintln!(
@@ -555,7 +566,9 @@ mod app {
     fn main_loop(mut cx: main_loop::Context) {
         // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
         // const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
-        const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
+        // const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
+
+        const COUNTER_TIMES: u32 = 40; // 800 hz => 20 hz
 
         let flight_data = cx.shared.flight_data;
         let sens_data = cx.shared.sens_data;
@@ -577,13 +590,13 @@ mod app {
                     *cx.local.counter = 0;
                     (flight_data, sens_data, bt, exti, controller).lock(
                         |fd, sd, bt, exti, controller| {
-                            // bt.pause_interrupt(exti);
-                            // bt.log_write_quat(&fd.quat).unwrap();
-                            // bt.unpause_interrupt(exti);
+                            bt.pause_interrupt(exti);
+                            bt.log_write_quat(&fd.quat).unwrap();
+                            bt.unpause_interrupt(exti);
 
-                            let gyro0 = sd.imu_gyro.read_and_reset();
-                            let acc0 = sd.imu_acc.read_and_reset();
-                            let mag0 = sd.magnetometer.read_and_reset();
+                            // let gyro0 = sd.imu_gyro.read_and_reset();
+                            // let acc0 = sd.imu_acc.read_and_reset();
+                            // let mag0 = sd.magnetometer.read_and_reset();
 
                             // print_v3("gyro = ", gyro0, 4);
                             // print_v3("acc  = ", acc0, 4);
@@ -602,12 +615,14 @@ mod app {
                             // bt.unpause_interrupt(exti);
                             // // rprintln!("1");
 
-                            // // rprintln!("writing PID");
-                            // for id in [IdPID::RollRate] {
-                            //     bt.pause_interrupt(exti);
-                            //     bt.log_write_pid(id, &controller[id]).unwrap();
-                            //     bt.unpause_interrupt(exti);
-                            // }
+                            let pids = [IdPID::RollRate, IdPID::RollStab];
+
+                            // rprintln!("writing PID");
+                            for id in pids {
+                                bt.pause_interrupt(exti);
+                                bt.log_write_pid(id, &controller[id]).unwrap();
+                                bt.unpause_interrupt(exti);
+                            }
 
                             // #[cfg(feature = "nope")]
                             // for id in IdPID::ITER {
