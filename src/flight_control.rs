@@ -132,7 +132,7 @@ impl DroneController {
         let mut pid_altitude_stab = PID::new(0.0, 0.0, 0.0);
         let mut pid_altitude_rate = PID::new(0.0, 0.0, 0.0);
 
-        #[cfg(feature = "nope")]
+        // #[cfg(feature = "nope")]
         /// starting point
         {
             //
@@ -147,9 +147,9 @@ impl DroneController {
             // pid_roll_stab.kd = 0.0;
             // pid_roll_stab.i_limit = 0.0;
 
-            pid_yaw_rate.kp = 0.002105;
+            pid_yaw_rate.kp = 1.0;
 
-            pid_yaw_stab.kp = 0.474;
+            pid_yaw_stab.kp = 1.0;
 
             // /// PID and roll should be the same
             // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
@@ -158,8 +158,9 @@ impl DroneController {
             //
         }
 
-        // #[cfg(feature = "nope")]
+        #[cfg(feature = "nope")]
         /// ST values, divided by 1900 (from PWM)
+        /// too low
         {
             pid_roll_stab.kp = 0.001579; // kp1
             pid_roll_stab.i_limit = 0.001053; // XXX: ST firmware says this is 5 degrees ??
@@ -342,7 +343,7 @@ impl DroneController {
         let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
         let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
-        rprintln!("out0, out1 = {=f32:08}, {=f32:08}", out0_yaw, out1_yaw);
+        // rprintln!("out0 = {=f32:08}\nout1 = {=f32:08}", out0_yaw, out1_yaw);
 
         // rprintln!(
         //     "out1_roll, out1_pitch, out1_yaw = {:?}, {:?}, {:?}",
@@ -403,6 +404,10 @@ impl DroneController {
         let back_right = back_right.clamp(0.0, 1.0);
 
         MotorOutputs {
+            input_roll: roll,
+            input_pitch: pitch,
+            input_yaw: yaw,
+
             front_left,
             front_right,
             back_left,
@@ -473,6 +478,11 @@ impl Default for FlightConfig {
 /// PWM values: from 0-1900
 #[derive(Default, Clone, Copy, Format)]
 pub struct MotorOutputs {
+    /// for logging
+    pub input_roll:  f32,
+    pub input_pitch: f32,
+    pub input_yaw:   f32,
+
     pub front_left:  f32,
     pub front_right: f32,
     pub back_left:   f32,
