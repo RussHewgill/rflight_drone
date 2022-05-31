@@ -101,8 +101,17 @@ impl MotorsPWM {
 impl MotorsPWM {
     pub fn set_armed(&mut self, armed: bool) {
         rprintln!("setting motors armed = {:?}", armed);
+
         rprintln!("DEBUG: motors bypassed");
+
         // self.armed = armed;
+        // if armed {
+        //     self.enable_all();
+        // } else {
+        //     self.disable_all();
+        // }
+
+        //
     }
 
     pub fn enable_all(&mut self) {

@@ -196,6 +196,20 @@ impl PID {
     }
 }
 
+/// copy settings
+impl PID {
+    pub fn copy_settings_to(&self, other: &mut PID) {
+        other.kp = self.kp;
+        other.ki = self.ki;
+        other.kd = self.kd;
+
+        other.p_limit = self.p_limit;
+        other.i_limit = self.i_limit;
+        other.d_limit = self.d_limit;
+        other.output_limit = self.output_limit;
+    }
+}
+
 #[derive(Debug, Clone, Copy, Format)]
 #[repr(u8)]
 pub enum PIDParam {

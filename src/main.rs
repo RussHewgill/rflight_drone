@@ -294,7 +294,7 @@ mod app {
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -514,16 +514,34 @@ mod app {
                 // /// update PIDs
                 // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
 
-                // /// apply mixed PID outputs to motors
-                // motor_outputs.apply(motors);
+                let throttle = 0.0;
+                let roll = 0.0;
+                let pitch = 0.0;
+                let yaw = 0.2;
 
-                let (roll, pitch, yaw) = fd.get_euler_angles();
+                let motor_outputs = controller.mix(throttle, roll, pitch, yaw);
+
+                /// apply mixed PID outputs to motors
+                motor_outputs.apply(motors);
+
                 rprintln!(
-                    "(r,p,y) = {:?}, {:?}, {:?}",
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
+                    "{=f32:08}, {=f32:08}\n{=f32:08}, {=f32:08}",
+                    r(motor_outputs.front_left),
+                    r(motor_outputs.front_right),
+                    r(motor_outputs.back_left),
+                    r(motor_outputs.back_right),
                 );
+
+                // rprintln!("motor_outputs = {:?}", motor_outputs);
+                // // rprintln!("inputs = {:?}", inputs);
+
+                // let (roll, pitch, yaw) = fd.get_euler_angles();
+                // rprintln!(
+                //     "(r,p,y) = {:?}, {:?}, {:?}",
+                //     r(rad_to_deg(roll)),
+                //     r(rad_to_deg(pitch)),
+                //     r(rad_to_deg(yaw)),
+                // );
 
                 *tim9_flag = true;
             });
@@ -578,11 +596,11 @@ mod app {
                             //     gyro0.z
                             // );
 
-                            // rprintln!("0");
-                            bt.pause_interrupt(exti);
-                            bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                            bt.unpause_interrupt(exti);
-                            // rprintln!("1");
+                            // // rprintln!("0");
+                            // bt.pause_interrupt(exti);
+                            // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                            // bt.unpause_interrupt(exti);
+                            // // rprintln!("1");
 
                             // // rprintln!("writing PID");
                             // for id in [IdPID::RollRate] {
