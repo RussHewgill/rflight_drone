@@ -511,15 +511,15 @@ mod app {
                 /// update FlightData
                 fd.update(ahrs);
 
-                // /// update PIDs
-                // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+                /// update PIDs
+                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
 
-                let throttle = 0.0;
-                let roll = 0.0;
-                let pitch = 0.0;
-                let yaw = 0.2;
+                // let throttle = 0.0;
+                // let roll = 0.0;
+                // let pitch = 0.0;
+                // let yaw = 0.2;
 
-                let motor_outputs = controller.mix(throttle, roll, pitch, yaw);
+                // let motor_outputs = controller.mix(throttle, roll, pitch, yaw);
 
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);

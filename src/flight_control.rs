@@ -134,15 +134,21 @@ impl DroneController {
 
         /// starting point
         {
-            pid_roll_rate.kp = 0.0;
+            pid_roll_rate.kp = 1.0;
             pid_roll_rate.ki = 0.0;
             pid_roll_rate.kd = 0.0;
-
             pid_roll_rate.i_limit = 0.0;
 
-            /// PID and roll should be the same
-            pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
-            pid_roll_stab.copy_settings_to(&mut pid_pitch_stab);
+            // pid_roll_stab.kp = 1.0;
+            // pid_roll_stab.ki = 0.0;
+            // pid_roll_stab.kd = 0.0;
+            // pid_roll_stab.i_limit = 0.0;
+
+            // /// PID and roll should be the same
+            // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
+            // pid_roll_stab.copy_settings_to(&mut pid_pitch_stab);
+
+            //
         }
 
         #[cfg(feature = "nope")]
@@ -289,6 +295,8 @@ impl DroneController {
         // let out0_pitch = 0.0;
         // let out0_yaw = 0.0;
 
+        /// Roll  = y
+        /// Pitch = x
         let err1_roll = out0_roll - gyro.y;
         let err1_pitch = out0_pitch - gyro.x;
         let err1_yaw = out0_pitch - gyro.z;
