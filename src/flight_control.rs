@@ -75,6 +75,8 @@ mod prev_inputs {
 }
 
 mod control_inputs {
+    use core::f32::consts::PI;
+
     use defmt::{println as rprintln, Format};
 
     /// Received from remote control
@@ -125,6 +127,7 @@ mod control_inputs {
         }
     }
 
+    /// set values
     impl ControlInputs {
         pub fn set_roll(&mut self, roll: f32) {
             self.roll = roll.clamp(-1.0, 1.0);
@@ -133,7 +136,8 @@ mod control_inputs {
             self.pitch = pitch.clamp(-1.0, 1.0);
         }
         pub fn set_yaw(&mut self, yaw: f32) {
-            self.yaw = yaw.clamp(-1.0, 1.0);
+            // self.yaw = yaw.clamp(-1.0, 1.0);
+            self.yaw = yaw;
         }
         pub fn set_throttle(&mut self, throttle: f32) {
             self.throttle = throttle.clamp(-1.0, 1.0);
@@ -220,19 +224,22 @@ impl DroneController {
         {
             //
 
-            pid_roll_rate.kp = 1.0;
-            pid_roll_rate.ki = 0.0;
-            pid_roll_rate.kd = 0.0;
-            pid_roll_rate.i_limit = 0.0;
+            // pid_roll_rate.kp = 1.0;
+            // pid_roll_rate.ki = 0.0;
+            // pid_roll_rate.kd = 0.0;
+            // pid_roll_rate.i_limit = 0.0;
 
-            pid_roll_stab.kp = 1.0;
-            pid_roll_stab.ki = 0.0;
-            pid_roll_stab.kd = 0.0;
-            pid_roll_stab.i_limit = 0.0;
+            // pid_roll_stab.kp = 1.0;
+            // pid_roll_stab.ki = 0.0;
+            // pid_roll_stab.kd = 0.0;
+            // pid_roll_stab.i_limit = 0.0;
 
-            // pid_yaw_rate.kp = 1.0;
+            // pid_pitch_rate.kp = 1.0;
+            // pid_pitch_stab.kp = 1.0;
 
-            // pid_yaw_stab.kp = 1.0;
+            pid_yaw_rate.kp = 1.0;
+
+            pid_yaw_stab.kp = 1.0;
 
             // /// PID and roll should be the same
             // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
@@ -408,12 +415,15 @@ impl DroneController {
         let err0_pitch = inputs.pitch - ahrs_pitch;
         let err0_yaw = inputs.yaw - ahrs_yaw;
 
-        let out0_roll = self.pid_roll_stab.step(err0_roll);
-        let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
+        // rprintln!("inputs.yaw = {:?}", inputs.yaw);
+        // rprintln!("ahrs_yaw   = {:?}", ahrs_yaw);
+
+        // let out0_roll = self.pid_roll_stab.step(err0_roll);
+        // let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
         let out0_yaw = self.pid_yaw_stab.step(err0_yaw);
 
-        // let out0_roll = 0.0;
-        // let out0_pitch = 0.0;
+        let out0_roll = 0.0;
+        let out0_pitch = 0.0;
         // let out0_yaw = 0.0;
 
         /// Roll  = y
@@ -422,30 +432,31 @@ impl DroneController {
         let err1_pitch = out0_pitch - gyro.x;
         let err1_yaw = out0_yaw - gyro.z;
 
-        let out1_roll = self.pid_roll_rate.step(err1_roll);
-        let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
+        // let out1_roll = self.pid_roll_rate.step(err1_roll);
+        // let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
         let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
-        // let out1_roll = 0.0;
-        // let out1_pitch = 0.0;
+        let out1_roll = 0.0;
+        let out1_pitch = 0.0;
 
         // rprintln!("out0 = {=f32:08}\nout1 = {=f32:08}", out0_yaw, out1_yaw);
 
         use crate::math::rad_to_deg;
-        use crate::utils::{r, r2};
+        use crate::utils::r;
 
-        // rprintln!("err0_roll = {:?}", rad_to_deg(err0_roll));
-        // rprintln!("out0_roll = {:?}", out0_roll);
-        // rprintln!("err1_roll = {:?}", err1_roll);
-        // rprintln!("out1_roll = {:?}", out1_roll);
-        // rprintln!("");
+        // rprintln!("err0_yaw = {:?}", rad_to_deg(err0_yaw));
+        // // rprintln!("out0_yaw = {:?}", out0_yaw);
+        // rprintln!("err1_yaw = {:?}", err1_yaw);
+        // // rprintln!("out1_yaw = {:?}", out1_yaw);
 
-        // rprintln!(
-        //     "yaw = {:?}\nout0 = {:?}\nout1 = {:?}",
-        //     r(rad_to_deg(ahrs_yaw)),
-        //     r(out0_yaw),
-        //     r(out1_yaw),
-        // );
+        rprintln!(
+            "yaw = {:?}\nout0 = {:?}\nout1 = {:?}",
+            r(rad_to_deg(ahrs_yaw)),
+            r(out0_yaw),
+            r(out1_yaw),
+        );
+
+        rprintln!("");
 
         // rprintln!(
         //     "out1_roll, out1_pitch, out1_yaw = {:?}, {:?}, {:?}",
@@ -455,16 +466,6 @@ impl DroneController {
         // );
 
         self.mix(inputs.throttle, out1_roll, out1_pitch, out1_yaw)
-        // self.mix(i_throttle, out0_roll, out0_pitch, out0_yaw)
-
-        // MotorOutputs {
-        //     front_left:  0.0,
-        //     front_right: 0.0,
-        //     back_left:   0.0,
-        //     back_right:  0.0,
-        // }
-
-        //
     }
 }
 

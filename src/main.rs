@@ -532,13 +532,17 @@ mod app {
                 fd.update(ahrs);
 
                 /// XXX: Testing yaw
-                inputs.set_yaw(deg_to_rad(145.0));
+                inputs.set_yaw(deg_to_rad(110.0));
 
                 /// XXX: Table isn't flat
-                inputs.set_roll(deg_to_rad(-1.46));
+                // inputs.set_roll(deg_to_rad(-1.46));
 
                 /// update PIDs
                 let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+
+                // let quat = UQuat::from_euler_angles(0.0, 0.0, deg_to_rad(110.0));
+                // let gyro = V3::new(0.0, 0.0, 0.0);
+                // let motor_outputs = controller.update(*inputs, &quat, gyro);
 
                 // let throttle = 0.0;
                 // let roll = 0.0;
@@ -550,17 +554,17 @@ mod app {
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);
 
-                let (roll, pitch, yaw) = fd.get_euler_angles();
-                rprintln!(
-                    "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                    r(motor_outputs.front_right), // XXX: swap left and right
-                    r(motor_outputs.front_left),  // to match position on table
-                    r(motor_outputs.back_right),
-                    r(motor_outputs.back_left),
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
-                );
+                // let (roll, pitch, yaw) = fd.get_euler_angles();
+                // rprintln!(
+                //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                //     r(motor_outputs.back_right),
+                //     r(motor_outputs.back_left),
+                //     r(motor_outputs.front_right), // XXX: rotate 180
+                //     r(motor_outputs.front_left),  // to match position on table
+                //     r(rad_to_deg(roll)),
+                //     r(rad_to_deg(pitch)),
+                //     r(rad_to_deg(yaw)),
+                // );
 
                 // rprintln!(
                 //     "{=f32:08}, {=f32:08}\n{=f32:08}, {=f32:08}",

@@ -79,6 +79,10 @@ impl PID {
         let p_unbounded = error * self.kp;
         let p = Self::apply_limit(self.p_limit, p_unbounded);
 
+        // rprintln!("error = {:?}", error);
+        // rprintln!("p_unbounded = {:?}", p_unbounded);
+        // rprintln!("p = {:?}", p);
+
         /// Mitigate output jumps when ki(t) != ki(t-1).
         /// While it's standard to use an error_integral that's a running sum of
         /// just the error (no ki), because we support ki changing dynamically,
