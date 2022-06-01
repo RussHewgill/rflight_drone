@@ -6,55 +6,135 @@ use crate::{
 
 use defmt::{println as rprintln, Format};
 
-/// Received from remote control
-#[derive(Default, Clone, Copy, Format)]
-pub struct ControlInputs {
-    pub roll:         i16,
-    pub pitch:        i16,
-    pub yaw:          i16,
-    pub throttle:     i16,
-    pub takeoff:      bool,
-    pub calibrate:    bool,
-    pub motors_armed: bool,
+pub use self::control_inputs::*;
+
+#[cfg(feature = "nope")]
+mod prev_inputs {
+
+    /// Received from remote control
+    #[derive(Default, Clone, Copy, Format)]
+    pub struct ControlInputs {
+        pub roll:         i16,
+        pub pitch:        i16,
+        pub yaw:          i16,
+        pub throttle:     i16,
+        pub takeoff:      bool,
+        pub calibrate:    bool,
+        pub motors_armed: bool,
+    }
+
+    /// deserialize
+    impl ControlInputs {
+        pub fn deserialize(data: &[u8]) -> Option<ControlInputs> {
+            if data.len() != 9 {
+                return None;
+            }
+            let throttle = i16::from_be_bytes(data[0..2].try_into().unwrap());
+            let roll = i16::from_be_bytes(data[2..4].try_into().unwrap());
+            let pitch = i16::from_be_bytes(data[4..6].try_into().unwrap());
+            let yaw = i16::from_be_bytes(data[6..8].try_into().unwrap());
+
+            let takeoff = (data[8] & 0b0001) != 0;
+            let calibrate = (data[8] & 0b0010) != 0;
+            let motors_armed = (data[8] & 0b0100) != 0;
+
+            Some(ControlInputs {
+                roll,
+                pitch,
+                yaw,
+                throttle,
+                takeoff,
+                calibrate,
+                motors_armed,
+            })
+        }
+
+        pub fn as_f32(&self) -> (f32, f32, f32, f32) {
+            (
+                Self::to_f32(self.roll),
+                Self::to_f32(self.pitch),
+                Self::to_f32(self.yaw),
+                Self::to_f32(self.throttle),
+            )
+        }
+
+        pub fn to_f32(x: i16) -> f32 {
+            x as f32 / (i16::MAX as f32)
+        }
+        // pub fn from_f32(x: f32) -> i16 {
+        //     let x = x.clamp(-1.0, 1.0);
+        //     (x * i16::MAX as f32) as i16
+        // }
+    }
+
+    impl ControlInputs {
+        pub fn set_roll(&mut self, roll: f32) {
+            self.roll = Self::from_f32(roll);
+        }
+    }
 }
 
-/// deserialize
-impl ControlInputs {
-    pub fn deserialize(data: &[u8]) -> Option<ControlInputs> {
-        if data.len() != 9 {
-            return None;
+mod control_inputs {
+    use defmt::{println as rprintln, Format};
+
+    /// Received from remote control
+    /// Only for Angle mode
+    /// TODO: Acro mode
+    #[derive(Default, Clone, Copy, Format)]
+    pub struct ControlInputs {
+        pub roll:         f32,
+        pub pitch:        f32,
+        pub yaw:          f32,
+        pub throttle:     f32,
+        pub takeoff:      bool,
+        pub calibrate:    bool,
+        pub motors_armed: bool,
+    }
+
+    /// deserialize
+    impl ControlInputs {
+        pub fn deserialize(data: &[u8]) -> Option<ControlInputs> {
+            if data.len() != 9 {
+                return None;
+            }
+            let throttle = i16::from_be_bytes(data[0..2].try_into().unwrap());
+            let roll = i16::from_be_bytes(data[2..4].try_into().unwrap());
+            let pitch = i16::from_be_bytes(data[4..6].try_into().unwrap());
+            let yaw = i16::from_be_bytes(data[6..8].try_into().unwrap());
+
+            let takeoff = (data[8] & 0b0001) != 0;
+            let calibrate = (data[8] & 0b0010) != 0;
+            let motors_armed = (data[8] & 0b0100) != 0;
+
+            Some(ControlInputs {
+                roll: Self::to_f32(roll),
+                pitch: Self::to_f32(pitch),
+                yaw: Self::to_f32(yaw),
+                throttle: Self::to_f32(throttle),
+                takeoff,
+                calibrate,
+                motors_armed,
+            })
         }
-        let throttle = i16::from_be_bytes(data[0..2].try_into().unwrap());
-        let roll = i16::from_be_bytes(data[2..4].try_into().unwrap());
-        let pitch = i16::from_be_bytes(data[4..6].try_into().unwrap());
-        let yaw = i16::from_be_bytes(data[6..8].try_into().unwrap());
 
-        let takeoff = (data[8] & 0b0001) != 0;
-        let calibrate = (data[8] & 0b0010) != 0;
-        let motors_armed = (data[8] & 0b0100) != 0;
-
-        Some(ControlInputs {
-            roll,
-            pitch,
-            yaw,
-            throttle,
-            takeoff,
-            calibrate,
-            motors_armed,
-        })
+        pub fn to_f32(x: i16) -> f32 {
+            x as f32 / (i16::MAX as f32)
+        }
     }
 
-    pub fn as_f32(&self) -> (f32, f32, f32, f32) {
-        (
-            Self::to_f32(self.roll),
-            Self::to_f32(self.pitch),
-            Self::to_f32(self.yaw),
-            Self::to_f32(self.throttle),
-        )
-    }
-
-    pub fn to_f32(x: i16) -> f32 {
-        x as f32 / (i16::MAX as f32)
+    impl ControlInputs {
+        pub fn set_roll(&mut self, roll: f32) {
+            self.roll = roll.clamp(-1.0, 1.0);
+        }
+        pub fn set_pitch(&mut self, pitch: f32) {
+            self.pitch = pitch.clamp(-1.0, 1.0);
+        }
+        pub fn set_yaw(&mut self, yaw: f32) {
+            self.yaw = yaw.clamp(-1.0, 1.0);
+        }
+        pub fn set_throttle(&mut self, throttle: f32) {
+            self.throttle = throttle.clamp(-1.0, 1.0);
+        }
     }
 }
 
@@ -137,19 +217,19 @@ impl DroneController {
         {
             //
 
-            // pid_roll_rate.kp = 1.0;
-            // pid_roll_rate.ki = 0.0;
-            // pid_roll_rate.kd = 0.0;
-            // pid_roll_rate.i_limit = 0.0;
+            pid_roll_rate.kp = 1.0;
+            pid_roll_rate.ki = 0.0;
+            pid_roll_rate.kd = 0.0;
+            pid_roll_rate.i_limit = 0.0;
 
-            // pid_roll_stab.kp = 1.0;
-            // pid_roll_stab.ki = 0.0;
-            // pid_roll_stab.kd = 0.0;
-            // pid_roll_stab.i_limit = 0.0;
+            pid_roll_stab.kp = 1.0;
+            pid_roll_stab.ki = 0.0;
+            pid_roll_stab.kd = 0.0;
+            pid_roll_stab.i_limit = 0.0;
 
-            pid_yaw_rate.kp = 1.0;
+            // pid_yaw_rate.kp = 1.0;
 
-            pid_yaw_stab.kp = 1.0;
+            // pid_yaw_stab.kp = 1.0;
 
             // /// PID and roll should be the same
             // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
@@ -319,11 +399,11 @@ impl DroneController {
     ) -> MotorOutputs {
         let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
 
-        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.as_f32();
+        // let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.as_f32();
 
-        let err0_roll = i_roll - ahrs_roll;
-        let err0_pitch = i_pitch - ahrs_pitch;
-        let err0_yaw = i_yaw - ahrs_yaw;
+        let err0_roll = inputs.roll - ahrs_roll;
+        let err0_pitch = inputs.pitch - ahrs_pitch;
+        let err0_yaw = inputs.yaw - ahrs_yaw;
 
         let out0_roll = self.pid_roll_stab.step(err0_roll);
         let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
@@ -337,13 +417,32 @@ impl DroneController {
         /// Pitch = x
         let err1_roll = out0_roll - gyro.y;
         let err1_pitch = out0_pitch - gyro.x;
-        let err1_yaw = out0_pitch - gyro.z;
+        let err1_yaw = out0_yaw - gyro.z;
 
         let out1_roll = self.pid_roll_rate.step(err1_roll);
         let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
         let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
+        // let out1_roll = 0.0;
+        // let out1_pitch = 0.0;
+
         // rprintln!("out0 = {=f32:08}\nout1 = {=f32:08}", out0_yaw, out1_yaw);
+
+        use crate::math::rad_to_deg;
+        use crate::utils::{r, r2};
+
+        // rprintln!("err0_roll = {:?}", rad_to_deg(err0_roll));
+        // rprintln!("out0_roll = {:?}", out0_roll);
+        // rprintln!("err1_roll = {:?}", err1_roll);
+        // rprintln!("out1_roll = {:?}", out1_roll);
+        // rprintln!("");
+
+        // rprintln!(
+        //     "yaw = {:?}\nout0 = {:?}\nout1 = {:?}",
+        //     r(rad_to_deg(ahrs_yaw)),
+        //     r(out0_yaw),
+        //     r(out1_yaw),
+        // );
 
         // rprintln!(
         //     "out1_roll, out1_pitch, out1_yaw = {:?}, {:?}, {:?}",
@@ -352,7 +451,7 @@ impl DroneController {
         //     out1_yaw
         // );
 
-        self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
+        self.mix(inputs.throttle, out1_roll, out1_pitch, out1_yaw)
         // self.mix(i_throttle, out0_roll, out0_pitch, out0_yaw)
 
         // MotorOutputs {

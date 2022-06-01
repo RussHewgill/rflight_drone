@@ -2,9 +2,9 @@
 
 use nalgebra::{self as na};
 
-use defmt::Format;
+use defmt::{println as rprintln, Format};
 
-#[derive(Debug, Clone, Copy, Format)]
+#[derive(Clone, Copy, Format)]
 pub struct PID {
     pub kp: f32,
     pub ki: f32,
@@ -23,7 +23,7 @@ pub struct PID {
     pub setpoint: f32,
 }
 
-#[derive(Debug, Default, Clone, Copy, Format)]
+#[derive(Default, Clone, Copy, Format)]
 pub struct PIDOutput {
     pub p:      f32,
     pub i:      f32,
@@ -64,19 +64,8 @@ impl PID {
     }
 }
 
-/// reset, step
+/// step
 impl PID {
-    pub fn reset_integral(&mut self) {
-        self.integral = 0.0;
-        // self.prev_input = None;
-        // self.prev_output = None;
-
-        // self.p_hist.clear();
-        // self.i_hist.clear();
-        // self.d_hist.clear();
-        // self.output_hist.clear();
-    }
-
     pub fn step(&mut self, input: f32) -> f32 {
         // let (output, _, _, _) = self._step(input);
         let output = self._step(input);
@@ -90,19 +79,19 @@ impl PID {
         let p_unbounded = error * self.kp;
         let p = Self::apply_limit(self.p_limit, p_unbounded);
 
-        // Mitigate output jumps when ki(t) != ki(t-1).
-        // While it's standard to use an error_integral that's a running sum of
-        // just the error (no ki), because we support ki changing dynamically,
-        // we store the entire term so that we don't need to remember previous
-        // ki values.
+        /// Mitigate output jumps when ki(t) != ki(t-1).
+        /// While it's standard to use an error_integral that's a running sum of
+        /// just the error (no ki), because we support ki changing dynamically,
+        /// we store the entire term so that we don't need to remember previous
+        /// ki values.
         self.integral = self.integral + error * self.ki;
 
-        // Mitigate integral windup: Don't want to keep building up error
-        // beyond what i_limit will allow.
+        /// Mitigate integral windup: Don't want to keep building up error
+        /// beyond what i_limit will allow.
         self.integral = Self::apply_limit(self.i_limit, self.integral);
 
-        // Mitigate derivative kick: Use the derivative of the measurement
-        // rather than the derivative of the error.
+        /// Mitigate derivative kick: Use the derivative of the measurement
+        /// rather than the derivative of the error.
         let d_unbounded = -match self.prev_input.as_ref() {
             Some(prev_measurement) => input - *prev_measurement,
             None => 0.0,
@@ -123,6 +112,20 @@ impl PID {
         self.prev_output = out;
 
         out
+    }
+}
+
+/// reset, apply limit
+impl PID {
+    pub fn reset_integral(&mut self) {
+        self.integral = 0.0;
+        // self.prev_input = None;
+        // self.prev_output = None;
+
+        // self.p_hist.clear();
+        // self.i_hist.clear();
+        // self.d_hist.clear();
+        // self.output_hist.clear();
     }
 
     fn apply_limit(limit: f32, value: f32) -> f32 {
