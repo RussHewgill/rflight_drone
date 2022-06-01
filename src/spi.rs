@@ -87,7 +87,7 @@ mod spi4 {
             self.enable(true);
 
             /// 2,3. Send byte, then wait for TXE = 1
-            for b in bytes.into_iter() {
+            for b in bytes.iter() {
                 self.send_u8(*b);
 
                 while !self.is_txe() {
@@ -109,7 +109,7 @@ mod spi4 {
             // assert!(read.len() > 1);
             // assert_eq!(read.len(), send.len());
 
-            let mut send = send.into_iter();
+            let mut send = send.iter();
             let mut read = read.iter_mut();
 
             while self.spi_is_busy() {

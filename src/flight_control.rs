@@ -97,20 +97,23 @@ mod control_inputs {
             if data.len() != 9 {
                 return None;
             }
-            let throttle = i16::from_be_bytes(data[0..2].try_into().unwrap());
-            let roll = i16::from_be_bytes(data[2..4].try_into().unwrap());
-            let pitch = i16::from_be_bytes(data[4..6].try_into().unwrap());
-            let yaw = i16::from_be_bytes(data[6..8].try_into().unwrap());
+            let roll = i16::from_be_bytes(data[0..2].try_into().unwrap());
+            let pitch = i16::from_be_bytes(data[2..4].try_into().unwrap());
+            let yaw = i16::from_be_bytes(data[4..6].try_into().unwrap());
+            let throttle = i16::from_be_bytes(data[6..8].try_into().unwrap());
 
             let takeoff = (data[8] & 0b0001) != 0;
             let calibrate = (data[8] & 0b0010) != 0;
             let motors_armed = (data[8] & 0b0100) != 0;
 
+            /// negative throttle probably won't work with motors?
+            let throttle = Self::to_f32(throttle).clamp(0.0, 1.0);
+
             Some(ControlInputs {
                 roll: Self::to_f32(roll),
                 pitch: Self::to_f32(pitch),
                 yaw: Self::to_f32(yaw),
-                throttle: Self::to_f32(throttle),
+                throttle,
                 takeoff,
                 calibrate,
                 motors_armed,

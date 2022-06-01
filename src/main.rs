@@ -8,6 +8,24 @@
 // XXX: Features:
 // for doc comments on var assignments
 #![feature(stmt_expr_attributes)]
+// XXX: Clippy
+#![allow(
+    // clippy::all,
+    // clippy::restriction,
+    clippy::pedantic,
+    // clippy::cargo,
+    // clippy::complexity,
+    // clippy::correctness,
+    // clippy::nursery,
+    // clippy::restriction,
+    clippy::style,
+    // clippy::suspicious,
+    // clippy::perf,
+
+    clippy::type_complexity,
+    clippy::useless_conversion,
+    clippy::too_many_arguments,
+)]
 
 pub mod battery;
 pub mod bluetooth;
@@ -535,10 +553,10 @@ mod app {
                 let (roll, pitch, yaw) = fd.get_euler_angles();
                 rprintln!(
                     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                    r(motor_outputs.front_left),
-                    r(motor_outputs.front_right),
-                    r(motor_outputs.back_left),
+                    r(motor_outputs.front_right), // XXX: swap left and right
+                    r(motor_outputs.front_left),  // to match position on table
                     r(motor_outputs.back_right),
+                    r(motor_outputs.back_left),
                     r(rad_to_deg(roll)),
                     r(rad_to_deg(pitch)),
                     r(rad_to_deg(yaw)),

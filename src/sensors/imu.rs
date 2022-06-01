@@ -480,7 +480,7 @@ pub mod config {
             }
         }
 
-        #[derive(Debug, Clone, Copy, PartialEq)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[repr(u8)]
         pub enum AccelInputComposite {
             LowLatency = 0,
