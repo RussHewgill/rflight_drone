@@ -42,8 +42,11 @@ impl MotorsPWM {
     // pub const MOTOR_MAX_PWM: f32 = 1900.0;
     // pub const MOTOR_MAX_PWM_I: u16 = 1900;
 
-    /// from ST firmware, probably not very accurate
-    pub const MOTOR_MIN_THROTTLE: f32 = 200.0;
+    // /// from ST firmware, probably not very accurate
+    // pub const MOTOR_MIN_THROTTLE: f32 = 200.0;
+
+    // pub const MOTOR_MAX_THROTTLE: Option<f32> = None;
+    pub const MOTOR_MAX_THROTTLE: Option<f32> = Some(0.02);
 
     /// from ST firmware
     pub const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
@@ -102,14 +105,14 @@ impl MotorsPWM {
     pub fn set_armed(&mut self, armed: bool) {
         rprintln!("setting motors armed = {:?}", armed);
 
-        rprintln!("DEBUG: motors bypassed");
+        // rprintln!("DEBUG: motors bypassed");
 
-        // self.armed = armed;
-        // if armed {
-        //     self.enable_all();
-        // } else {
-        //     self.disable_all();
-        // }
+        self.armed = armed;
+        if armed {
+            self.enable_all();
+        } else {
+            self.disable_all();
+        }
 
         //
     }
@@ -191,7 +194,11 @@ impl MotorsPWM {
         if !self.armed {
             return;
         }
-        let pwm = pwm.clamp(0.0, 1.0);
+        let pwm = if let Some(max) = Self::MOTOR_MAX_THROTTLE {
+            pwm.clamp(0.0, max)
+        } else {
+            pwm.clamp(0.0, 1.0)
+        };
         match motor {
             MotorSelect::Motor1 => {
                 self.pin1.set_duty((pwm * Self::MOTOR_MAX_PWM) as u16);

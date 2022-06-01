@@ -531,10 +531,10 @@ mod app {
                 /// update FlightData
                 fd.update(ahrs);
 
-                /// XXX: Testing yaw
-                inputs.set_yaw(deg_to_rad(110.0));
+                // /// XXX: Testing yaw
+                // inputs.set_yaw(deg_to_rad(110.0));
 
-                /// XXX: Table isn't flat
+                // /// XXX: Table isn't flat
                 // inputs.set_roll(deg_to_rad(-1.46));
 
                 /// update PIDs
@@ -554,17 +554,17 @@ mod app {
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);
 
-                // let (roll, pitch, yaw) = fd.get_euler_angles();
-                // rprintln!(
-                //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                //     r(motor_outputs.back_right),
-                //     r(motor_outputs.back_left),
-                //     r(motor_outputs.front_right), // XXX: rotate 180
-                //     r(motor_outputs.front_left),  // to match position on table
-                //     r(rad_to_deg(roll)),
-                //     r(rad_to_deg(pitch)),
-                //     r(rad_to_deg(yaw)),
-                // );
+                let (roll, pitch, yaw) = fd.get_euler_angles();
+                rprintln!(
+                    "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                    r(motor_outputs.back_right),
+                    r(motor_outputs.back_left),
+                    r(motor_outputs.front_right), // XXX: rotate 180
+                    r(motor_outputs.front_left),  // to match position on table
+                    r(rad_to_deg(roll)),
+                    r(rad_to_deg(pitch)),
+                    r(rad_to_deg(yaw)),
+                );
 
                 // rprintln!(
                 //     "{=f32:08}, {=f32:08}\n{=f32:08}, {=f32:08}",
@@ -652,12 +652,12 @@ mod app {
 
                             let pids = [IdPID::RollRate, IdPID::RollStab];
 
-                            // rprintln!("writing PID");
-                            for id in pids {
-                                bt.pause_interrupt(exti);
-                                bt.log_write_pid(id, &controller[id]).unwrap();
-                                bt.unpause_interrupt(exti);
-                            }
+                            // // rprintln!("writing PID");
+                            // for id in pids {
+                            //     bt.pause_interrupt(exti);
+                            //     bt.log_write_pid(id, &controller[id]).unwrap();
+                            //     bt.unpause_interrupt(exti);
+                            // }
 
                             // #[cfg(feature = "nope")]
                             // for id in IdPID::ITER {
@@ -940,74 +940,6 @@ mod app {
     #[local]
     struct Local {}
 
-    #[cfg(feature = "nope")]
-    // #[init]
-    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
-        let mut cp: stm32f401::CorePeripherals = cx.core;
-        let mut dp: stm32f401::Peripherals = cx.device;
-
-        let mut rcc = dp.RCC.constrain();
-        let clocks = rcc.cfgr.use_hse(16.MHz()).sysclk(84.MHz()).freeze();
-
-        dp.TIM4.cr1.modify(|r, w| {
-            w.dir()
-                .up() // direction
-                .cms()
-                .edge_aligned() //
-                .ckd()
-                .div1() // clock division
-                .udis()
-                .enabled() // update generation
-        });
-
-        // dp.TIM4.cr1.modify(|r, w| {
-        //     w.mms()
-        //         .
-        // });
-
-        // TODO: TRGO Reset mode
-
-        /// auto-reload value
-        dp.TIM4.arr.modify(|r, w| w.arr().bits(1999));
-
-        /// prescaler value
-        dp.TIM4.psc.modify(|r, w| w.psc().bits(84));
-
-        dp.TIM4.smcr.modify(|r, w| {
-            w.msm()
-                .no_sync() // slave mode disabled
-                .ts()
-                .itr0() // internal trigger 0
-                .etp()
-                .not_inverted() // ETR noninverted
-                .ece()
-                .disabled() // external clock mode 2
-                .etps()
-                .div1() // external trigger prescaler disabled
-                .etf()
-                .no_filter() // external trigger filter disabled
-        });
-
-        dp.TIM4.ccer.modify(|r, w| {
-            w.cc1np()
-                .clear_bit() // CC1 channel configured as output
-                .cc1p()
-                .clear_bit() //CC1 active high
-        });
-
-        // TODO: output compare PWM mode 1
-        dp.TIM4.ccmr1_output().modify(|r, w| {
-            w.oc1pe()
-                .enabled() // OC1 preload register enabled
-                .oc1fe()
-                .set_bit() // fast mode enable
-                .cc1s()
-                .output() // C1 channel configured as output
-        });
-
-        (Shared {}, Local {}, init::Monotonics())
-    }
-
     #[allow(unreachable_code)]
     // #[cfg(feature = "nope")]
     #[init]
@@ -1064,7 +996,7 @@ mod app {
         // motors.set_motor_u16(m0, pwm);
         // motors.set_motor_u16(m1, pwm);
 
-        delay.delay(2000.millis());
+        delay.delay(1000.millis());
 
         // motors.disable_motor(m0);
         // motors.disable_motor(m1);
