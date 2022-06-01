@@ -230,18 +230,15 @@ impl DroneController {
         {
             //
 
-            // pid_roll_rate.kp = 1.0;
-            // pid_roll_rate.ki = 0.0;
-            // pid_roll_rate.kd = 0.0;
-            // pid_roll_rate.i_limit = 0.0;
+            pid_roll_rate.kp = 1.0;
+            pid_roll_rate.ki = 0.0;
+            pid_roll_rate.kd = 0.0;
+            pid_roll_rate.i_limit = 0.0;
 
-            // pid_roll_stab.kp = 1.0;
-            // pid_roll_stab.ki = 0.0;
-            // pid_roll_stab.kd = 0.0;
-            // pid_roll_stab.i_limit = 0.0;
-
-            // pid_pitch_rate.kp = 1.0;
-            // pid_pitch_stab.kp = 1.0;
+            pid_roll_stab.kp = 1.0;
+            pid_roll_stab.ki = 0.0;
+            pid_roll_stab.kd = 0.0;
+            pid_roll_stab.i_limit = 0.0;
 
             // pid_yaw_rate.kp = 1.0;
 
@@ -463,6 +460,7 @@ impl DroneController {
         //     out1_yaw
         // );
 
+        /// TODO: add pitch, roll limits
         self.mix(inputs.throttle, out1_roll, out1_pitch, out1_yaw)
     }
 }
@@ -590,6 +588,7 @@ pub struct MotorOutputs {
     pub back_right:  f32,
 }
 
+/// apply
 impl MotorOutputs {
     pub fn apply(&self, motors: &mut MotorsPWM) {
         use crate::motors::MotorSelect::*;
@@ -598,13 +597,4 @@ impl MotorOutputs {
         motors.set_motor_f32(Motor3, self.front_left);
         motors.set_motor_f32(Motor4, self.back_left);
     }
-
-    // pub fn mix(throttle: f32, roll: f32, pitch: f32, yaw: f32) -> Self {
-    //     Self {
-    //         front_left:  0,
-    //         front_right: 0,
-    //         back_left:   0,
-    //         back_right:  0,
-    //     }
-    // }
 }

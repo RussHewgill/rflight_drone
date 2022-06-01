@@ -45,6 +45,7 @@ impl MotorsPWM {
     // /// from ST firmware, probably not very accurate
     // pub const MOTOR_MIN_THROTTLE: f32 = 200.0;
 
+    /// 0.23 is nearly enough to take off
     // pub const MOTOR_MAX_THROTTLE: f32 = 1.0;
     pub const MOTOR_MAX_THROTTLE: f32 = 0.3;
 
@@ -105,14 +106,14 @@ impl MotorsPWM {
     pub fn set_armed(&mut self, armed: bool) {
         rprintln!("setting motors armed = {:?}", armed);
 
-        // rprintln!("DEBUG: motors bypassed");
+        rprintln!("DEBUG: motors bypassed");
 
-        self.armed = armed;
-        if armed {
-            self.enable_all();
-        } else {
-            self.disable_all();
-        }
+        // self.armed = armed;
+        // if armed {
+        //     self.enable_all();
+        // } else {
+        //     self.disable_all();
+        // }
 
         //
     }

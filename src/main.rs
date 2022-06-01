@@ -290,6 +290,9 @@ mod app {
         tim3.start(sensor_period).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
+        let v = init_struct.adc.sample();
+        rprintln!("Battery = {:?} V", v);
+
         let shared = Shared {
             dwt,
             exti,
@@ -565,6 +568,18 @@ mod app {
                     r(rad_to_deg(pitch)),
                     r(rad_to_deg(yaw)),
                 );
+
+                // let (roll, pitch, yaw) = fd.get_euler_angles();
+                // rprintln!(
+                //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                //     r(motor_outputs.front_left),  // FL FR
+                //     r(motor_outputs.front_right), // BL BR
+                //     r(motor_outputs.back_left),
+                //     r(motor_outputs.back_right),
+                //     r(rad_to_deg(roll)),
+                //     r(rad_to_deg(pitch)),
+                //     r(rad_to_deg(yaw)),
+                // );
 
                 // rprintln!(
                 //     "{=f32:08}, {=f32:08}\n{=f32:08}, {=f32:08}",
