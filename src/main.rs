@@ -543,17 +543,6 @@ mod app {
                 /// update PIDs
                 let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
 
-                // let quat = UQuat::from_euler_angles(0.0, 0.0, deg_to_rad(110.0));
-                // let gyro = V3::new(0.0, 0.0, 0.0);
-                // let motor_outputs = controller.update(*inputs, &quat, gyro);
-
-                // let throttle = 0.0;
-                // let roll = 0.0;
-                // let pitch = 0.0;
-                // let yaw = 0.2;
-
-                // let motor_outputs = controller.mix(throttle, roll, pitch, yaw);
-
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);
 
@@ -891,7 +880,12 @@ mod app {
                     //     _ => {}
                     // }
 
-                    bt.handle_connect_disconnect(&event);
+                    if let Some(ConnectionChange::Disconnect) =
+                        bt.handle_connect_disconnect(&event)
+                    {
+                        rprintln!("Disconnected, disarming motors");
+                        motors.set_armed(false);
+                    }
 
                     bt.handle_input(motors, inputs, controller, &event);
 
@@ -996,7 +990,7 @@ mod app {
         // let pwm_f32 = pwm as f32 / MotorsPWM::MOTOR_MAX_PWM;
         // rprintln!("pwm_f32 = {:?}", pwm_f32);
 
-        let pwm = 0.25;
+        let pwm = 0.1;
 
         rprintln!("pwm = {:?}", pwm);
         let pwm_u16 = (pwm * MotorsPWM::MOTOR_MAX_PWM) as u16;

@@ -242,8 +242,8 @@ impl DroneController {
             // pid_roll_stab.kd = 0.0;
             // pid_roll_stab.i_limit = 0.0;
 
-            pid_pitch_rate.kp = 1.0;
-            pid_pitch_stab.kp = 1.0;
+            // pid_pitch_rate.kp = 1.0;
+            // pid_pitch_stab.kp = 1.0;
 
             // pid_yaw_rate.kp = 1.0;
 
@@ -326,57 +326,6 @@ impl DroneController {
             pid_yaw_rate,
             pid_altitude_stab,
             pid_altitude_rate,
-            config: FlightConfig::default(),
-        }
-    }
-
-    #[rustfmt::skip]
-    #[cfg(feature = "nope")]
-    pub fn new_default_params() -> Self {
-        let pid_stab_roll = PID::new(
-            3.0,
-            0.0,
-            0.0,
-        );
-        let pid_rate_roll = PID::new(
-            80.0,
-            0.0,
-            0.0
-        );
-        let pid_stab_pitch = PID::new(
-            0.0,
-            0.0,
-            0.0
-        );
-        let pid_rate_pitch = PID::new(
-            0.0,
-            0.0,
-            0.0
-        );
-        let pid_stab_yaw = PID::new(
-            0.0,
-            0.0,
-            0.0
-        );
-        let pid_rate_yaw = PID::new(
-            0.0,
-            0.0,
-            0.0
-        );
-        let pid_throttle = PID::new(
-            0.0,
-            0.0,
-            0.0
-        );
-
-        Self {
-            pid_stab_roll,
-            pid_rate_roll,
-            pid_stab_pitch,
-            pid_rate_pitch,
-            pid_stab_yaw,
-            pid_rate_yaw,
-            pid_throttle,
             config: FlightConfig::default(),
         }
     }

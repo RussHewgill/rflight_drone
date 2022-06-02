@@ -48,11 +48,10 @@ impl MotorsPWM {
     /// 0.23 is nearly enough to take off
     // pub const MOTOR_MAX_THROTTLE: f32 = 1.0;
     pub const MOTOR_MAX_THROTTLE: f32 = 0.3;
+    // pub const MOTOR_MAX_THROTTLE: f32 = 0.4;
 
     /// from ST firmware
     pub const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
-    // pub const FREQ: HertzU32 = fugit::HertzU32::Hz(750);
-    // pub const FREQ: HertzU32 = fugit::HertzU32::Hz(250);
 }
 
 /// new
