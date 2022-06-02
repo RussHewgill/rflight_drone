@@ -79,6 +79,8 @@ mod control_inputs {
 
     use defmt::{println as rprintln, Format};
 
+    use crate::math::rad_to_deg;
+
     /// Received from remote control
     #[derive(Default, Clone, Copy, Format)]
     pub struct ControlInputs {
@@ -132,6 +134,22 @@ mod control_inputs {
 
         pub fn to_f32(x: i16) -> f32 {
             x as f32 / (i16::MAX as f32)
+        }
+    }
+
+    /// get_values
+    impl ControlInputs {
+        /// gyro is in deg/s, so pid inputs/outputs must be as well
+        pub fn get_values(&self) -> (f32, f32, f32, f32) {
+            (
+                rad_to_deg(self.roll),
+                rad_to_deg(self.pitch),
+                rad_to_deg(self.yaw),
+                // self.roll,
+                // self.pitch,
+                // self.yaw,
+                self.throttle,
+            )
         }
     }
 
@@ -227,6 +245,9 @@ impl DroneController {
         let mut pid_altitude_stab = PID::new(0.0, 0.0, 0.0);
         let mut pid_altitude_rate = PID::new(0.0, 0.0, 0.0);
 
+        /// output meanings:
+        /// pid_pitch_stab:  desired pitch rate in rad/s
+
         // #[cfg(feature = "nope")]
         /// starting point
         {
@@ -244,6 +265,14 @@ impl DroneController {
 
             // pid_pitch_rate.kp = 1.0;
             // pid_pitch_stab.kp = 1.0;
+
+            // pid_pitch_stab.kp = 0.001579; // kp1
+            // pid_pitch_stab.i_limit = 0.001053; // XXX: ST firmware says this is 5 degrees ??
+
+            // pid_pitch_rate.kp = 0.04211; // kp2
+            // pid_pitch_rate.ki = 0.04211; // ki2
+            // pid_pitch_rate.kd = 0.005263; // kd2
+            // pid_pitch_rate.i_limit = 0.01053;
 
             // pid_yaw_rate.kp = 1.0;
 
@@ -366,9 +395,11 @@ impl DroneController {
     ) -> MotorOutputs {
         let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
 
-        let err0_roll = inputs.roll - ahrs_roll;
-        let err0_pitch = inputs.pitch - ahrs_pitch;
-        let err0_yaw = inputs.yaw - ahrs_yaw;
+        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values();
+
+        let err0_roll = i_roll - ahrs_roll;
+        let err0_pitch = i_pitch - ahrs_pitch;
+        let err0_yaw = i_yaw - ahrs_yaw;
 
         let out0_roll = self.pid_roll_stab.step(err0_roll);
         let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
@@ -415,7 +446,7 @@ impl DroneController {
         // );
 
         /// TODO: add pitch, roll limits
-        self.mix(inputs.throttle, out1_roll, out1_pitch, out1_yaw)
+        self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
     }
 }
 
