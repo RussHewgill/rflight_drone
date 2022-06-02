@@ -557,17 +557,17 @@ mod app {
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);
 
-                let (roll, pitch, yaw) = fd.get_euler_angles();
-                rprintln!(
-                    "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                    r(motor_outputs.back_right),
-                    r(motor_outputs.back_left),
-                    r(motor_outputs.front_right), // XXX: rotate 180
-                    r(motor_outputs.front_left),  // to match position on table
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
-                );
+                // let (roll, pitch, yaw) = fd.get_euler_angles();
+                // rprintln!(
+                //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                //     r(motor_outputs.back_right),
+                //     r(motor_outputs.back_left),
+                //     r(motor_outputs.front_right), // XXX: rotate 180
+                //     r(motor_outputs.front_left),  // to match position on table
+                //     r(rad_to_deg(roll)),
+                //     r(rad_to_deg(pitch)),
+                //     r(rad_to_deg(yaw)),
+                // );
 
                 // let (roll, pitch, yaw) = fd.get_euler_angles();
                 // rprintln!(
@@ -618,7 +618,8 @@ mod app {
         // const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
         // const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
 
-        const COUNTER_TIMES: u32 = 40; // 800 hz => 20 hz
+        // const COUNTER_TIMES: u32 = 40; // 800 hz => 20 hz
+        const COUNTER_TIMES: u32 = 80; // 800 hz => 10 hz
 
         let flight_data = cx.shared.flight_data;
         let sens_data = cx.shared.sens_data;
@@ -665,14 +666,14 @@ mod app {
                             // bt.unpause_interrupt(exti);
                             // // rprintln!("1");
 
-                            let pids = [IdPID::RollRate, IdPID::RollStab];
+                            let pids = [IdPID::PitchRate, IdPID::PitchStab];
 
-                            // // rprintln!("writing PID");
-                            // for id in pids {
-                            //     bt.pause_interrupt(exti);
-                            //     bt.log_write_pid(id, &controller[id]).unwrap();
-                            //     bt.unpause_interrupt(exti);
-                            // }
+                            // rprintln!("writing PID");
+                            for id in pids {
+                                bt.pause_interrupt(exti);
+                                bt.log_write_pid(id, &controller[id]).unwrap();
+                                bt.unpause_interrupt(exti);
+                            }
 
                             // #[cfg(feature = "nope")]
                             // for id in IdPID::ITER {

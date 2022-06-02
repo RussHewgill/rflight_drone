@@ -106,14 +106,14 @@ impl MotorsPWM {
     pub fn set_armed(&mut self, armed: bool) {
         rprintln!("setting motors armed = {:?}", armed);
 
-        rprintln!("DEBUG: motors bypassed");
+        // rprintln!("DEBUG: motors bypassed");
 
-        // self.armed = armed;
-        // if armed {
-        //     self.enable_all();
-        // } else {
-        //     self.disable_all();
-        // }
+        self.armed = armed;
+        if armed {
+            self.enable_all();
+        } else {
+            self.disable_all();
+        }
 
         //
     }
@@ -141,7 +141,7 @@ impl MotorsPWM {
     }
 
     fn _enable_motor(&mut self, motor: MotorSelect, enable: bool) {
-        if !self.armed {
+        if enable && !self.armed {
             rprintln!("tried to enable motors when not armed");
             return;
         }

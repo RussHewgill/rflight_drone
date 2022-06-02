@@ -116,6 +116,8 @@ mod control_inputs {
             /// negative throttle probably won't work with motors?
             let throttle = Self::to_f32(throttle).clamp(0.0, 1.0);
 
+            // eprintln!("motors_armed = {:?}", motors_armed);
+
             Some(ControlInputs {
                 roll: Self::to_f32(roll),
                 pitch: Self::to_f32(pitch),
@@ -230,23 +232,26 @@ impl DroneController {
         {
             //
 
-            pid_roll_rate.kp = 1.0;
-            pid_roll_rate.ki = 0.0;
-            pid_roll_rate.kd = 0.0;
-            pid_roll_rate.i_limit = 0.0;
+            // pid_roll_rate.kp = 1.0;
+            // pid_roll_rate.ki = 0.0;
+            // pid_roll_rate.kd = 0.0;
+            // pid_roll_rate.i_limit = 0.0;
 
-            pid_roll_stab.kp = 1.0;
-            pid_roll_stab.ki = 0.0;
-            pid_roll_stab.kd = 0.0;
-            pid_roll_stab.i_limit = 0.0;
+            // pid_roll_stab.kp = 1.0;
+            // pid_roll_stab.ki = 0.0;
+            // pid_roll_stab.kd = 0.0;
+            // pid_roll_stab.i_limit = 0.0;
+
+            pid_pitch_rate.kp = 1.0;
+            pid_pitch_stab.kp = 1.0;
 
             // pid_yaw_rate.kp = 1.0;
 
             // pid_yaw_stab.kp = 1.0;
 
-            /// PID and roll should be the same
-            pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
-            pid_roll_stab.copy_settings_to(&mut pid_pitch_stab);
+            // /// PID and roll should be the same
+            // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
+            // pid_roll_stab.copy_settings_to(&mut pid_pitch_stab);
 
             //
         }
