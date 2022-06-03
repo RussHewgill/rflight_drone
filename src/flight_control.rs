@@ -263,8 +263,8 @@ impl DroneController {
             // pid_roll_stab.kd = 0.0;
             // pid_roll_stab.i_limit = 0.0;
 
-            pid_pitch_rate.kp = 0.01;
-            pid_pitch_stab.kp = 0.01;
+            // pid_pitch_rate.kp = 0.01;
+            // pid_pitch_stab.kp = 0.01;
 
             // pid_pitch_stab.kp = 0.001579; // kp1
             // pid_pitch_stab.i_limit = 0.001053; // XXX: ST firmware says this is 5 degrees ??
@@ -423,11 +423,13 @@ impl DroneController {
         use crate::math::rad_to_deg;
         use crate::utils::r;
 
-        // rprintln!("err0_pitch = {:?}", err0_pitch);
-        // rprintln!("out0_pitch = {:?}", out0_pitch);
-        // rprintln!("err1_pitch = {:?}", err1_pitch);
-        // rprintln!("out1_pitch = {:?}", out1_pitch);
-        // rprintln!("");
+        // rprintln!(
+        //     "err0_pitch = {:?}\nout0_pitch = {:?}\nerr1_pitch = {:?}\nout1_pitch = {:?}",
+        //     err0_pitch,
+        //     out0_pitch,
+        //     err1_pitch,
+        //     out1_pitch
+        // );
 
         // rprintln!(
         //     "yaw = {:?}\nout0 = {:?}\nout1 = {:?}",
@@ -465,6 +467,15 @@ impl DroneController {
         yaw: f32,
         once: bool,
     ) -> MotorOutputs {
+        /// Roll
+        /// ++  --
+        /// ++  --
+        /// Pitch
+        /// ++ ++
+        /// -- --
+        /// Yaw
+        /// -- ++
+        /// ++ --
         let front_left = throttle - yaw + pitch + roll; // M3
         let front_right = throttle + yaw + pitch - roll; // M2
         let back_left = throttle + yaw - pitch + roll; // M4

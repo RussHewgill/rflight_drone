@@ -384,6 +384,8 @@ mod app {
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);
 
+                // print_v3("gyro   = ", mag, 3);
+
                 let (roll, pitch, yaw) = fd.get_euler_angles();
                 rprintln!(
                     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
