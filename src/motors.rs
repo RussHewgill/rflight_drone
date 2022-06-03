@@ -48,7 +48,8 @@ impl MotorsPWM {
     /// 0.23 is nearly enough to take off
     // pub const MOTOR_MAX_THROTTLE: f32 = 1.0;
     // pub const MOTOR_MAX_THROTTLE: f32 = 0.3;
-    pub const MOTOR_MAX_THROTTLE: f32 = 0.4;
+    // pub const MOTOR_MAX_THROTTLE: f32 = 0.4;
+    pub const MOTOR_MAX_THROTTLE: f32 = 0.5;
 
     /// from ST firmware
     pub const FREQ: HertzU32 = fugit::HertzU32::Hz(494);
@@ -100,7 +101,7 @@ impl MotorsPWM {
     }
 }
 
-/// enable, disable, set pwm
+/// set_armed
 impl MotorsPWM {
     pub fn set_armed(&mut self, armed: bool) {
         rprintln!("setting motors armed = {:?}", armed);
@@ -116,7 +117,10 @@ impl MotorsPWM {
 
         //
     }
+}
 
+/// enable, disable, set pwm
+impl MotorsPWM {
     pub fn enable_all(&mut self) {
         debug!("enabling all motors");
         self.enable_motor(MotorSelect::Motor1);

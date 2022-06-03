@@ -263,8 +263,8 @@ impl DroneController {
             // pid_roll_stab.kd = 0.0;
             // pid_roll_stab.i_limit = 0.0;
 
-            // pid_pitch_rate.kp = 1.0;
-            // pid_pitch_stab.kp = 1.0;
+            pid_pitch_rate.kp = 0.01;
+            pid_pitch_stab.kp = 0.01;
 
             // pid_pitch_stab.kp = 0.001579; // kp1
             // pid_pitch_stab.i_limit = 0.001053; // XXX: ST firmware says this is 5 degrees ??
@@ -385,10 +385,8 @@ impl DroneController {
 
 /// update
 impl DroneController {
-    // #[cfg(feature = "nope")]
     pub fn update(
         &mut self,
-        // inputs: &ControlInputs,
         inputs: ControlInputs,
         ahrs_quat: &UQuat,
         gyro: V3,
@@ -401,13 +399,13 @@ impl DroneController {
         let err0_pitch = i_pitch - ahrs_pitch;
         let err0_yaw = i_yaw - ahrs_yaw;
 
-        let out0_roll = self.pid_roll_stab.step(err0_roll);
+        // let out0_roll = self.pid_roll_stab.step(err0_roll);
         let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
-        let out0_yaw = self.pid_yaw_stab.step(err0_yaw);
+        // let out0_yaw = self.pid_yaw_stab.step(err0_yaw);
 
-        // let out0_roll = 0.0;
+        let out0_roll = 0.0;
         // let out0_pitch = 0.0;
-        // let out0_yaw = 0.0;
+        let out0_yaw = 0.0;
 
         /// Roll  = y
         /// Pitch = x
@@ -415,20 +413,20 @@ impl DroneController {
         let err1_pitch = out0_pitch - gyro.x;
         let err1_yaw = out0_yaw - gyro.z;
 
-        let out1_roll = self.pid_roll_rate.step(err1_roll);
+        // let out1_roll = self.pid_roll_rate.step(err1_roll);
         let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
-        let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+        // let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
-        // let out1_roll = 0.0;
-        // let out1_pitch = 0.0;
+        let out1_roll = 0.0;
+        let out1_yaw = 0.0;
 
         use crate::math::rad_to_deg;
         use crate::utils::r;
 
-        // rprintln!("err0_yaw = {:?}", rad_to_deg(err0_yaw));
-        // rprintln!("out0_yaw = {:?}", out0_yaw);
-        // rprintln!("err1_yaw = {:?}", err1_yaw);
-        // rprintln!("out1_yaw = {:?}", out1_yaw);
+        // rprintln!("err0_pitch = {:?}", err0_pitch);
+        // rprintln!("out0_pitch = {:?}", out0_pitch);
+        // rprintln!("err1_pitch = {:?}", err1_pitch);
+        // rprintln!("out1_pitch = {:?}", out1_pitch);
         // rprintln!("");
 
         // rprintln!(

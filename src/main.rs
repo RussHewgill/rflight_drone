@@ -324,174 +324,6 @@ mod app {
         (shared, local, init::Monotonics(mono))
     }
 
-    /// fusion
-    #[cfg(feature = "nope")]
-    // #[task(
-    //     binds = TIM3,
-    //     shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
-    //     local = [tim3, sensors],
-    //     priority = 4
-    // )]
-    fn timer_sensors(mut cx: timer_sensors::Context) {
-        cx.local
-            .tim3
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        let ahrs = cx.shared.ahrs;
-        let flight_data = cx.shared.flight_data;
-        let sens_data = cx.shared.sens_data;
-        let tim9_flag = cx.shared.tim9_flag;
-        let motors = cx.shared.motors;
-        let inputs = cx.shared.inputs;
-        let controller = cx.shared.controller;
-
-        /// update sensors, ahrs
-        (
-            ahrs,
-            sens_data,
-            flight_data,
-            tim9_flag,
-            motors,
-            inputs,
-            controller,
-        )
-            .lock(|ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
-                // rprintln!("timer_sensors lock 0");
-
-                /// Read sensor data
-                cx.local.sensors.read_data_mag(sd);
-                cx.local.sensors.read_data_imu(sd, false);
-                cx.local.sensors.read_data_baro(sd);
-
-                /// update AHRS
-                let gyro0 = sd.imu_gyro.read_and_reset();
-                let acc0 = sd.imu_acc.read_and_reset();
-                let mag0 = sd.magnetometer.read_and_reset();
-
-                // let pressure = sd.baro_pressure.read_and_reset();
-                // let temp = sd.baro_temperature.read_and_reset();
-                // let alt = ahrs.update_baro(pressure, temp);
-                // rprintln!("alt = {:?}", alt);
-
-                // if ahrs.calibration.initializing {
-                //     ahrs.calibration.update(gyro0, acc0, mag0);
-                // }
-
-                let gyro1 = ahrs.calibration.calibrate_gyro(gyro0);
-                let acc = ahrs.calibration.calibrate_acc(acc0);
-                let mag = ahrs.calibration.calibrate_mag(mag0);
-
-                // let gyro = gyro0;
-                // let acc = acc0;
-                // let mag = mag0;
-
-                let gyro = ahrs.offset.update(gyro1);
-                // let gyro = gyro1;
-
-                #[cfg(feature = "nope")]
-                {
-                    // print_v3("gyro = ", gyro, 4);
-                    // print_v3("acc  = ", acc, 4);
-                    // print_v3("mag  = ", mag, 6);
-
-                    // print_v3("mag0 = ", mag0, 6);
-
-                    // use na::RealField;
-                    // let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-                    // rprintln!(
-                    //     "heading = {:?}, mag(x,y,z) = ({:?}, {:?}, {:?})",
-                    //     round_to(heading, 1),
-                    //     round_to(mag.x, 6),
-                    //     round_to(mag.y, 6),
-                    //     round_to(mag.z, 6),
-                    // );
-
-                    // /// expected magnetic field:
-                    // /// Declination (+E) = 15.9 deg
-                    // /// Inclination (+D) = 70.1 deg
-                    // /// total:      53_743 nT
-                    // /// +North:     17_611 nT
-                    // /// +East:      5_028  nT
-                    // /// +Vertical:  50_527 nT
-                    // let mag_strength = mag.magnitude();
-                    // let mag_horiz = {
-                    //     let v = V3::new(mag.x, mag.y, 0.0);
-                    //     v.magnitude()
-                    // };
-
-                    // rprintln!(
-                    //     "mag total: [{=f32:08}]\nhorizontal = {=f32:08}\n{=f32:08}, {=f32:08}, {=f32:08}",
-                    //     mag_strength,
-                    //     mag_horiz,
-                    //     r(mag.x),
-                    //     r(mag.y),
-                    //     r(mag.z)
-                    // );
-                }
-
-                ahrs.update(gyro, acc, mag);
-                // ahrs.update_no_mag(gyro, acc);
-
-                /// update FlightData
-                fd.update(ahrs);
-
-                /// update PIDs
-                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
-
-                /// apply mixed PID outputs to motors
-                motor_outputs.apply(motors);
-
-                let (roll, pitch, yaw) = fd.get_euler_angles();
-
-                // rprintln!(
-                //     "(r,p,y) = {:?}, {:?}, {:?}",
-                //     r(rad_to_deg(roll)),
-                //     r(rad_to_deg(pitch)),
-                //     r(rad_to_deg(yaw)),
-                // );
-
-                use na::{ComplexField, RealField};
-                let heading = rad_to_deg(f32::atan2(mag.y, mag.x));
-
-                let xh = mag.x * pitch.cos() + mag.y * pitch.sin() * roll.sin()
-                    - mag.z * roll.cos() * pitch.sin();
-                let yh = mag.y * roll.cos() + mag.z * roll.sin();
-
-                let heading2 = rad_to_deg(f32::atan2(yh, xh));
-
-                // let heading2 = AhrsFusion::compass_calc_heading(acc, mag);
-
-                // let heading2 =
-                // let heading2 = rad_to_deg()
-
-                // rprintln!(
-                //     "yaw = {:?}\nheading  = {:?}\nheading2 = {:?}",
-                //     rad_to_deg(yaw),
-                //     heading,
-                //     heading2
-                // );
-
-                // let q = fd.quat.as_ref();
-
-                // use na::{Quaternion, Vector2};
-                // let h = q * (Quaternion::from_parts(0.0, mag) * q.conjugate());
-                // let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
-                // let b = UQuat::from_quaternion(b);
-
-                // fn f(x: f32) -> f32 {
-                //     (x * 10.0).round() / 10.0
-                // }
-
-                // rprintln!(
-                //     "heading = {=f32:04}, yaw = {=f32:04}",
-                //     f(heading),
-                //     f(rad_to_deg(yaw))
-                // );
-
-                *tim9_flag = true;
-                // rprintln!("timer_sensors lock 1");
-            });
-    }
-
     #[task(
         binds = TIM3,
         shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
@@ -543,16 +375,22 @@ mod app {
                 /// update PIDs
                 let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
 
+                // let throttle = 0.2;
+                // let roll = 0.0;
+                // let pitch = 0.00002;
+                // let yaw = 0.0;
+                // let motor_outputs = controller.mix(throttle, roll, pitch, yaw);
+
                 /// apply mixed PID outputs to motors
                 motor_outputs.apply(motors);
 
                 let (roll, pitch, yaw) = fd.get_euler_angles();
                 rprintln!(
                     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                    r(motor_outputs.back_right),
-                    r(motor_outputs.back_left),
-                    r(motor_outputs.front_right), // XXX: rotate 180
-                    r(motor_outputs.front_left),  // to match position on table
+                    round_to(motor_outputs.back_right, 4),
+                    round_to(motor_outputs.back_left, 4),
+                    round_to(motor_outputs.front_right, 4), // XXX: rotate 180
+                    round_to(motor_outputs.front_left, 4),  // to match position on table
                     r(rad_to_deg(roll)),
                     r(rad_to_deg(pitch)),
                     r(rad_to_deg(yaw)),
@@ -568,6 +406,12 @@ mod app {
                 //     r(rad_to_deg(roll)),
                 //     r(rad_to_deg(pitch)),
                 //     r(rad_to_deg(yaw)),
+                // );
+
+                // rprintln!(
+                //     "stab: {:08}\nrate: {:08}",
+                //     controller.pid_pitch_stab.prev_output.output,
+                //     controller.pid_pitch_rate.prev_output.output,
                 // );
 
                 // rprintln!(
