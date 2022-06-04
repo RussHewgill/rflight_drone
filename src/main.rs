@@ -359,8 +359,46 @@ mod app {
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
 
-        rprintln!("wat 1");
-        // unimplemented!()
+        (
+            cx.shared.ahrs,
+            cx.shared.sens_data,
+            cx.shared.flight_data,
+            cx.shared.tim9_flag,
+            cx.shared.motors,
+            cx.shared.inputs,
+            cx.shared.controller,
+        )
+            .lock(|ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
+                /// update AHRS
+                let gyro = sd.imu_gyro.read_and_reset();
+                let acc = sd.imu_acc.read_and_reset();
+                let mag = sd.magnetometer.read_and_reset();
+
+                ahrs.update(gyro, acc, mag);
+
+                /// update FlightData
+                fd.update(ahrs);
+
+                /// update PIDs
+                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+
+                /// apply mixed PID outputs to motors
+                motor_outputs.apply(motors);
+
+                let (roll, pitch, yaw) = fd.get_euler_angles();
+                rprintln!(
+                    "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                    round_to(motor_outputs.back_right, 4),
+                    round_to(motor_outputs.back_left, 4),
+                    round_to(motor_outputs.front_right, 4), // XXX: rotate 180
+                    round_to(motor_outputs.front_left, 4),  // to match position on table
+                    r(rad_to_deg(roll)),
+                    r(rad_to_deg(pitch)),
+                    r(rad_to_deg(yaw)),
+                );
+
+                *tim9_flag = true;
+            });
     }
 
     #[cfg(feature = "nope")]

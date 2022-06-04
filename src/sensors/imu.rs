@@ -27,6 +27,7 @@ pub struct IMU<CS> {
     cfg: ImuConfig,
 }
 
+/// new
 impl<CS> IMU<CS> {
     pub fn new(cs: CS) -> Self {
         Self {
@@ -90,6 +91,12 @@ where
         self.write_reg(spi, IMURegister::CTRL1_XL, 0b0000_0000)?;
         self.write_reg(spi, IMURegister::CTRL2_G, 0b0000_0000)?;
         Ok(())
+    }
+}
+
+impl<CS> IMU<CS> {
+    pub fn get_cfg(&self) -> &ImuConfig {
+        &self.cfg
     }
 }
 
@@ -389,6 +396,8 @@ pub mod config {
     }
 
     mod accel {
+        use fugit::HertzU32;
+
         use super::ImuSetting;
 
         #[derive(Debug, Clone, Copy)]
@@ -534,6 +543,26 @@ pub mod config {
             High1660  = 0b1000,
             High3330  = 0b1001,
             High6660  = 0b1010,
+        }
+
+        impl AccelPowerModes {
+            pub fn to_hertz(&self) -> HertzU32 {
+                use self::AccelPowerModes::*;
+                match self {
+                    PowerDown => 0.Hz(),
+                    Low1p6 => 0.Hz(),
+                    Low12p5 => 0.Hz(),
+                    Low26 => 0.Hz(),
+                    Low52 => 0.Hz(),
+                    Normal104 => 0.Hz(),
+                    Normal208 => 0.Hz(),
+                    High416 => 0.Hz(),
+                    High833 => 0.Hz(),
+                    High1660 => 0.Hz(),
+                    High3330 => 0.Hz(),
+                    High6660 => 0.Hz(),
+                }
+            }
         }
 
         impl ImuSetting for AccelPowerModes {

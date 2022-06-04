@@ -3,6 +3,7 @@ pub mod barometer;
 pub mod imu;
 pub mod magneto;
 
+use fugit::HertzU32;
 use stm32f4::stm32f401::SPI2;
 use stm32f4xx_hal::gpio::{Alternate, Output, Pin};
 use stm32f4xx_hal::nb;
@@ -31,11 +32,6 @@ pub struct Sensors {
     imu:          IMU<Pin<'A', 8, Output>>,
     magnetometer: Magnetometer<Pin<'B', 12, Output>>,
     barometer:    Barometer<Pin<'C', 13, Output>>,
-
-    // pub data: SensorData,
-    pub offset_gyro: V3,
-    pub offset_acc:  V3,
-    pub offset_mag:  V3,
 }
 
 /// Board: (battery connector in upper right, pointing up)
@@ -98,10 +94,6 @@ impl Sensors {
             imu,
             magnetometer,
             barometer,
-            // data: SensorData::default(),
-            offset_gyro: V3::default(),
-            offset_acc: V3::default(),
-            offset_mag: V3::default(),
         }
     }
 }
@@ -127,6 +119,12 @@ impl Sensors {
         F: FnOnce(&mut Spi3, &mut Barometer<Pin<'C', 13, Output>>) -> T,
     {
         f(&mut self.spi, &mut self.barometer)
+    }
+}
+
+impl Sensors {
+    pub fn get_rates(&self) -> (HertzU32, HertzU32, HertzU32) {
+        unimplemented!()
     }
 }
 
