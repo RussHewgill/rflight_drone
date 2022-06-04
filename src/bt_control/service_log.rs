@@ -25,7 +25,9 @@ use crate::{
     bluetooth::{
         gatt::UpdateLongCharacteristicValueParameters, hal_bt::Commands as HalCommands,
     },
-    bt_control::{UUID_LOG_PID_CHAR, UUID_LOG_QUAT_CHAR, UUID_LOG_SENS_CHAR},
+    bt_control::{
+        UUID_LOG_BATT_CHAR, UUID_LOG_PID_CHAR, UUID_LOG_QUAT_CHAR, UUID_LOG_SENS_CHAR,
+    },
     flight_control::IdPID,
     pid::{PIDOutput, PID},
     sensors::V3,
@@ -52,6 +54,7 @@ pub struct SvLogger {
     pub char_handle_quat: CharacteristicHandle,
     pub char_handle_sens: CharacteristicHandle,
     pub char_handle_pid:  CharacteristicHandle,
+    pub char_handle_batt: CharacteristicHandle,
 }
 
 /// write
@@ -256,7 +259,7 @@ where
     GpioError: core::fmt::Debug,
 {
     pub fn init_log_service(&mut self) -> Result<(), BTError<SpiError, GpioError>> {
-        const NUM_SERVICES: usize = 3;
+        const NUM_SERVICES: usize = 4;
         // const NUM_RECORDS: usize = 1 + 3 * NUM_SERVICES;
 
         let params = AddServiceParameters {
@@ -344,6 +347,14 @@ where
             2,
         )?;
 
+        let handle_batt = self.add_log_char(
+            service.service_handle,
+            UUID_LOG_BATT_CHAR,
+            6,
+            CharacteristicProperty::NOTIFY,
+            3,
+        )?;
+
         // let params1 = AddCharacteristicParameters {
         //     service_handle:            service.service_handle,
         //     characteristic_uuid:       UUID_LOG_SENS_CHAR,
@@ -396,6 +407,7 @@ where
             char_handle_quat: handle_quat,
             char_handle_sens: handle_sens,
             char_handle_pid:  handle_pid,
+            char_handle_batt: handle_batt,
         };
 
         self.services.logger = Some(logger);

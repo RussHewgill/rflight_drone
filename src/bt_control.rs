@@ -115,6 +115,9 @@ mod uuids {
     pub const UUID_LOG_PID_CHAR: crate::bluetooth::gatt::Uuid =
         uuid_from_hex(0x954ea4cad97841018a6ab34dd34df896);
 
+    pub const UUID_LOG_BATT_CHAR: crate::bluetooth::gatt::Uuid =
+        uuid_from_hex(0x4fe63a0e927b4764a2f29bda08e4d7e2);
+
     // /// Sensors
     // pub const UUID_SENSOR_SERVICE: crate::bluetooth::gatt::Uuid =
     //     uuid_from_hex(0x639d0157e75a4eb9835298b676f51912);
