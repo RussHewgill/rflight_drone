@@ -548,19 +548,21 @@ pub mod config {
         impl AccelPowerModes {
             pub fn to_hertz(&self) -> HertzU32 {
                 use self::AccelPowerModes::*;
+                use fugit::RateExtU32;
+                #[rustfmt::skip]
                 match self {
-                    PowerDown => 0.Hz(),
-                    Low1p6 => 0.Hz(),
-                    Low12p5 => 0.Hz(),
-                    Low26 => 0.Hz(),
-                    Low52 => 0.Hz(),
-                    Normal104 => 0.Hz(),
-                    Normal208 => 0.Hz(),
-                    High416 => 0.Hz(),
-                    High833 => 0.Hz(),
-                    High1660 => 0.Hz(),
-                    High3330 => 0.Hz(),
-                    High6660 => 0.Hz(),
+                    PowerDown => 0u32.Hz(),
+                    Low1p6    => 6u32.Hz(),
+                    Low12p5   => 12u32.Hz(),
+                    Low26     => 26u32.Hz(),
+                    Low52     => 52u32.Hz(),
+                    Normal104 => 104u32.Hz(),
+                    Normal208 => 208u32.Hz(),
+                    High416   => 416u32.Hz(),
+                    High833   => 833u32.Hz(),
+                    High1660  => 1660u32.Hz(),
+                    High3330  => 3330u32.Hz(),
+                    High6660  => 6660u32.Hz(),
                 }
             }
         }
@@ -573,6 +575,8 @@ pub mod config {
     }
 
     mod gyro {
+        use fugit::HertzU32;
+
         use super::ImuSetting;
 
         #[derive(Debug, Clone, Copy)]
@@ -647,6 +651,27 @@ pub mod config {
             High1660  = 0b1000,
             High3330  = 0b1001,
             High6660  = 0b1011,
+        }
+
+        impl GyroPowerModes {
+            pub fn to_hertz(&self) -> HertzU32 {
+                use self::GyroPowerModes::*;
+                use fugit::RateExtU32;
+                #[rustfmt::skip]
+                match self {
+                    PowerDown => 0u32.Hz(),
+                    Low12p5   => 12u32.Hz(),
+                    Low26     => 26u32.Hz(),
+                    Low52     => 52u32.Hz(),
+                    Normal104 => 104u32.Hz(),
+                    Normal208 => 208u32.Hz(),
+                    High416   => 416u32.Hz(),
+                    High833   => 833u32.Hz(),
+                    High1660  => 1660u32.Hz(),
+                    High3330  => 3330u32.Hz(),
+                    High6660  => 6660u32.Hz(),
+                }
+            }
         }
 
         impl ImuSetting for GyroPowerModes {

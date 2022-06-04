@@ -38,8 +38,8 @@ use crate::bt_control::BTController;
 /// 2: BT Delay
 /// 3: PID interrupt
 /// 4: Motor PWM
-/// _: Sensors interrupt
 /// 5: Main monotonic
+/// 10: Sensors interrupt
 
 pub fn init_all_pre(rcc: &mut RCC) {
     /// Enable GPIOA + GPIOB + GPIOC
@@ -250,11 +250,11 @@ pub fn init_sensors(sensors: &mut Sensors) {
             .unwrap();
     });
 
-    sensors.with_spi_baro(|spi, baro| {
-        baro.init(spi).unwrap();
-        baro.set_data_rate(spi, crate::sensors::barometer::BaroDataRate::R75)
-            .unwrap();
-    });
+    // sensors.with_spi_baro(|spi, baro| {
+    //     baro.init(spi).unwrap();
+    //     baro.set_data_rate(spi, crate::sensors::barometer::BaroDataRate::R75)
+    //         .unwrap();
+    // });
 }
 
 fn init_bt_interrupt(

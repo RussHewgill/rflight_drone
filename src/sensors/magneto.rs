@@ -3,6 +3,7 @@
 // use cortex_m_semihosting::hprintln;
 use embedded_hal as hal;
 
+use fugit::HertzU32;
 use stm32f4xx_hal::nb;
 use stm32f4xx_hal::{
     hal::digital::v2::{InputPin, OutputPin},
@@ -13,7 +14,8 @@ use crate::spi::{Spi3, SpiError};
 
 pub struct Magnetometer<CS> {
     // spi: Spi3,
-    cs: CS,
+    cs:        CS,
+    data_rate: MagDataRate,
 }
 
 const SPI_READ: u8 = 0x80; // 0x01 << 7
@@ -25,7 +27,10 @@ where
     CS: OutputPin<Error = PinError>,
 {
     pub fn new(cs: CS) -> Self {
-        Self { cs }
+        Self {
+            cs,
+            data_rate: MagDataRate::R10,
+        }
     }
 
     pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
@@ -74,9 +79,22 @@ where
             0 | 1 | 2 | 3 => (rate as u8) << 2,
             _ => panic!("set_data_rate, bad rate"),
         };
+
+        self.data_rate = match rate {
+            0 => MagDataRate::R10,
+            1 => MagDataRate::R20,
+            2 => MagDataRate::R50,
+            3 => MagDataRate::R100,
+            _ => panic!("set_data_rate, bad rate"),
+        };
+
         let current = self.read_reg(spi, MagRegister::CFG_REG_A)?;
         self.write_reg(spi, MagRegister::CFG_REG_A, current | rate)?;
         Ok(())
+    }
+
+    pub fn get_data_rate(&self) -> &MagDataRate {
+        &self.data_rate
     }
 
     pub fn set_offset_cancellation(
@@ -251,6 +269,16 @@ pub enum MagDataRate {
 impl MagDataRate {
     fn to_val(self) -> u8 {
         (self as u8) << 2
+    }
+
+    pub fn to_hertz(&self) -> HertzU32 {
+        use fugit::RateExtU32;
+        match self {
+            MagDataRate::R10 => 10u32.Hz(),
+            MagDataRate::R20 => 20u32.Hz(),
+            MagDataRate::R50 => 50u32.Hz(),
+            MagDataRate::R100 => 100u32.Hz(),
+        }
     }
 }
 

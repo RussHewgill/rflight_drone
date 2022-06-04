@@ -3,7 +3,7 @@ pub mod barometer;
 pub mod imu;
 pub mod magneto;
 
-use fugit::HertzU32;
+use fugit::{HertzU32, RateExtU32};
 use stm32f4::stm32f401::SPI2;
 use stm32f4xx_hal::gpio::{Alternate, Output, Pin};
 use stm32f4xx_hal::nb;
@@ -123,8 +123,20 @@ impl Sensors {
 }
 
 impl Sensors {
+    /// TODO: Baro rate
+    // pub fn get_rates(&self) -> (HertzU32, HertzU32, HertzU32, HertzU32) {
     pub fn get_rates(&self) -> (HertzU32, HertzU32, HertzU32) {
-        unimplemented!()
+        let cfg_imu = self.imu.get_cfg();
+
+        let rate_gyro = cfg_imu.gyro_power.to_hertz();
+        let rate_acc = cfg_imu.acc_power.to_hertz();
+
+        let rate_mag = self.magnetometer.get_data_rate().to_hertz();
+
+        // let rate_baro = 0u32.Hz();
+
+        // (rate_gyro, rate_acc, rate_mag, rate_baro)
+        (rate_gyro, rate_acc, rate_mag)
     }
 }
 

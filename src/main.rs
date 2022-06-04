@@ -292,13 +292,13 @@ mod app {
         //     core::mem::size_of::<PID>()
         // );
 
-        /// start PID timer
-        tim3.start(pid_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start PID timer
+        // tim3.start(pid_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start Sensor timer
-        tim10.start(sensor_period).unwrap();
-        tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start Sensor timer
+        // tim10.start(sensor_period).unwrap();
+        // tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
@@ -326,7 +326,7 @@ mod app {
             // interval,
         };
 
-        // timer_sensors::spawn_after(100.millis()).unwrap();
+        timer_sensors::spawn_after(100.millis()).unwrap();
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
@@ -336,16 +336,57 @@ mod app {
     }
 
     #[task(
-        binds = TIM1_UP_TIM10,
-        shared = [sens_data],
-        local = [tim10, sensors],
+        // binds = TIM1_UP_TIM10,
+        shared = [sens_data, dwt],
+        local = [tim10, sensors, counter: u32 = 0],
         priority = 4
     )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
-        cx.local
-            .tim10
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        rprintln!("wat 0");
+        // cx.local
+        //     .tim10
+        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+
+        /// mag: 23394 ns, 42.75 kHz
+        /// imu: 33955 ns, 29.5 kHz
+        cx.shared.dwt.lock(|dwt| {
+            let mut ts = arrayvec::ArrayVec::<u64, 100>::new();
+
+            for _ in 0..100 {
+                // while !cx
+                //     .local
+                //     .sensors
+                //     .with_spi_mag(|spi, mag| mag.read_new_data_available(spi))
+                //     .unwrap()
+                // {
+                //     cortex_m::asm::nop();
+                // }
+
+                while !cx.local.sensors.with_spi_imu(|spi, imu| {
+                    imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)
+                }) {
+                    cortex_m::asm::nop();
+                }
+
+                let t = dwt.measure(|| {
+                    cx.shared.sens_data.lock(|sd| {
+                        /// Read sensor data
+                        // cx.local.sensors.read_data_mag(sd);
+                        cx.local.sensors.read_data_imu(sd, false);
+                        // cx.local.sensors.read_data_baro(sd);
+                    });
+                });
+
+                // ts.push(t.as_secs_f32());
+                ts.push(t.as_nanos());
+            }
+
+            let mut x = 0;
+            for t in ts.iter() {
+                x += *t;
+            }
+
+            rprintln!("avg = {:?}", x / 100);
+        });
     }
 
     #[task(
