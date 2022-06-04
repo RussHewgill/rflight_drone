@@ -45,6 +45,8 @@ impl MotorsPWM {
     // /// from ST firmware, probably not very accurate
     // pub const MOTOR_MIN_THROTTLE: f32 = 200.0;
 
+    pub const MOTOR_MIN_THROTTLE: f32 = 0.05;
+
     /// 0.23 is nearly enough to take off
     pub const MOTOR_MAX_THROTTLE: f32 = 1.0;
     // pub const MOTOR_MAX_THROTTLE: f32 = 0.3;
@@ -201,7 +203,11 @@ impl MotorsPWM {
         if !self.armed {
             return;
         }
-        let pwm = pwm.clamp(0.0, Self::MOTOR_MAX_THROTTLE);
+        let pwm = if pwm < Self::MOTOR_MIN_THROTTLE {
+            0.0
+        } else {
+            pwm.clamp(0.0, Self::MOTOR_MAX_THROTTLE)
+        };
         match motor {
             MotorSelect::Motor1 => {
                 self.pin1.set_duty((pwm * Self::MOTOR_MAX_PWM) as u16);
