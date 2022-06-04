@@ -2,7 +2,7 @@ use cortex_m::peripheral::NVIC;
 use embedded_hal::spi::MODE_3;
 // use dwt_systick_monotonic::DwtSystick;
 use stm32f4::stm32f401::{
-    self, ADC1, EXTI, RCC, SPI1, SPI2, TIM10, TIM2, TIM3, TIM5, TIM9,
+    self, ADC1, EXTI, RCC, SPI1, SPI2, TIM10, TIM2, TIM3, TIM4, TIM5,
 };
 use stm32f401::{CorePeripherals, Peripherals};
 use stm32f4xx_hal::adc::Adc;
@@ -34,9 +34,13 @@ use crate::time::MonoTimer;
 // use crate::time::MonoTimer;
 use crate::bt_control::BTController;
 
-// use systick_monotonic::{ExtU64, Systick};
+/// Timers:
+/// 2: BT Delay
+/// 3: PID interrupt
+/// 4: Motor PWM
+/// _: Sensors interrupt
+/// 5: Main monotonic
 
-// pub fn init_all_pre(cp: &mut CorePeripherals, dp: &mut Peripherals) {
 pub fn init_all_pre(rcc: &mut RCC) {
     /// Enable GPIOA + GPIOB + GPIOC
     rcc.ahb1enr.modify(|r, w| {
@@ -65,7 +69,7 @@ pub struct InitStruct {
     /// clocks and timers
     pub clocks:  Clocks,
     pub tim3:    TIM3,
-    pub tim9:    TIM9,
+    pub tim10:   TIM10,
     pub mono:    MonoTimer<TIM5, 1_000_000>,
     /// wrappers
     pub sensors: Sensors,
@@ -88,8 +92,6 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
     // let mut uart = UART::new(dp.USART1, gpioa.pa9, gpioa.pa10, &clocks);
 
     let mono = MonoTimer::<TIM5, 1_000_000>::new(dp.TIM5, &clocks);
-
-    let mut tim3 = dp.TIM3;
 
     let mut syscfg = dp.SYSCFG.constrain();
 
@@ -123,8 +125,8 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
         dwt,
         exti: dp.EXTI,
         clocks,
-        tim3,
-        tim9: dp.TIM9,
+        tim3: dp.TIM3,
+        tim10: dp.TIM10,
         mono,
         sensors,
         bt,

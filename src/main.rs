@@ -98,7 +98,7 @@ mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::MillisDurationU32;
-    use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM5, TIM9};
+    use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM4, TIM5};
 
     // use rtt_target::{rprint, rprintln, rtt_init_print};
     use defmt::println as rprintln;
@@ -166,6 +166,7 @@ mod app {
         //
         sensors: Sensors,
         tim3:    CounterHz<TIM3>,
+        tim10:   CounterHz<TIM10>,
         // interval: MillisDurationU32,
     }
 
@@ -183,9 +184,11 @@ mod app {
         // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 5.Hz();
 
-        // let main_period: stm32f4xx_hal::time::Hertz = 50.Hz();
+        let pid_period: stm32f4xx_hal::time::Hertz = 800.Hz();
 
-        // let mut init_struct = init_all(cp, dp, &mut bt_buf[..]);
+        let sensor_period: stm32f4xx_hal::time::Hertz = 1.Hz();
+        let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
+
         let mut init_struct = init_all(cp, dp);
 
         let clocks = init_struct.clocks;
@@ -220,6 +223,9 @@ mod app {
 
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM3> =
             init_struct.tim3.counter_hz(&clocks);
+
+        let mut tim10: stm32f4xx_hal::timer::CounterHz<TIM10> =
+            init_struct.tim10.counter_hz(&clocks);
 
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
@@ -286,9 +292,13 @@ mod app {
         //     core::mem::size_of::<PID>()
         // );
 
-        /// start timer
-        tim3.start(sensor_period).unwrap();
+        /// start PID timer
+        tim3.start(pid_period).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
+
+        /// start Sensor timer
+        tim10.start(sensor_period).unwrap();
+        tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
@@ -312,12 +322,13 @@ mod app {
         let local = Local {
             sensors,
             tim3,
+            tim10,
             // interval,
         };
 
         // timer_sensors::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -325,12 +336,41 @@ mod app {
     }
 
     #[task(
-        binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
-        local = [tim3, sensors],
+        binds = TIM1_UP_TIM10,
+        shared = [sens_data],
+        local = [tim10, sensors],
         priority = 4
     )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
+        cx.local
+            .tim10
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        rprintln!("wat 0");
+    }
+
+    #[task(
+        binds = TIM3,
+        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
+        local = [tim3],
+        priority = 5
+    )]
+    fn timer_pid(mut cx: timer_pid::Context) {
+        cx.local
+            .tim3
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+
+        rprintln!("wat 1");
+        // unimplemented!()
+    }
+
+    #[cfg(feature = "nope")]
+    // #[task(
+    //     binds = TIM3,
+    //     shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
+    //     local = [tim3, sensors],
+    //     priority = 5
+    // )]
+    fn timer_pid(mut cx: timer_pid::Context) {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
@@ -794,11 +834,13 @@ mod app {
     }
 
     #[local]
-    struct Local {}
+    struct Local {
+        timer: CounterHz<TIM10>,
+    }
 
     #[allow(unreachable_code)]
-    // #[cfg(feature = "nope")]
-    #[init]
+    #[cfg(feature = "nope")]
+    // #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         // foo::spawn().unwrap();
 
@@ -862,9 +904,34 @@ mod app {
         (Shared {}, Local {}, init::Monotonics())
     }
 
-    #[task(shared = [], local = [])]
+    #[init]
+    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        let mut cp: stm32f401::CorePeripherals = cx.core;
+        let mut dp: stm32f401::Peripherals = cx.device;
+
+        let mut rcc = dp.RCC.constrain();
+        let clocks = rcc.cfgr.use_hse(16.MHz()).sysclk(84.MHz()).freeze();
+        rprintln!("sysclk()   core = {:?}", clocks.sysclk());
+        rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
+
+        let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM10> =
+            dp.TIM10.counter_hz(&clocks);
+
+        tim3.start(2.Hz()).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+
+        (Shared {}, Local { timer: tim3 }, init::Monotonics())
+    }
+
+    #[task(
+        binds = TIM1_UP_TIM10,
+        // binds = TIM3,
+        shared = [], local = [timer])]
     fn foo(cx: foo::Context) {
-        foo::spawn().unwrap();
+        cx.local
+            .timer
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        rprintln!("wat");
     }
 
     #[idle]
