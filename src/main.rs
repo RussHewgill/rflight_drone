@@ -167,6 +167,8 @@ mod app {
         sensors: Sensors,
         tim3:    CounterHz<TIM3>,
         tim10:   CounterHz<TIM10>,
+        // t_imu:   u32,
+        // t_mag:   u32,
         // interval: MillisDurationU32,
     }
 
@@ -178,16 +180,16 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        let sensor_period: stm32f4xx_hal::time::Hertz = 800.Hz();
+        let sensor_period: stm32f4xx_hal::time::Hertz = 1600.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 100.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 5.Hz();
 
-        let pid_period: stm32f4xx_hal::time::Hertz = 800.Hz();
+        let pid_period: stm32f4xx_hal::time::Hertz = 1600.Hz();
 
-        let sensor_period: stm32f4xx_hal::time::Hertz = 1.Hz();
-        let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
+        // let sensor_period: stm32f4xx_hal::time::Hertz = 2.Hz();
+        // let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
 
         let mut init_struct = init_all(cp, dp);
 
@@ -292,13 +294,13 @@ mod app {
         //     core::mem::size_of::<PID>()
         // );
 
-        // /// start PID timer
-        // tim3.start(pid_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start PID timer
+        tim3.start(pid_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start Sensor timer
-        // tim10.start(sensor_period).unwrap();
-        // tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Sensor timer
+        tim10.start(sensor_period).unwrap();
+        tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
@@ -323,10 +325,13 @@ mod app {
             sensors,
             tim3,
             tim10,
+            // t_imu,
+            // t_mag,
             // interval,
         };
 
-        timer_sensors::spawn_after(100.millis()).unwrap();
+        // timer_sensors::spawn_after(100.millis()).unwrap();
+        // timer_pid::spawn_after(100.millis()).unwrap();
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
@@ -336,63 +341,34 @@ mod app {
     }
 
     #[task(
-        // binds = TIM1_UP_TIM10,
+        binds = TIM1_UP_TIM10,
         shared = [sens_data, dwt],
         local = [tim10, sensors, counter: u32 = 0],
         priority = 4
     )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
-        // cx.local
-        //     .tim10
-        //     .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+        cx.local
+            .tim10
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
 
         /// mag: 23394 ns, 42.75 kHz
         /// imu: 33955 ns, 29.5 kHz
-        cx.shared.dwt.lock(|dwt| {
-            let mut ts = arrayvec::ArrayVec::<u64, 100>::new();
-
-            for _ in 0..100 {
-                // while !cx
-                //     .local
-                //     .sensors
-                //     .with_spi_mag(|spi, mag| mag.read_new_data_available(spi))
-                //     .unwrap()
-                // {
-                //     cortex_m::asm::nop();
-                // }
-
-                while !cx.local.sensors.with_spi_imu(|spi, imu| {
-                    imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)
-                }) {
-                    cortex_m::asm::nop();
-                }
-
-                let t = dwt.measure(|| {
-                    cx.shared.sens_data.lock(|sd| {
-                        /// Read sensor data
-                        // cx.local.sensors.read_data_mag(sd);
-                        cx.local.sensors.read_data_imu(sd, false);
-                        // cx.local.sensors.read_data_baro(sd);
-                    });
-                });
-
-                // ts.push(t.as_secs_f32());
-                ts.push(t.as_nanos());
-            }
-
-            let mut x = 0;
-            for t in ts.iter() {
-                x += *t;
-            }
-
-            rprintln!("avg = {:?}", x / 100);
+        cx.shared.sens_data.lock(|sd| {
+            // if *cx.local.counter = 1 {
+            // } else {
+            //     *cx.local.counter += 1;
+            // }
+            /// Read sensor data
+            cx.local.sensors.read_data_mag(sd);
+            cx.local.sensors.read_data_imu(sd, false);
+            // cx.local.sensors.read_data_baro(sd);
         });
     }
 
     #[task(
         binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
-        local = [tim3],
+        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller, dwt],
+        local = [tim3, counter: u32 = 0],
         priority = 5
     )]
     fn timer_pid(mut cx: timer_pid::Context) {
@@ -400,6 +376,8 @@ mod app {
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
 
+        /// ahrs update: 34.5 - 37.8 us, 27.6 kHz
+        /// PID updates: ~120 us, 8.3 kHz
         (
             cx.shared.ahrs,
             cx.shared.sens_data,
@@ -408,38 +386,53 @@ mod app {
             cx.shared.motors,
             cx.shared.inputs,
             cx.shared.controller,
+            cx.shared.dwt,
         )
-            .lock(|ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
-                /// update AHRS
-                let gyro = sd.imu_gyro.read_and_reset();
-                let acc = sd.imu_acc.read_and_reset();
-                let mag = sd.magnetometer.read_and_reset();
+            .lock(
+                // |ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
+                |ahrs, sd, fd, tim9_flag, motors, inputs, controller, dwt| {
+                    /// update AHRS
+                    let gyro = sd.imu_gyro.read_and_reset();
+                    let acc = sd.imu_acc.read_and_reset();
+                    let mag = sd.magnetometer.read_and_reset();
 
-                ahrs.update(gyro, acc, mag);
+                    // let t0 = dwt.measure(|| {
+                    // });
+                    // rprintln!("t0 = {:?} ns", t0.as_nanos());
 
-                /// update FlightData
-                fd.update(ahrs);
+                    ahrs.update(gyro, acc, mag);
 
-                /// update PIDs
-                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+                    /// update FlightData
+                    fd.update(ahrs);
 
-                /// apply mixed PID outputs to motors
-                motor_outputs.apply(motors);
+                    /// update PIDs
+                    let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
 
-                let (roll, pitch, yaw) = fd.get_euler_angles();
-                rprintln!(
-                    "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                    round_to(motor_outputs.back_right, 4),
-                    round_to(motor_outputs.back_left, 4),
-                    round_to(motor_outputs.front_right, 4), // XXX: rotate 180
-                    round_to(motor_outputs.front_left, 4),  // to match position on table
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
-                );
+                    /// apply mixed PID outputs to motors
+                    motor_outputs.apply(motors);
 
-                *tim9_flag = true;
-            });
+                    /// print at ~16 Hz
+                    if *cx.local.counter >= 100 {
+                        *cx.local.counter = 0;
+
+                        let (roll, pitch, yaw) = fd.get_euler_angles();
+                        rprintln!(
+                            "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                            round_to(motor_outputs.back_right, 4),
+                            round_to(motor_outputs.back_left, 4),
+                            round_to(motor_outputs.front_right, 4), // XXX: rotate 180
+                            round_to(motor_outputs.front_left, 4), // to match position on table
+                            r(rad_to_deg(roll)),
+                            r(rad_to_deg(pitch)),
+                            r(rad_to_deg(yaw)),
+                        );
+                    } else {
+                        *cx.local.counter += 1;
+                    }
+
+                    *tim9_flag = true;
+                },
+            );
     }
 
     #[cfg(feature = "nope")]
@@ -573,7 +566,8 @@ mod app {
         // const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
 
         // const COUNTER_TIMES: u32 = 40; // 800 hz => 20 hz
-        const COUNTER_TIMES: u32 = 80; // 800 hz => 10 hz
+        // const COUNTER_TIMES: u32 = 80; // 800 hz => 10 hz
+        const COUNTER_TIMES: u32 = 160; // 1600 hz => 10 hz
 
         let flight_data = cx.shared.flight_data;
         let sens_data = cx.shared.sens_data;
