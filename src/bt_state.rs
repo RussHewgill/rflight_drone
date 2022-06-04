@@ -143,26 +143,29 @@ where
                     let param = PIDParam::from_u8(data[1]).unwrap();
                     let val = f32::from_be_bytes(data[2..6].try_into().unwrap());
 
-                    rprintln!("setting {:?} {:?} = {:?}", id, param, val);
+                    // rprintln!("setting {:?} {:?} = {:?}", id, param, val);
 
                     controller[id][param] = val;
 
-                    /// Pitch and Yaw should match
-                    match id {
-                        IdPID::RollRate => {
-                            controller[IdPID::PitchRate][param] = val;
-                        }
-                        IdPID::RollStab => {
-                            controller[IdPID::PitchStab][param] = val;
-                        }
-                        IdPID::PitchRate => {
-                            controller[IdPID::RollRate][param] = val;
-                        }
-                        IdPID::PitchStab => {
-                            controller[IdPID::RollStab][param] = val;
-                        }
-                        _ => {}
-                    }
+                    // TODO:
+                    // /// Pitch and Yaw should match
+                    // match id {
+                    //     IdPID::RollRate => {
+                    //         controller[IdPID::PitchRate][param] = val;
+                    //     }
+                    //     IdPID::RollStab => {
+                    //         controller[IdPID::PitchStab][param] = val;
+                    //     }
+                    //     IdPID::PitchRate => {
+                    //         controller[IdPID::RollRate][param] = val;
+                    //     }
+                    //     IdPID::PitchStab => {
+                    //         controller[IdPID::RollStab][param] = val;
+                    //     }
+                    //     _ => {}
+                    // }
+
+                    //
                 }
             }
             _ => {}

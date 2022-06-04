@@ -415,17 +415,19 @@ mod app {
                     if *cx.local.counter >= 100 {
                         *cx.local.counter = 0;
 
-                        let (roll, pitch, yaw) = fd.get_euler_angles();
-                        rprintln!(
-                            "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                            round_to(motor_outputs.back_right, 4),
-                            round_to(motor_outputs.back_left, 4),
-                            round_to(motor_outputs.front_right, 4), // XXX: rotate 180
-                            round_to(motor_outputs.front_left, 4), // to match position on table
-                            r(rad_to_deg(roll)),
-                            r(rad_to_deg(pitch)),
-                            r(rad_to_deg(yaw)),
-                        );
+                        // let (roll, pitch, yaw) = fd.get_euler_angles();
+                        // rprintln!(
+                        //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                        //     round_to(motor_outputs.back_right, 4),
+                        //     round_to(motor_outputs.back_left, 4),
+                        //     round_to(motor_outputs.front_right, 4), // XXX: rotate 180
+                        //     round_to(motor_outputs.front_left, 4), // to match position on table
+                        //     r(rad_to_deg(roll)),
+                        //     r(rad_to_deg(pitch)),
+                        //     r(rad_to_deg(yaw)),
+                        // );
+
+                        //
                     } else {
                         *cx.local.counter += 1;
                     }
