@@ -453,7 +453,12 @@ mod app {
         // const COUNTER_TIMES: u32 = 80; // 800 hz => 10 hz
         // const COUNTER_TIMES: u32 = 160; // 1600 hz => 10 hz
         // const COUNTER_TIMES: u32 = 80; // 1600 hz => 20 hz
-        const COUNTER_TIMES: u32 = 40; // 1600 hz => 40 hz
+        // const COUNTER_TIMES: u32 = 40; // 1600 hz => 40 hz
+
+        /// For a single quat characteristic:
+        /// 80 Hz is ok
+        /// 100 Hz is too much
+        const COUNTER_TIMES: u32 = 1600 / 20; // 1600 hz => 10
         const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
 
         // /// Send data on BT at 20 Hz
@@ -468,7 +473,7 @@ mod app {
         // let inputs = cx.shared.inputs;
         let motors = cx.shared.motors;
         let controller = cx.shared.controller;
-        let adc = cx.shared.adc;
+        // let adc = cx.shared.adc;
 
         // *cx.local.bat_counter += 1;
         // if *cx.local.bat_counter
@@ -478,11 +483,11 @@ mod app {
             if *tim9_flag {
                 *tim9_flag = false;
 
-                *cx.local.counter += 1;
                 if *cx.local.counter >= COUNTER_TIMES {
                     *cx.local.counter = 0;
-                    (flight_data, sens_data, bt, exti, controller, adc, motors).lock(
-                        |fd, sd, bt, exti, controller, adc, motors| {
+
+                    (flight_data, sens_data, bt, exti, controller, motors).lock(
+                        |fd, sd, bt, exti, controller, motors| {
                             /// send orientation
                             bt.pause_interrupt(exti);
                             bt.log_write_quat(&fd.quat).unwrap();
@@ -491,17 +496,19 @@ mod app {
                             /// send battery voltage
                             if *cx.local.bat_counter >= BATT_TIMES {
                                 *cx.local.bat_counter = 0;
-                                let v = adc.sample();
+                                cx.shared.adc.lock(|adc| {
+                                    let v = adc.sample();
 
-                                if motors.is_armed() && v <= adc.min_voltage {
-                                    rprintln!("Low Battery, disarming motors");
-                                    motors.set_armed(false);
-                                }
+                                    if motors.is_armed() && v <= adc.min_voltage {
+                                        rprintln!("Low Battery, disarming motors");
+                                        motors.set_armed(false);
+                                    }
 
-                                // rprintln!("sending battery");
-                                bt.pause_interrupt(exti);
-                                bt.log_write_batt(v).unwrap();
-                                bt.unpause_interrupt(exti);
+                                    // rprintln!("sending battery");
+                                    bt.pause_interrupt(exti);
+                                    bt.log_write_batt(v).unwrap();
+                                    bt.unpause_interrupt(exti);
+                                });
                             } else {
                                 *cx.local.bat_counter += 1;
                             }
@@ -510,22 +517,9 @@ mod app {
                             // let acc0 = sd.imu_acc.read_and_reset();
                             // let mag0 = sd.magnetometer.read_and_reset();
 
-                            // print_v3("gyro = ", gyro0, 4);
-                            // print_v3("acc  = ", acc0, 4);
-                            // print_v3("mag  = ", mag0, 4);
-
-                            // rprintln!(
-                            //     "gyro0 = {:?}, {:?}, {:?}",
-                            //     gyro0.x,
-                            //     gyro0.y,
-                            //     gyro0.z
-                            // );
-
-                            // // rprintln!("0");
                             // bt.pause_interrupt(exti);
                             // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                             // bt.unpause_interrupt(exti);
-                            // // rprintln!("1");
 
                             let pids = [IdPID::PitchRate, IdPID::PitchStab];
 
@@ -547,6 +541,8 @@ mod app {
                             // unimplemented!()
                         },
                     );
+                } else {
+                    *cx.local.counter += 1;
                 }
             }
         });

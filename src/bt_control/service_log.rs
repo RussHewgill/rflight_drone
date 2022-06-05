@@ -356,10 +356,12 @@ where
             0,
         )?;
 
+        /// XXX: made less huge
         let handle_sens = self.add_log_char(
             service.service_handle,
             UUID_LOG_SENS_CHAR,
-            40,
+            // 40,
+            1,
             CharacteristicProperty::NOTIFY | CharacteristicProperty::READ,
             1,
         )?;
@@ -375,7 +377,7 @@ where
         let handle_batt = self.add_log_char(
             service.service_handle,
             UUID_LOG_BATT_CHAR,
-            6,
+            4,
             CharacteristicProperty::NOTIFY,
             3,
         )?;
