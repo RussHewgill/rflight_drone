@@ -190,7 +190,8 @@ where
 
     fn convert_raw_data(l: u8, h: u8) -> f32 {
         let v0 = l as i16 | ((h as i16) << 8);
-        ((v0 as f32) / (i16::MAX as f32)) * Self::SCALE
+        // ((v0 as f32) / (i16::MAX as f32)) * Self::SCALE
+        (v0 as f32) * Self::SCALE
         // v0
     }
 }

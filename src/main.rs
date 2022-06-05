@@ -233,7 +233,7 @@ mod app {
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
 
-        let controller = DroneController::new_default_params();
+        let mut controller = DroneController::new_default_params();
 
         /// Fusion
         let mut ahrs_alg = AhrsFusion::new(
@@ -322,6 +322,9 @@ mod app {
         //     let mag = mag.read_data(spi).unwrap();
         //     print_v3("mag  = ", mag.into(), 4);
         // });
+
+        /// Testing Pitch PID
+        controller.pid_pitch_stab.setpoint = 15.0;
 
         /// start PID timer
         tim3.start(pid_period).unwrap();
@@ -445,17 +448,17 @@ mod app {
                     if *cx.local.counter >= 200 {
                         *cx.local.counter = 0;
 
-                        // let (roll, pitch, yaw) = fd.get_euler_angles();
-                        // rprintln!(
-                        //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                        //     round_to(motor_outputs.back_right, 4),
-                        //     round_to(motor_outputs.back_left, 4),
-                        //     round_to(motor_outputs.front_right, 4), // XXX: rotate 180
-                        //     round_to(motor_outputs.front_left, 4), // to match position on table
-                        //     r(rad_to_deg(roll)),
-                        //     r(rad_to_deg(pitch)),
-                        //     r(rad_to_deg(yaw)),
-                        // );
+                        let (roll, pitch, yaw) = fd.get_euler_angles();
+                        rprintln!(
+                            "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                            round_to(motor_outputs.back_right, 4),
+                            round_to(motor_outputs.back_left, 4),
+                            round_to(motor_outputs.front_right, 4), // XXX: rotate 180
+                            round_to(motor_outputs.front_left, 4), // to match position on table
+                            r(rad_to_deg(roll)),
+                            r(rad_to_deg(pitch)),
+                            r(rad_to_deg(yaw)),
+                        );
 
                         //
                     } else {
