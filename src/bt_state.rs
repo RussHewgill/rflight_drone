@@ -105,8 +105,8 @@ where
         motors: &mut MotorsPWM,
         control_inputs: &mut ControlInputs,
         controller: &mut DroneController,
+        voltage: f32,
         event: &BTEvent,
-        //
     ) {
         let input = if let Some(input) = self.services.input {
             input

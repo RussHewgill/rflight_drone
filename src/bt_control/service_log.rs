@@ -205,6 +205,31 @@ where
         Ok(())
     }
 
+    pub fn log_write_batt(
+        &mut self,
+        batt: f32,
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        let logger = if let Some(logger) = self.services.logger {
+            logger
+        } else {
+            panic!("no logger?");
+        };
+
+        let data = batt.to_be_bytes();
+
+        let val = UpdateCharacteristicValueParameters {
+            service_handle:        logger.service_handle,
+            characteristic_handle: logger.char_handle_batt,
+            offset:                0,
+            value:                 &data,
+        };
+        block!(self.update_characteristic_value(&val)).unwrap();
+
+        let result = self.ignore_event_timeout(None)?;
+
+        Ok(())
+    }
+
     #[cfg(feature = "nope")]
     pub fn log_write(
         &mut self,

@@ -7,13 +7,23 @@ use stm32f4xx_hal::{
 };
 
 pub struct BatteryAdc {
-    pub adc:     Adc<ADC1>,
-    pub voltage: Pin<'B', 1, Analog>,
+    pub adc:          Adc<ADC1>,
+    pub voltage:      Pin<'B', 1, Analog>,
+    pub last_reading: f32,
+    pub min_voltage:  f32,
 }
 
 impl BatteryAdc {
     pub fn new(adc: Adc<ADC1>, voltage: Pin<'B', 1, Analog>) -> Self {
-        Self { adc, voltage }
+        let mut out = Self {
+            adc,
+            voltage,
+            last_reading: 0.0,
+            // min_voltage: 3.8,
+            min_voltage: 4.5,
+        };
+        out.sample();
+        out
     }
 
     pub fn sample(&mut self) -> f32 {
@@ -25,6 +35,8 @@ impl BatteryAdc {
 
         let v_bat: f32 = (sample as f32 * V_REF) / 2u32.pow(12) as f32;
         let v_bat: f32 = v_bat * ((R_UP + R_DOWN) / R_DOWN);
+
+        self.last_reading = v_bat;
 
         v_bat
     }

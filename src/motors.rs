@@ -17,11 +17,12 @@ use defmt::{debug, println as rprintln};
 /// M4: CCW, back left
 /// Max duty: 56680
 pub struct MotorsPWM {
-    armed: bool,
-    pin1:  PwmChannel<TIM4, 0>,
-    pin2:  PwmChannel<TIM4, 1>,
-    pin3:  PwmChannel<TIM4, 2>,
-    pin4:  PwmChannel<TIM4, 3>,
+    armed:  bool,
+    locked: bool,
+    pin1:   PwmChannel<TIM4, 0>,
+    pin2:   PwmChannel<TIM4, 1>,
+    pin3:   PwmChannel<TIM4, 2>,
+    pin4:   PwmChannel<TIM4, 3>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -96,6 +97,7 @@ impl MotorsPWM {
 
         Self {
             armed: false,
+            locked: false,
             // tim4,
             pin1,
             pin2,
@@ -112,6 +114,11 @@ impl MotorsPWM {
 
         // rprintln!("DEBUG: motors bypassed");
 
+        if armed && self.locked {
+            rprintln!("Can't arm motors, locked");
+            return;
+        }
+
         self.armed = armed;
         if armed {
             self.enable_all();
@@ -120,6 +127,10 @@ impl MotorsPWM {
         }
 
         //
+    }
+
+    pub fn is_armed(&self) -> bool {
+        self.armed
     }
 }
 

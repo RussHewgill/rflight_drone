@@ -558,7 +558,7 @@ mod app {
     }
 
     #[task(
-        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller],
+        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
         local = [counter: u32 = 0, bat_counter: u32 = 0, buf: [u8; 16] = [0; 16]],
         priority = 3
     )]
@@ -570,13 +570,16 @@ mod app {
         // const COUNTER_TIMES: u32 = 40; // 800 hz => 20 hz
         // const COUNTER_TIMES: u32 = 80; // 800 hz => 10 hz
         const COUNTER_TIMES: u32 = 160; // 1600 hz => 10 hz
+        const BATT_TIMES: u32 = 10; // 10 hz => 1 hz
 
         let flight_data = cx.shared.flight_data;
         let sens_data = cx.shared.sens_data;
         let bt = cx.shared.bt;
         let exti = cx.shared.exti;
         // let inputs = cx.shared.inputs;
+        let motors = cx.shared.motors;
         let controller = cx.shared.controller;
+        let adc = cx.shared.adc;
 
         // *cx.local.bat_counter += 1;
         // if *cx.local.bat_counter
@@ -589,11 +592,30 @@ mod app {
                 *cx.local.counter += 1;
                 if *cx.local.counter >= COUNTER_TIMES {
                     *cx.local.counter = 0;
-                    (flight_data, sens_data, bt, exti, controller).lock(
-                        |fd, sd, bt, exti, controller| {
+                    (flight_data, sens_data, bt, exti, controller, adc, motors).lock(
+                        |fd, sd, bt, exti, controller, adc, motors| {
+                            /// send orientation
                             bt.pause_interrupt(exti);
                             bt.log_write_quat(&fd.quat).unwrap();
                             bt.unpause_interrupt(exti);
+
+                            /// send battery voltage
+                            if *cx.local.bat_counter >= BATT_TIMES {
+                                *cx.local.bat_counter = 0;
+                                let v = adc.sample();
+
+                                if motors.is_armed() && v <= adc.min_voltage {
+                                    rprintln!("Low Battery, disarming motors");
+                                    motors.set_armed(false);
+                                }
+
+                                rprintln!("sending battery");
+                                bt.pause_interrupt(exti);
+                                bt.log_write_batt(v).unwrap();
+                                bt.unpause_interrupt(exti);
+                            } else {
+                                *cx.local.bat_counter += 1;
+                            }
 
                             // let gyro0 = sd.imu_gyro.read_and_reset();
                             // let acc0 = sd.imu_acc.read_and_reset();
@@ -790,7 +812,7 @@ mod app {
         // bt_test::spawn_after(250.millis()).unwrap();
     }
 
-    #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds], priority = 8)]
+    #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds, adc], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
         (
             cx.shared.bt,
@@ -798,8 +820,9 @@ mod app {
             cx.shared.controller,
             cx.shared.motors,
             cx.shared.inputs,
+            cx.shared.adc,
         )
-            .lock(|bt, exti, controller, motors, inputs| {
+            .lock(|bt, exti, controller, motors, inputs, adc| {
                 rprintln!("bt_irq");
 
                 bt.clear_interrupt();
@@ -848,7 +871,7 @@ mod app {
                         motors.set_armed(false);
                     }
 
-                    bt.handle_input(motors, inputs, controller, &event);
+                    bt.handle_input(motors, inputs, controller, adc.last_reading, &event);
 
                     if !bt.data_ready().unwrap() {
                         break;
