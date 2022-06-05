@@ -458,7 +458,7 @@ mod app {
         /// For a single quat characteristic:
         /// 80 Hz is ok
         /// 100 Hz is too much
-        const COUNTER_TIMES: u32 = 1600 / 20; // 1600 hz => 10
+        const COUNTER_TIMES: u32 = 1600 / 16; // 1600 hz => 10
         const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
 
         // /// Send data on BT at 20 Hz

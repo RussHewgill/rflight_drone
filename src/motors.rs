@@ -214,7 +214,8 @@ impl MotorsPWM {
         if !self.armed {
             return;
         }
-        let pwm = if pwm < Self::MOTOR_MIN_THROTTLE {
+        let pwm = if pwm < Self::MOTOR_MIN_THROTTLE - 1e-6 {
+            // rprintln!("pwm below MIN");
             0.0
         } else {
             pwm.clamp(0.0, Self::MOTOR_MAX_THROTTLE)

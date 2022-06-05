@@ -695,7 +695,7 @@ where
                     //     unimplemented!()
                     // }
                     ev => {
-                        rprintln!("unhandled event = {:?}", ev);
+                        rprintln!("read_event_uart: unhandled event = {:?}", ev);
                     }
                 }
             }
