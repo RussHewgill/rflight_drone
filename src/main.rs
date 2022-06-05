@@ -302,6 +302,9 @@ mod app {
 
         // let (h, l) = (0x16, 0x69);
         // let scale = 0.000061;
+
+        // let (h, l) = (0x00, 0x21);
+        // let scale = 150.0;
         // fn convert_raw_data(l: u8, h: u8, scale: f32) -> f32 {
         //     let v0 = l as i16 | ((h as i16) << 8);
         //     (v0 as f32) * scale
@@ -315,13 +318,18 @@ mod app {
         //     print_v3("acc  = ", acc.into(), 4);
         // });
 
-        // /// start PID timer
-        // tim3.start(pid_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // sensors.with_spi_mag(|spi, mag| {
+        //     let mag = mag.read_data(spi).unwrap();
+        //     print_v3("mag  = ", mag.into(), 4);
+        // });
 
-        // /// start Sensor timer
-        // tim10.start(sensor_period).unwrap();
-        // tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start PID timer
+        tim3.start(pid_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+
+        /// start Sensor timer
+        tim10.start(sensor_period).unwrap();
+        tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
