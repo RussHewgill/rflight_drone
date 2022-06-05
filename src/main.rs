@@ -295,13 +295,34 @@ mod app {
         //     core::mem::size_of::<PID>()
         // );
 
-        /// start PID timer
-        tim3.start(pid_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        sensors.with_spi_imu(|spi, imu| {
+            let (h, l) = (0x2C, 0xA4);
+            // let (h, l) = (0xD3, 0x5C);
+            let (h, l) = (0xa6, 0xb7);
+            let scale = 0.00875;
 
-        /// start Sensor timer
-        tim10.start(sensor_period).unwrap();
-        tim10.listen(stm32f4xx_hal::timer::Event::Update);
+            fn convert_raw_data(l: u8, h: u8, scale: f32) -> f32 {
+                let v0 = l as i16 | ((h as i16) << 8);
+                (v0 as f32) * scale
+            }
+
+            let x = convert_raw_data(l, h, scale);
+            rprintln!("x = {:?}", x);
+        });
+
+        // sensors.with_spi_imu(|spi, imu| {
+        //     let (gyro, acc) = imu.read_data(spi).unwrap();
+        //     print_v3("gyro = ", gyro.into(), 4);
+        //     print_v3("acc  = ", acc.into(), 4);
+        // });
+
+        // /// start PID timer
+        // tim3.start(pid_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+
+        // /// start Sensor timer
+        // tim10.start(sensor_period).unwrap();
+        // tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
@@ -413,8 +434,8 @@ mod app {
                     /// apply mixed PID outputs to motors
                     motor_outputs.apply(motors);
 
-                    /// print at ~16 Hz
-                    if *cx.local.counter >= 100 {
+                    /// print at ~8 Hz
+                    if *cx.local.counter >= 200 {
                         *cx.local.counter = 0;
 
                         // let (roll, pitch, yaw) = fd.get_euler_angles();

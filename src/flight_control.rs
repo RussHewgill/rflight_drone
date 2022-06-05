@@ -391,7 +391,14 @@ impl DroneController {
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
+        /// in radians
         let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
+        /// convert to degrees since gyro is in deg/s
+        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = (
+            rad_to_deg(ahrs_roll),
+            rad_to_deg(ahrs_pitch),
+            rad_to_deg(ahrs_yaw),
+        );
 
         let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values();
 
