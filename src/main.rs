@@ -323,9 +323,6 @@ mod app {
         //     print_v3("mag  = ", mag.into(), 4);
         // });
 
-        /// Testing Pitch PID
-        controller.pid_pitch_stab.setpoint = 15.0;
-
         /// start PID timer
         tim3.start(pid_period).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
@@ -489,7 +486,7 @@ mod app {
         /// For a single quat characteristic:
         /// 80 Hz is ok
         /// 100 Hz is too much
-        const COUNTER_TIMES: u32 = 1600 / 16; // 1600 hz => 10
+        const COUNTER_TIMES: u32 = 1600 / 10; // 1600 hz => 10
         const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
 
         // /// Send data on BT at 20 Hz

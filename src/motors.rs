@@ -46,7 +46,7 @@ impl MotorsPWM {
     // /// from ST firmware, probably not very accurate
     // pub const MOTOR_MIN_THROTTLE: f32 = 200.0;
 
-    pub const MOTOR_MIN_THROTTLE: f32 = 0.05;
+    pub const MOTOR_MIN_THROTTLE: f32 = 0.02;
 
     /// 0.23 is nearly enough to take off
     pub const MOTOR_MAX_THROTTLE: f32 = 1.0;
