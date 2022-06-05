@@ -295,20 +295,19 @@ mod app {
         //     core::mem::size_of::<PID>()
         // );
 
-        sensors.with_spi_imu(|spi, imu| {
-            let (h, l) = (0x2C, 0xA4);
-            // let (h, l) = (0xD3, 0x5C);
-            let (h, l) = (0xa6, 0xb7);
-            let scale = 0.00875;
+        // let (h, l) = (0x2C, 0xA4);
+        // let (h, l) = (0xD3, 0x5C);
+        // let (h, l) = (0xa6, 0xb7);
+        // let scale = 0.00875;
 
-            fn convert_raw_data(l: u8, h: u8, scale: f32) -> f32 {
-                let v0 = l as i16 | ((h as i16) << 8);
-                (v0 as f32) * scale
-            }
-
-            let x = convert_raw_data(l, h, scale);
-            rprintln!("x = {:?}", x);
-        });
+        // let (h, l) = (0x16, 0x69);
+        // let scale = 0.000061;
+        // fn convert_raw_data(l: u8, h: u8, scale: f32) -> f32 {
+        //     let v0 = l as i16 | ((h as i16) << 8);
+        //     (v0 as f32) * scale
+        // }
+        // let x = convert_raw_data(l, h, scale);
+        // rprintln!("x = {:?}", x);
 
         // sensors.with_spi_imu(|spi, imu| {
         //     let (gyro, acc) = imu.read_data(spi).unwrap();

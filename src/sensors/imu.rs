@@ -154,17 +154,17 @@ where
             Self::convert_raw_data(
                 acc_data[0],
                 acc_data[1],
-                self.cfg.acc_scale.to_scale(),
+                self.cfg.acc_scale.to_sensitivity(),
             ),
             Self::convert_raw_data(
                 acc_data[2],
                 acc_data[3],
-                self.cfg.acc_scale.to_scale(),
+                self.cfg.acc_scale.to_sensitivity(),
             ),
             Self::convert_raw_data(
                 acc_data[4],
                 acc_data[5],
-                self.cfg.acc_scale.to_scale(),
+                self.cfg.acc_scale.to_sensitivity(),
             ),
         ];
 
@@ -188,7 +188,8 @@ where
 
     pub fn convert_raw_data(l: u8, h: u8, scale: f32) -> f32 {
         let v0 = l as i16 | ((h as i16) << 8);
-        ((v0 as f32) / (i16::MAX as f32)) * scale
+        // ((v0 as f32) / (i16::MAX as f32)) * scale
+        (v0 as f32) * scale
     }
 }
 
@@ -518,12 +519,12 @@ pub mod config {
         }
 
         impl AccelScaleFactor {
-            pub fn to_scale(self) -> f32 {
+            pub fn to_sensitivity(self) -> f32 {
                 match self {
-                    Self::S2 => 2.0,
-                    Self::S4 => 4.0,
-                    Self::S8 => 8.0,
-                    Self::S16 => 16.0,
+                    Self::S2 => 0.000061,
+                    Self::S4 => 0.000122,
+                    Self::S8 => 0.000244,
+                    Self::S16 => 0.000488,
                 }
             }
         }
