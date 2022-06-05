@@ -36,6 +36,7 @@ impl BTState {
     }
 }
 
+/// handle_connect_disconnect
 impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 where
     CS: OutputPin<Error = GpioError>,

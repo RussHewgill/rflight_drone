@@ -97,7 +97,7 @@ use core::convert::Infallible;
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
-    use fugit::MillisDurationU32;
+    use fugit::{HertzU32, MillisDurationU32};
     use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM4, TIM5};
 
     // use rtt_target::{rprint, rprintln, rtt_init_print};
@@ -142,6 +142,7 @@ mod app {
 
     #[shared]
     struct Shared {
+        freqs:         (HertzU32, HertzU32),
         dwt:           Dwt,
         exti:          EXTI,
         // ahrs:          AhrsController<AhrsComplementary>,
@@ -180,13 +181,13 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        let sensor_period: stm32f4xx_hal::time::Hertz = 1600.Hz();
+        let sensor_period: HertzU32 = 1600.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 100.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 5.Hz();
 
-        let pid_period: stm32f4xx_hal::time::Hertz = 1600.Hz();
+        let pid_period: HertzU32 = 1600.Hz();
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 2.Hz();
         // let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
@@ -306,6 +307,7 @@ mod app {
         rprintln!("Battery = {:?} V", v);
 
         let shared = Shared {
+            freqs: (sensor_period, pid_period),
             dwt,
             exti,
             ahrs,
@@ -437,129 +439,9 @@ mod app {
             );
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    //     binds = TIM3,
-    //     shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller],
-    //     local = [tim3, sensors],
-    //     priority = 5
-    // )]
-    fn timer_pid(mut cx: timer_pid::Context) {
-        cx.local
-            .tim3
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-
-        /// update sensors, ahrs
-        (
-            cx.shared.ahrs,
-            cx.shared.sens_data,
-            cx.shared.flight_data,
-            cx.shared.tim9_flag,
-            cx.shared.motors,
-            cx.shared.inputs,
-            cx.shared.controller,
-        )
-            .lock(|ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
-                /// Read sensor data
-                cx.local.sensors.read_data_mag(sd);
-                cx.local.sensors.read_data_imu(sd, false);
-                cx.local.sensors.read_data_baro(sd);
-
-                /// update AHRS
-                let gyro = sd.imu_gyro.read_and_reset();
-                let acc = sd.imu_acc.read_and_reset();
-                let mag = sd.magnetometer.read_and_reset();
-
-                // let mag = mag - ahrs.calibration.hard_iron_offset;
-                // print_v3("mag   = ", mag, 6);
-                // print_v3("mag_n = ", mag.normalize(), 6);
-                // print_v3("m_ref = ", m_ref.normalize(), 6);
-
-                ahrs.update(gyro, acc, mag);
-
-                /// update FlightData
-                fd.update(ahrs);
-
-                // /// XXX: Testing yaw
-                // inputs.set_yaw(deg_to_rad(110.0));
-
-                // /// XXX: Table isn't flat
-                // inputs.set_roll(deg_to_rad(-1.46));
-
-                /// update PIDs
-                let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
-
-                // let throttle = 0.2;
-                // let roll = 0.0;
-                // let pitch = 0.00002;
-                // let yaw = 0.0;
-                // let motor_outputs = controller.mix(throttle, roll, pitch, yaw);
-
-                /// apply mixed PID outputs to motors
-                motor_outputs.apply(motors);
-
-                // print_v3("gyro   = ", mag, 3);
-
-                let (roll, pitch, yaw) = fd.get_euler_angles();
-                rprintln!(
-                    "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                    round_to(motor_outputs.back_right, 4),
-                    round_to(motor_outputs.back_left, 4),
-                    round_to(motor_outputs.front_right, 4), // XXX: rotate 180
-                    round_to(motor_outputs.front_left, 4),  // to match position on table
-                    r(rad_to_deg(roll)),
-                    r(rad_to_deg(pitch)),
-                    r(rad_to_deg(yaw)),
-                );
-
-                // let (roll, pitch, yaw) = fd.get_euler_angles();
-                // rprintln!(
-                //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                //     r(motor_outputs.front_left),  // FL FR
-                //     r(motor_outputs.front_right), // BL BR
-                //     r(motor_outputs.back_left),
-                //     r(motor_outputs.back_right),
-                //     r(rad_to_deg(roll)),
-                //     r(rad_to_deg(pitch)),
-                //     r(rad_to_deg(yaw)),
-                // );
-
-                // rprintln!(
-                //     "stab: {:08}\nrate: {:08}",
-                //     controller.pid_pitch_stab.prev_output.output,
-                //     controller.pid_pitch_rate.prev_output.output,
-                // );
-
-                // rprintln!(
-                //     "{=f32:08}, {=f32:08}\n{=f32:08}, {=f32:08}",
-                //     r(motor_outputs.front_left),
-                //     r(motor_outputs.front_right),
-                //     r(motor_outputs.back_left),
-                //     r(motor_outputs.back_right),
-                // );
-
-                // let (roll, pitch, yaw) = fd.get_euler_angles();
-                // rprintln!(
-                //     "yaw = {:?}\nctrl = {:?}",
-                //     r(rad_to_deg(yaw)),
-                //     r2(motor_outputs.input_yaw),
-                // );
-
-                // let (roll, pitch, yaw) = fd.get_euler_angles();
-                // rprintln!(
-                //     "(r,p,y) = {:?}, {:?}, {:?}",
-                //     r(rad_to_deg(roll)),
-                //     r(rad_to_deg(pitch)),
-                //     r(rad_to_deg(yaw)),
-                // );
-
-                *tim9_flag = true;
-            });
-    }
-
     #[task(
         shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
-        local = [counter: u32 = 0, bat_counter: u32 = 0, buf: [u8; 16] = [0; 16]],
+        local = [counter: u32 = 0, bat_counter: u32 = 0],
         priority = 3
     )]
     fn main_loop(mut cx: main_loop::Context) {
@@ -569,8 +451,15 @@ mod app {
 
         // const COUNTER_TIMES: u32 = 40; // 800 hz => 20 hz
         // const COUNTER_TIMES: u32 = 80; // 800 hz => 10 hz
-        const COUNTER_TIMES: u32 = 160; // 1600 hz => 10 hz
-        const BATT_TIMES: u32 = 10; // 10 hz => 1 hz
+        // const COUNTER_TIMES: u32 = 160; // 1600 hz => 10 hz
+        // const COUNTER_TIMES: u32 = 80; // 1600 hz => 20 hz
+        const COUNTER_TIMES: u32 = 40; // 1600 hz => 40 hz
+        const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
+
+        // /// Send data on BT at 20 Hz
+        // let COUNTER_TIMES: u32 = cx.shared.freqs.0.to_Hz() / 20;
+        // /// Send battery at 1 Hz
+        // let BATT_TIMES: u32 = cx.shared.freqs.0.to_Hz() / 20;
 
         let flight_data = cx.shared.flight_data;
         let sens_data = cx.shared.sens_data;
@@ -609,7 +498,7 @@ mod app {
                                     motors.set_armed(false);
                                 }
 
-                                rprintln!("sending battery");
+                                // rprintln!("sending battery");
                                 bt.pause_interrupt(exti);
                                 bt.log_write_batt(v).unwrap();
                                 bt.unpause_interrupt(exti);
@@ -840,36 +729,57 @@ mod app {
                         }
                     };
 
-                    // /// TODO: update connection params
-                    // match bt.state.handle_connect_disconnect(&event) {
-                    //     Some(ConnectionChange::NewConnection(conn_handle)) => {
-                    //         // let conn_interval = ConnectionIntervalBuilder::new()
-                    //         //     .with_latency()
-                    //         //     .build()
-                    //         //     .unwrap();
-                    //         // let params = ConnectionUpdateParameters {
-                    //         //     conn_handle,
-                    //         //     conn_interval,
-                    //         //     expected_connection_length:
-                    //         //         ExpectedConnectionLength::new(
-                    //         //             core::time::Duration::from_secs_f32(1.0),
-                    //         //             core::time::Duration::from_secs_f32(1200.0), // 20 minutes
-                    //         //         )
-                    //         //         .unwrap(),
-                    //         // };
-                    //         // // block!(bt.le_connection_update(params)).unwrap();
-                    //         // block!(bt.(params)).unwrap();
-                    //         // bt.read_event_uart().unwrap();
-                    //     }
-                    //     _ => {}
-                    // }
-
-                    if let Some(ConnectionChange::Disconnect) =
-                        bt.handle_connect_disconnect(&event)
-                    {
-                        rprintln!("Disconnected, disarming motors");
-                        motors.set_armed(false);
+                    /// TODO: update connection params
+                    match bt.handle_connect_disconnect(&event) {
+                        // Some(ConnectionChange::NewConnection(conn_handle)) => {
+                        //     rprintln!("conn_handle = {:?}", conn_handle);
+                        //     rprintln!("wat -2");
+                        //     let conn_interval = ConnectionIntervalBuilder::new()
+                        //         .with_range(
+                        //             core::time::Duration::from_micros(7500 * 4),
+                        //             core::time::Duration::from_micros(7500 * 4),
+                        //         )
+                        //         .with_latency(0)
+                        //         .with_supervision_timeout(
+                        //             core::time::Duration::from_secs_f32(1.0),
+                        //         )
+                        //         .build()
+                        //         .unwrap();
+                        //     rprintln!("wat -1");
+                        //     let params =
+                        //         bluetooth_hci_defmt::host::ConnectionUpdateParameters {
+                        //             conn_handle,
+                        //             conn_interval,
+                        //             expected_connection_length:
+                        //                 ExpectedConnectionLength::new(
+                        //                     core::time::Duration::from_millis(32),
+                        //                     core::time::Duration::from_millis(32),
+                        //                 )
+                        //                 .unwrap(),
+                        //         };
+                        //     rprintln!("wat 0");
+                        //     block!(bt.le_connection_update(&params)).unwrap();
+                        //     // block!(bt.start_connection_update(&params)).unwrap();
+                        //     let ev0 = bt._read_event();
+                        //     rprintln!("ev0 = {:?}", ev0);
+                        //     let ev1 = bt._read_event();
+                        //     rprintln!("ev1 = {:?}", ev1);
+                        //     bt.read_event_uart().unwrap();
+                        //     rprintln!("wat 3");
+                        // }
+                        Some(ConnectionChange::Disconnect) => {
+                            rprintln!("Disconnected, disarming motors");
+                            motors.set_armed(false);
+                        }
+                        _ => {}
                     }
+
+                    // if let Some(ConnectionChange::Disconnect) =
+                    //     bt.handle_connect_disconnect(&event)
+                    // {
+                    //     rprintln!("Disconnected, disarming motors");
+                    //     motors.set_armed(false);
+                    // }
 
                     bt.handle_input(motors, inputs, controller, adc.last_reading, &event);
 

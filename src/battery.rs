@@ -19,8 +19,7 @@ impl BatteryAdc {
             adc,
             voltage,
             last_reading: 0.0,
-            // min_voltage: 3.8,
-            min_voltage: 4.5,
+            min_voltage: 3.8,
         };
         out.sample();
         out
