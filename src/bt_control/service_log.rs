@@ -328,26 +328,6 @@ where
         };
         rprintln!("service = {:?}", service);
 
-        // let params0 = AddCharacteristicParameters {
-        //     service_handle:            service.service_handle,
-        //     characteristic_uuid:       UUID_LOG_CHAR,
-        //     characteristic_value_len:  18,
-        //     characteristic_properties: CharacteristicProperty::NOTIFY,
-        //     security_permissions:      CharacteristicPermission::NONE,
-        //     gatt_event_mask:           CharacteristicEvent::NONE,
-        //     encryption_key_size:       EncryptionKeySize::with_value(7).unwrap(),
-        //     is_variable:               true,
-        //     fw_version_before_v72:     false,
-        // };
-        // block!(self.add_characteristic(&params0))?;
-        // rprintln!("sent c 0");
-
-        // let c0 = match self.read_event_params_vendor()? {
-        //     VReturnParameters::GattAddCharacteristic(c) => c,
-        //     other => unimplemented!("other = {:?}", other),
-        // };
-        // rprintln!("c 0 = {:?}", c0);
-
         let handle_quat = self.add_log_char(
             service.service_handle,
             UUID_LOG_QUAT_CHAR,
@@ -360,8 +340,8 @@ where
         let handle_sens = self.add_log_char(
             service.service_handle,
             UUID_LOG_SENS_CHAR,
-            // 40,
-            1,
+            40,
+            // 1,
             CharacteristicProperty::NOTIFY | CharacteristicProperty::READ,
             1,
         )?;
