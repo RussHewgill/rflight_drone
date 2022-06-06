@@ -1,5 +1,6 @@
 pub mod ahrs;
 pub mod barometer;
+pub mod filtering;
 pub mod imu;
 pub mod magneto;
 
@@ -12,6 +13,7 @@ use crate::spi::Spi3;
 
 use nalgebra::{self as na, UnitQuaternion, Vector3};
 
+use self::filtering::SensorFilters;
 use self::{barometer::Barometer, imu::IMU, magneto::Magnetometer};
 
 // #[derive(Clone, Copy, PartialEq)]
@@ -141,6 +143,7 @@ impl Sensors {
 }
 
 /// read data directly
+#[cfg(feature = "nope")]
 impl Sensors {
     pub fn _read_data_imu(&mut self) -> Option<(V3, V3)> {
         self.with_spi_imu(|spi, imu| {
@@ -195,19 +198,20 @@ impl Sensors {
 
 /// read data to SensorData, and swap axes
 impl Sensors {
-    pub fn read_data_imu(&mut self, data: &mut SensorData, discard: bool) {
-        if let Ok((data_gyro, data_acc)) = self.with_spi_imu(|spi, imu| {
-            while !(imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)) {
-                cortex_m::asm::nop();
-            }
-            imu.read_data(spi)
-        }) {
-            if !discard {
+    /// skips updating if data not ready
+    pub fn read_data_imu(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
+        self.with_spi_imu(|spi, imu| {
+            if imu.read_new_data_available(spi).unwrap().iter().any(|x| *x) {
+                let (data_gyro, data_acc) = imu.read_data(spi).unwrap();
+
                 let data_gyro = V3::new(
                     -data_gyro[1], // pitch
                     data_gyro[0],  // roll
                     data_gyro[2],  // yaw
                 );
+
+                let data_gyro = filters.update_gyro(data_gyro);
+
                 data.imu_gyro.update(data_gyro);
 
                 // /// rot about x,y,z
@@ -224,13 +228,77 @@ impl Sensors {
                     data_acc[2],
                 );
 
+                let data_acc = filters.update_acc(data_acc);
+
                 data.imu_acc.update(data_acc);
             }
+        });
+    }
+
+    pub fn read_data_mag(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
+        self.with_spi_mag(|spi, mag| {
+            if mag.read_new_data_available(spi).unwrap() {
+                let mag_data = mag.read_data(spi).unwrap();
+
+                /// from ST firmware
+                /// works correctly with Fusion AHRS
+                let mag_data = V3::new(
+                    -mag_data[1], //
+                    mag_data[0],
+                    mag_data[2],
+                );
+
+                let mag_data = filters.update_mag(mag_data);
+
+                data.magnetometer.update(mag_data);
+            }
+        });
+    }
+}
+
+/// read data to SensorData, and swap axes
+impl Sensors {
+    #[cfg(feature = "nope")]
+    pub fn read_data_imu(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
+        if let Ok((data_gyro, data_acc)) = self.with_spi_imu(|spi, imu| {
+            while !(imu.read_new_data_available(spi).unwrap().iter().any(|x| *x)) {
+                cortex_m::asm::nop();
+            }
+            imu.read_data(spi)
+        }) {
+            let data_gyro = V3::new(
+                -data_gyro[1], // pitch
+                data_gyro[0],  // roll
+                data_gyro[2],  // yaw
+            );
+
+            let data_gyro = filters.update_gyro(data_gyro);
+
+            data.imu_gyro.update(data_gyro);
+
+            // /// rot about x,y,z
+            // let data_acc = [
+            //     -data_acc[1], //
+            //     data_acc[0],
+            //     data_acc[2],
+            // ];
+
+            /// roll, pitch, yaw to match na::Quat
+            let data_acc = V3::new(
+                -data_acc[0], //
+                data_acc[1],
+                data_acc[2],
+            );
+
+            let data_acc = filters.update_acc(data_acc);
+
+            data.imu_acc.update(data_acc);
         } else {
             // unimplemented!()
         }
     }
 
+    #[cfg(feature = "nope")]
     pub fn read_data_mag(&mut self, data: &mut SensorData) {
         if let Ok(mag_data) = self.with_spi_mag(|spi, mag| {
             if mag.read_new_data_available(spi).unwrap() {

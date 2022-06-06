@@ -122,7 +122,7 @@ mod app {
         motors::MotorsPWM,
         pid::PID,
         sensors::{ahrs::*, V3},
-        sensors::{SensorData, Sensors, UQuat},
+        sensors::{filtering::SensorFilters, SensorData, Sensors, UQuat},
         time::MonoTimer,
         utils::*,
     };
@@ -152,6 +152,7 @@ mod app {
         // ahrs:          AhrsController<AhrsMadgwick>,
         sens_data:     SensorData,
         flight_data:   FlightData,
+        sens_filters:  SensorFilters,
         bt:            BTController,
         tim9_flag:     bool,
         adc:           BatteryAdc,
@@ -181,7 +182,8 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        let sensor_period: HertzU32 = 1600.Hz();
+        // let sensor_period: HertzU32 = 1600.Hz();
+        let sensor_period: HertzU32 = 6700.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 100.Hz();
         // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
@@ -278,6 +280,8 @@ mod app {
             3.117466,
         );
 
+        let sens_filters = SensorFilters::new();
+
         // ahrs.calibration.gyr
 
         // /// NED
@@ -341,6 +345,7 @@ mod app {
             ahrs,
             sens_data: SensorData::default(),
             flight_data: FlightData::default(),
+            sens_filters,
             bt,
             tim9_flag: false,
             adc: init_struct.adc,
@@ -372,7 +377,7 @@ mod app {
 
     #[task(
         binds = TIM1_UP_TIM10,
-        shared = [sens_data, dwt],
+        shared = [sens_data, sens_filters],
         local = [tim10, sensors, counter: u32 = 0],
         priority = 4
     )]
@@ -383,14 +388,14 @@ mod app {
 
         /// mag: 23394 ns, 42.75 kHz
         /// imu: 33955 ns, 29.5 kHz
-        cx.shared.sens_data.lock(|sd| {
+        (cx.shared.sens_data, cx.shared.sens_filters).lock(|sd, filters| {
             // if *cx.local.counter = 1 {
             // } else {
             //     *cx.local.counter += 1;
             // }
             /// Read sensor data
-            cx.local.sensors.read_data_mag(sd);
-            cx.local.sensors.read_data_imu(sd, false);
+            cx.local.sensors.read_data_mag(sd, filters);
+            cx.local.sensors.read_data_imu(sd, filters);
             // cx.local.sensors.read_data_baro(sd);
         });
     }
@@ -430,6 +435,7 @@ mod app {
                     // });
                     // rprintln!("t0 = {:?} ns", t0.as_nanos());
 
+                    // let gyro0 = gyro;
                     let gyro = ahrs.update(gyro, acc, mag);
 
                     /// update FlightData
@@ -440,6 +446,16 @@ mod app {
 
                     /// apply mixed PID outputs to motors
                     motor_outputs.apply(motors);
+
+                    // rprintln!(
+                    //     "gyro0 = {=f32:08}, {=f32:08}, {=f32:08}\ngyro1 = {=f32:08}, {=f32:08}, {=f32:08}",
+                    //     round_to(gyro0.x, 6),
+                    //     round_to(gyro0.y, 6),
+                    //     round_to(gyro0.z, 6),
+                    //     round_to(gyro.x, 6),
+                    //     round_to(gyro.y, 6),
+                    //     round_to(gyro.z, 6),
+                    // );
 
                     /// print at ~8 Hz
                     if *cx.local.counter >= 200 {

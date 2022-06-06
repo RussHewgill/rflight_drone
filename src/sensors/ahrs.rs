@@ -11,6 +11,7 @@ use defmt::println as rprintln;
 
 use biquad::*;
 
+use super::filtering::IIRFilter;
 use super::{Rot3, UQuat, V3};
 
 pub use self::calibration::*;
@@ -27,17 +28,17 @@ pub trait AHRS {
     fn get_quat(&self) -> UQuat;
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct AhrsController<A: AHRS> {
     pub ahrs: A,
 
     pub calibration: SensorCalibration,
-
     // pub biquad_cutoff:   biquad::Hertz<f32>,
     // pub biquad_sampling: biquad::Hertz<f32>,
     // pub biquad_coeffs: Coefficients<f32>,
-    pub gyro_x_pre: [V3; 2],
-    pub gyro_y_pre: [V3; 2],
+    // pub gyro_x_pre: [V3; 2],
+    // pub gyro_y_pre: [V3; 2],
+    // pub gyro_iir_filter: IIRFilter,
 }
 
 /// new, update
@@ -49,52 +50,14 @@ impl<A: AHRS> AhrsController<A> {
             // biquad_cutoff: 90.hz(),
             // biquad_sampling: 1.hz(),
             // biquad_coeffs:
-            gyro_x_pre: [V3::zeros(); 2],
-            gyro_y_pre: [V3::zeros(); 2],
+            // gyro_iir_filter: IIRFilter::default(),
         }
-    }
-
-    pub fn gyro_filter_update(&mut self, gyro: V3) -> V3 {
-        /// XXX: 100 hz, 800 hz ???
-        let gyro_fil_coeff = (
-            0.94280904158206336,  // 0, a1
-            -0.33333333333333343, // 1, a2
-            0.09763107293781749,  // 2, b0
-            0.19526214587563498,  // 3, b1
-            0.09763107293781749,  // 4, b2
-        );
-
-        let gyro_fil_x = gyro_fil_coeff.2 * gyro.x
-            + gyro_fil_coeff.3 * self.gyro_x_pre[0].x
-            + gyro_fil_coeff.4 * self.gyro_x_pre[1].x
-            + gyro_fil_coeff.0 * self.gyro_y_pre[0].x
-            + gyro_fil_coeff.1 * self.gyro_y_pre[1].x;
-        let gyro_fil_y = gyro_fil_coeff.2 * gyro.y
-            + gyro_fil_coeff.3 * self.gyro_x_pre[0].y
-            + gyro_fil_coeff.4 * self.gyro_x_pre[1].y
-            + gyro_fil_coeff.0 * self.gyro_y_pre[0].y
-            + gyro_fil_coeff.1 * self.gyro_y_pre[1].y;
-        let gyro_fil_z = gyro_fil_coeff.2 * gyro.z
-            + gyro_fil_coeff.3 * self.gyro_x_pre[0].z
-            + gyro_fil_coeff.4 * self.gyro_x_pre[1].z
-            + gyro_fil_coeff.0 * self.gyro_y_pre[0].z
-            + gyro_fil_coeff.1 * self.gyro_y_pre[1].z;
-
-        let gyro_fil = V3::new(gyro_fil_x, gyro_fil_y, gyro_fil_z);
-
-        self.gyro_x_pre[1] = self.gyro_x_pre[0];
-        self.gyro_y_pre[1] = self.gyro_y_pre[0];
-
-        self.gyro_x_pre[0] = gyro;
-        self.gyro_y_pre[0] = gyro_fil;
-
-        gyro_fil
     }
 
     /// returns filtered gyro
     pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) -> V3 {
-        let gyro0 = gyro;
-        let gyro = self.gyro_filter_update(gyro);
+        // let gyro0 = gyro;
+        // let gyro = self.gyro_iir_filter.iir_update(gyro);
 
         // rprintln!("gyro0.x = {:?}\ngyro1.x = {:?}", gyro0.x, gyro.x);
 
@@ -268,7 +231,7 @@ pub mod offset {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub struct FlightData {
     /// Rotation using North-West-Up convention
     pub quat: UQuat,
