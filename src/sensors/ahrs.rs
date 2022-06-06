@@ -91,7 +91,8 @@ impl<A: AHRS> AhrsController<A> {
         gyro_fil
     }
 
-    pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) {
+    /// returns filtered gyro
+    pub fn update(&mut self, gyro: V3, acc: V3, mag: V3) -> V3 {
         let gyro0 = gyro;
         let gyro = self.gyro_filter_update(gyro);
 
@@ -105,6 +106,8 @@ impl<A: AHRS> AhrsController<A> {
         let gyro = self.calibration.offset.update(gyro);
 
         self.ahrs.update(gyro, acc, mag);
+
+        gyro
     }
 }
 

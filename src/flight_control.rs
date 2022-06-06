@@ -402,8 +402,8 @@ impl DroneController {
 
         let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values();
 
-        /// XXX: testing PID
-        let i_pitch = 15.0;
+        // /// XXX: testing PID
+        // let i_pitch = 15.0;
 
         let err0_roll = i_roll - ahrs_roll;
         let err0_pitch = i_pitch - ahrs_pitch;
