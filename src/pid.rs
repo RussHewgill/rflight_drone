@@ -217,7 +217,7 @@ impl PID {
     }
 }
 
-#[derive(Debug, Clone, Copy, Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Format)]
 #[repr(u8)]
 pub enum PIDParam {
     Kp,

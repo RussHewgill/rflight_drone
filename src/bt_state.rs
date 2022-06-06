@@ -148,6 +148,10 @@ where
 
                     controller[id][param] = val;
 
+                    if param == PIDParam::Ki || param == PIDParam::KiLimit {
+                        controller[id].reset_integral();
+                    }
+
                     // TODO:
                     // /// Pitch and Yaw should match
                     // match id {
