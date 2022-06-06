@@ -199,7 +199,11 @@ impl Sensors {
 /// read data to SensorData, and swap axes
 impl Sensors {
     /// skips updating if data not ready
-    pub fn read_data_imu(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
+    pub fn read_data_imu(
+        &mut self,
+        data: &mut SensorData,
+        filters: &mut SensorFilters,
+    ) -> bool {
         self.with_spi_imu(|spi, imu| {
             if imu.read_new_data_available(spi).unwrap().iter().any(|x| *x) {
                 let (data_gyro, data_acc) = imu.read_data(spi).unwrap();
@@ -214,13 +218,6 @@ impl Sensors {
 
                 data.imu_gyro.update(data_gyro);
 
-                // /// rot about x,y,z
-                // let data_acc = [
-                //     -data_acc[1], //
-                //     data_acc[0],
-                //     data_acc[2],
-                // ];
-
                 /// roll, pitch, yaw to match na::Quat
                 let data_acc = V3::new(
                     -data_acc[0], //
@@ -231,10 +228,14 @@ impl Sensors {
                 let data_acc = filters.update_acc(data_acc);
 
                 data.imu_acc.update(data_acc);
+                true
+            } else {
+                false
             }
-        });
+        })
     }
 
+    #[cfg(feature = "nope")]
     pub fn read_data_mag(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
         self.with_spi_mag(|spi, mag| {
             if mag.read_new_data_available(spi).unwrap() {
@@ -298,7 +299,7 @@ impl Sensors {
         }
     }
 
-    #[cfg(feature = "nope")]
+    // #[cfg(feature = "nope")]
     pub fn read_data_mag(&mut self, data: &mut SensorData) {
         if let Ok(mag_data) = self.with_spi_mag(|spi, mag| {
             if mag.read_new_data_available(spi).unwrap() {

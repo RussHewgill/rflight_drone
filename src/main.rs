@@ -182,12 +182,8 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        // let sensor_period: HertzU32 = 1600.Hz();
-        let sensor_period: HertzU32 = 6700.Hz();
-        // let sensor_period: stm32f4xx_hal::time::Hertz = 200.Hz();
-        // let sensor_period: stm32f4xx_hal::time::Hertz = 100.Hz();
-        // let sensor_period: stm32f4xx_hal::time::Hertz = 50.Hz();
-        // let sensor_period: stm32f4xx_hal::time::Hertz = 5.Hz();
+        let sensor_period: HertzU32 = 1600.Hz();
+        // let sensor_period: HertzU32 = 6700.Hz();
 
         let pid_period: HertzU32 = 1600.Hz();
 
@@ -204,6 +200,7 @@ mod app {
         let mut dwt = init_struct.dwt;
 
         rprintln!("sensor_period = {:?}", sensor_period.to_Hz());
+        rprintln!("pid_period    = {:?}", pid_period);
 
         bt.pause_interrupt(&mut exti);
         match bt.init_bt() {
@@ -389,13 +386,12 @@ mod app {
         /// mag: 23394 ns, 42.75 kHz
         /// imu: 33955 ns, 29.5 kHz
         (cx.shared.sens_data, cx.shared.sens_filters).lock(|sd, filters| {
-            // if *cx.local.counter = 1 {
-            // } else {
-            //     *cx.local.counter += 1;
-            // }
             /// Read sensor data
-            cx.local.sensors.read_data_mag(sd, filters);
-            cx.local.sensors.read_data_imu(sd, filters);
+            // cx.local.sensors.read_data_mag(sd, filters);
+            cx.local.sensors.read_data_mag(sd);
+            let read_imu = cx.local.sensors.read_data_imu(sd, filters);
+
+            // TODO: read baro
             // cx.local.sensors.read_data_baro(sd);
         });
     }
@@ -404,7 +400,8 @@ mod app {
         binds = TIM3,
         shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller, dwt],
         local = [tim3, counter: u32 = 0],
-        priority = 5
+        priority = 5,
+        // priority = 3,
     )]
     fn timer_pid(mut cx: timer_pid::Context) {
         cx.local
@@ -457,8 +454,9 @@ mod app {
                     //     round_to(gyro.z, 6),
                     // );
 
-                    /// print at ~8 Hz
-                    if *cx.local.counter >= 200 {
+                    /// print at FREQ / X Hz
+                    /// 6700, 67 => 100 Hz
+                    if *cx.local.counter >= 67 * 2 {
                         *cx.local.counter = 0;
 
                         // let (roll, pitch, yaw) = fd.get_euler_angles();
@@ -473,6 +471,14 @@ mod app {
                         //     r(rad_to_deg(yaw)),
                         // );
 
+                        let (roll, pitch, yaw) = fd.get_euler_angles();
+                        rprintln!(
+                            "(r,p,y) = \n\t{:08}\n\t{:08}\n\t{:08}",
+                            r(rad_to_deg(roll)),
+                            r(rad_to_deg(pitch)),
+                            r(rad_to_deg(yaw)),
+                        );
+
                         //
                     } else {
                         *cx.local.counter += 1;
@@ -486,7 +492,7 @@ mod app {
     #[task(
         shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
         local = [counter: u32 = 0, bat_counter: u32 = 0],
-        priority = 3
+        priority = 2
     )]
     fn main_loop(mut cx: main_loop::Context) {
         // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
