@@ -144,7 +144,7 @@ where
                     let param = PIDParam::from_u8(data[1]).unwrap();
                     let val = f32::from_be_bytes(data[2..6].try_into().unwrap());
 
-                    // rprintln!("setting {:?} {:?} = {:?}", id, param, val);
+                    rprintln!("setting {:?} {:?} = {:?}", id, param, val);
 
                     controller[id][param] = val;
 

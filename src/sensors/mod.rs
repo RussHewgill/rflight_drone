@@ -235,7 +235,6 @@ impl Sensors {
         })
     }
 
-    #[cfg(feature = "nope")]
     pub fn read_data_mag(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
         self.with_spi_mag(|spi, mag| {
             if mag.read_new_data_available(spi).unwrap() {
@@ -299,7 +298,7 @@ impl Sensors {
         }
     }
 
-    // #[cfg(feature = "nope")]
+    #[cfg(feature = "nope")]
     pub fn read_data_mag(&mut self, data: &mut SensorData) {
         if let Ok(mag_data) = self.with_spi_mag(|spi, mag| {
             if mag.read_new_data_available(spi).unwrap() {

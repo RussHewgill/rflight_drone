@@ -263,8 +263,8 @@ impl DroneController {
             // pid_roll_stab.kd = 0.0;
             // pid_roll_stab.i_limit = 0.0;
 
-            // pid_pitch_rate.kp = 0.01;
-            // pid_pitch_stab.kp = 0.01;
+            // pid_pitch_rate.kp = 0.1;
+            // pid_pitch_stab.kp = 0.1;
 
             // pid_pitch_stab.kp = 0.001579; // kp1
             // pid_pitch_stab.i_limit = 0.001053; // XXX: ST firmware says this is 5 degrees ??

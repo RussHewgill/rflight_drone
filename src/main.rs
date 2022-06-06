@@ -183,9 +183,12 @@ mod app {
         let mut dp: stm32f401::Peripherals = cx.device;
 
         // let sensor_period: HertzU32 = 1600.Hz();
-        let sensor_period: HertzU32 = 6700.Hz();
+        // let sensor_period: HertzU32 = 6700.Hz();
+        // let sensor_period: HertzU32 = 6660.Hz(); // XXX: gyro doesn't work above this??
+        let sensor_period: HertzU32 = 3330.Hz();
 
         let pid_period: HertzU32 = 1600.Hz();
+        // let pid_period: HertzU32 = 3200.Hz();
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 2.Hz();
         // let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
@@ -355,9 +358,14 @@ mod app {
         /// imu: 33955 ns, 29.5 kHz
         (cx.shared.sens_data, cx.shared.sens_filters).lock(|sd, filters| {
             /// Read sensor data
-            // cx.local.sensors.read_data_mag(sd, filters);
-            cx.local.sensors.read_data_mag(sd);
+            cx.local.sensors.read_data_mag(sd, filters);
             let read_imu = cx.local.sensors.read_data_imu(sd, filters);
+
+            // if !read_imu {
+            //     rprintln!("no IMU");
+            // } else {
+            //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+            // }
 
             // TODO: read baro
             // cx.local.sensors.read_data_baro(sd);
@@ -401,16 +409,19 @@ mod app {
                     // rprintln!("t0 = {:?} ns", t0.as_nanos());
 
                     // let gyro0 = gyro;
-                    let gyro = ahrs.update(gyro, acc, mag);
+                    // let gyro = ahrs.update(gyro, acc, mag);
+                    ahrs.update(gyro, acc, mag);
+
+                    // print_v3("gyro = ", gyro, 5);
 
                     /// update FlightData
                     fd.update(ahrs);
 
-                    // /// update PIDs
-                    // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+                    /// update PIDs
+                    let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
 
-                    // /// apply mixed PID outputs to motors
-                    // motor_outputs.apply(motors);
+                    /// apply mixed PID outputs to motors
+                    motor_outputs.apply(motors);
 
                     // rprintln!(
                     //     "gyro0 = {=f32:08}, {=f32:08}, {=f32:08}\ngyro1 = {=f32:08}, {=f32:08}, {=f32:08}",
@@ -506,42 +517,42 @@ mod app {
 
                     (flight_data, sens_data, bt, exti, controller, motors).lock(
                         |fd, sd, bt, exti, controller, motors| {
-                            // /// send orientation
-                            // bt.pause_interrupt(exti);
-                            // bt.log_write_quat(&fd.quat).unwrap();
-                            // bt.unpause_interrupt(exti);
-
-                            // /// send battery voltage
-                            // if *cx.local.bat_counter >= BATT_TIMES {
-                            //     *cx.local.bat_counter = 0;
-                            //     cx.shared.adc.lock(|adc| {
-                            //         let v = adc.sample();
-                            //         if motors.is_armed() && v <= adc.min_voltage {
-                            //             rprintln!("Low Battery, disarming motors");
-                            //             motors.set_armed(false);
-                            //         }
-                            //         bt.pause_interrupt(exti);
-                            //         bt.log_write_batt(v).unwrap();
-                            //         bt.unpause_interrupt(exti);
-                            //     });
-                            // } else {
-                            //     *cx.local.bat_counter += 1;
-                            // }
-
-                            let gyro0 = sd.imu_gyro.read_and_reset();
-                            let acc0 = sd.imu_acc.read_and_reset();
-                            let mag0 = sd.magnetometer.read_and_reset();
-
+                            /// send orientation
                             bt.pause_interrupt(exti);
-                            bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                            bt.log_write_quat(&fd.quat).unwrap();
                             bt.unpause_interrupt(exti);
 
-                            // let pids = [IdPID::PitchRate, IdPID::PitchStab];
-                            // for id in pids {
-                            //     bt.pause_interrupt(exti);
-                            //     bt.log_write_pid(id, &controller[id]).unwrap();
-                            //     bt.unpause_interrupt(exti);
-                            // }
+                            /// send battery voltage
+                            if *cx.local.bat_counter >= BATT_TIMES {
+                                *cx.local.bat_counter = 0;
+                                cx.shared.adc.lock(|adc| {
+                                    let v = adc.sample();
+                                    if motors.is_armed() && v <= adc.min_voltage {
+                                        rprintln!("Low Battery, disarming motors");
+                                        motors.set_armed(false);
+                                    }
+                                    bt.pause_interrupt(exti);
+                                    bt.log_write_batt(v).unwrap();
+                                    bt.unpause_interrupt(exti);
+                                });
+                            } else {
+                                *cx.local.bat_counter += 1;
+                            }
+
+                            // let gyro0 = sd.imu_gyro.read_and_reset();
+                            // let acc0 = sd.imu_acc.read_and_reset();
+                            // let mag0 = sd.magnetometer.read_and_reset();
+
+                            // bt.pause_interrupt(exti);
+                            // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                            // bt.unpause_interrupt(exti);
+
+                            let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                            for id in pids {
+                                bt.pause_interrupt(exti);
+                                bt.log_write_pid(id, &controller[id]).unwrap();
+                                bt.unpause_interrupt(exti);
+                            }
 
                             // #[cfg(feature = "nope")]
                             // for id in IdPID::ITER {
