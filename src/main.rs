@@ -93,7 +93,7 @@ use bluetooth_hci_defmt::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
 // #[cfg(feature = "nope")]
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,EXTI0])]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,SPI4,EXTI0])]
 mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
@@ -246,32 +246,6 @@ mod app {
         ahrs_alg.cfg_acc_rejection = 10.0;
         ahrs_alg.cfg_mag_rejection = 20.0;
 
-        // ahrs.calibration.hard_iron_offset = V3::new(
-        //     -5.1751766, //
-        //     -0.5539105, //
-        //     3.117466,
-        // );
-
-        // /// Kalman
-        // let mut ahrs_alg = AhrsExtKalman::new(
-        //     sensor_period,
-        //     0.5, // XXX: ???
-        // );
-
-        // /// complementary
-        // let gain = 0.1;
-        // let ahrs_alg = AhrsComplementary::new(sensor_period, gain);
-
-        // /// Madgwick
-        // let beta = 40.0; // XXX: ??
-        // let ahrs_alg = AhrsMadgwick::new(sensor_period, beta);
-
-        // /// Mahony
-        // let ahrs_alg = AhrsMahony::new(sensor_period);
-
-        // /// ST ahrs
-        // let ahrs_alg = AhrsST::new(sensor_period);
-
         let mut ahrs = AhrsController::new(ahrs_alg, sensor_period);
 
         ahrs.calibration.hard_iron_offset = V3::new(
@@ -279,12 +253,6 @@ mod app {
             -17325.0,  //
             101025.0,
         );
-
-        // ahrs.calibration.hard_iron_offset = V3::new(
-        //     -5.1751766, //
-        //     -0.5539105, //
-        //     3.117466,
-        // );
 
         let sens_filters = SensorFilters::new();
 
@@ -295,13 +263,13 @@ mod app {
         //     50522.0, //
         // ));
 
-        /// start PID timer
-        tim3.start(pid_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
-
         /// start Sensor timer
         tim10.start(sensor_period).unwrap();
         tim10.listen(stm32f4xx_hal::timer::Event::Update);
+
+        /// start PID timer
+        tim3.start(pid_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
@@ -336,16 +304,37 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
         // timer_pid::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
+
+        test_motors::spawn().unwrap();
+        kill_motors::spawn_after(5_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
+    #[task(shared = [motors, inputs], priority = 6)]
+    fn test_motors(mut cx: test_motors::Context) {
+        (cx.shared.motors, cx.shared.inputs).lock(|motors, inputs| {
+            inputs.motors_armed = true;
+            inputs.throttle = 0.1;
+            motors.set_armed(true);
+        });
+    }
+
+    #[task(shared = [motors], priority = 7)]
+    fn kill_motors(mut cx: kill_motors::Context) {
+        rprintln!("disarming motors");
+        cx.shared.motors.lock(|motors| {
+            motors.set_armed(false);
+        });
+    }
+
     #[task(
         binds = TIM1_UP_TIM10,
-        shared = [sens_data, sens_filters],
+        // shared = [sens_data, sens_filters],
+        shared = [sens_data, sens_filters, motors],
         local = [tim10, sensors, counter: u32 = 0],
         priority = 4
     )]
@@ -356,20 +345,31 @@ mod app {
 
         /// mag: 23394 ns, 42.75 kHz
         /// imu: 33955 ns, 29.5 kHz
-        (cx.shared.sens_data, cx.shared.sens_filters).lock(|sd, filters| {
-            /// Read sensor data
-            cx.local.sensors.read_data_mag(sd, filters);
-            let read_imu = cx.local.sensors.read_data_imu(sd, filters);
+        // (cx.shared.sens_data, cx.shared.sens_filters).lock(|sd, filters| {
+        (
+            cx.shared.sens_data,
+            cx.shared.sens_filters,
+            cx.shared.motors,
+        )
+            .lock(|sd, filters, motors| {
+                /// Read sensor data
+                cx.local.sensors.read_data_mag(sd, filters);
+                let read_imu = cx.local.sensors.read_data_imu(sd, filters);
 
-            if !read_imu {
-                // rprintln!("no IMU");
-            } else {
-                print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
-            }
+                // if !read_imu {
+                //     rprintln!("no IMU");
+                // } else {
+                //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+                // }
 
-            // TODO: read baro
-            // cx.local.sensors.read_data_baro(sd);
-        });
+                if motors.is_armed() {
+                    let gyro = sd.imu_gyro.read_and_reset();
+                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                }
+
+                // TODO: read baro
+                // cx.local.sensors.read_data_baro(sd);
+            });
     }
 
     #[task(

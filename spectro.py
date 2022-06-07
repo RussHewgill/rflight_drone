@@ -17,7 +17,13 @@ def main():
 
     names = ["X","Y","Z"]
 
-    with open('gyro.log') as csv_file:
+    # path = "gyro.log"
+    # path = "gyro_iir.log"
+    # path = "gyro_no_iir.log"
+    path = "gyro_builtin_filter_on.log"
+    # path = "gyro_builtin_filter_off.log"
+
+    with open("".join(["logs/", path])) as csv_file:
         csv_reader = csv.DictReader(csv_file, fieldnames=names)
         line_count = 0
         for row in csv_reader:
@@ -43,7 +49,7 @@ def main():
     ax.axes.xaxis.set_visible(False)
     ax.axes.yaxis.set_visible(False)
 
-    plt.title('Spectrogram of a wav file with piano music')
+    plt.title(f"Spectrogram of gyro X-axis, {path}")
     plt.plot(xs)
     plt.xlabel('Sample')
     plt.ylabel('Amplitude')

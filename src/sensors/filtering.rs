@@ -6,7 +6,8 @@ use biquad::*;
 
 use super::V3;
 
-pub use self::iir::IIRFilter;
+pub use self::iir::*;
+pub use self::pt1::*;
 
 #[derive(Clone, Copy)]
 pub struct SensorFilters {
@@ -38,9 +39,9 @@ impl SensorFilters {
 /// update
 impl SensorFilters {
     pub fn update_gyro(&mut self, mut gyro: V3) -> V3 {
-        if self.gyro_iir.0 {
-            gyro = self.gyro_iir.1.iir_update(gyro);
-        }
+        // if self.gyro_iir.0 {
+        //     gyro = self.gyro_iir.1.iir_update(gyro);
+        // }
 
         // if self.gyro_biquad_lowpass.0 {
         //     gyro = self.gyro_biquad_lowpass.1.run(gyro);
@@ -59,6 +60,43 @@ impl SensorFilters {
 
     pub fn update_baro(&mut self, baro: V3) -> V3 {
         baro
+    }
+}
+
+mod pt1 {
+    use core::f32::consts::PI;
+
+    use super::V3;
+
+    #[derive(Clone, Copy)]
+    pub struct PT1Filter {
+        state:       f32,
+        cutoff_freq: f32,
+    }
+
+    // impl Default for PT1Filter {
+    //     fn default() -> Self {
+    //         Self::new()
+    //     }
+    // }
+
+    impl PT1Filter {
+        pub fn new(cutoff_freq: f32) -> Self {
+            Self {
+                state: 0.0,
+                cutoff_freq,
+            }
+        }
+
+        pub fn filter_gain(f_cut: f32, dt: f32) -> f32 {
+            let rc = 1.0 / (2.0 * PI * f_cut);
+            dt / (rc + dt)
+        }
+
+        pub fn apply(&mut self, input: f32) -> f32 {
+            self.state = self.state + self.cutoff_freq * (input - self.state);
+            self.state
+        }
     }
 }
 
