@@ -304,10 +304,10 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
         // timer_pid::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
-        // test_motors::spawn().unwrap();
-        // kill_motors::spawn_after(5_000.millis()).unwrap();
+        test_motors::spawn().unwrap();
+        kill_motors::spawn_after(5_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -333,8 +333,8 @@ mod app {
 
     #[task(
         binds = TIM1_UP_TIM10,
-        shared = [sens_data, sens_filters],
-        // shared = [sens_data, sens_filters, motors],
+        // shared = [sens_data, sens_filters],
+        shared = [sens_data, sens_filters, motors],
         local = [tim10, sensors, counter: u32 = 0],
         priority = 4
     )]
@@ -345,31 +345,31 @@ mod app {
 
         /// mag: 23394 ns, 42.75 kHz
         /// imu: 33955 ns, 29.5 kHz
-        (cx.shared.sens_data, cx.shared.sens_filters).lock(|sd, filters| {
-            // (
-            // cx.shared.sens_data,
-            // cx.shared.sens_filters,
-            // cx.shared.motors,
-            // )
-            // .lock(|sd, filters, motors| {
-            /// Read sensor data
-            cx.local.sensors.read_data_mag(sd, filters);
-            let read_imu = cx.local.sensors.read_data_imu(sd, filters);
+        // (cx.shared.sens_data, cx.shared.sens_filters).lock(|sd, filters| {
+        (
+            cx.shared.sens_data,
+            cx.shared.sens_filters,
+            cx.shared.motors,
+        )
+            .lock(|sd, filters, motors| {
+                /// Read sensor data
+                cx.local.sensors.read_data_mag(sd, filters);
+                let read_imu = cx.local.sensors.read_data_imu(sd, filters);
 
-            // if !read_imu {
-            //     rprintln!("no IMU");
-            // } else {
-            //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
-            // }
+                // if !read_imu {
+                //     rprintln!("no IMU");
+                // } else {
+                //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+                // }
 
-            // if motors.is_armed() {
-            //     let gyro = sd.imu_gyro.read_and_reset();
-            //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
-            // }
+                if motors.is_armed() {
+                    let gyro = sd.imu_gyro.read_and_reset();
+                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                }
 
-            // TODO: read baro
-            // cx.local.sensors.read_data_baro(sd);
-        });
+                // TODO: read baro
+                // cx.local.sensors.read_data_baro(sd);
+            });
     }
 
     #[task(

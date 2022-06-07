@@ -6,32 +6,26 @@ use biquad::*;
 
 use super::V3;
 
+pub use self::biquad_wrapper::*;
 pub use self::iir::*;
 pub use self::pt1::*;
+pub use self::rpm::*;
 
 #[derive(Clone, Copy)]
 pub struct SensorFilters {
-    gyro_iir: (bool, IIRFilter),
-    // gyro_biquad_lowpass: (bool, DirectForm2Transposed<f32>),
+    gyro_iir:            (bool, IIRFilter),
+    gyro_biquad_lowpass: (bool, BiquadFilter),
 }
 
 /// new
 impl SensorFilters {
     pub fn new() -> Self {
-        // let cutoff = 100.hz();
-        // let sampling = 6660.hz();
-        // let coeffs = Coefficients::<f32>::from_params(
-        //     Type::LowPass,
-        //     cutoff,
-        //     sampling,
-        //     Q_BUTTERWORTH_F32,
-        // )
-        // .unwrap();
-        // let gyro_biquad_lowpass = (true, DirectForm2Transposed::<f32>::new(coeffs));
+        let gyro_biquad_lowpass =
+            (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::LowPass));
 
         Self {
             gyro_iir: (true, IIRFilter::default()),
-            // gyro_biquad_lowpass,
+            gyro_biquad_lowpass,
         }
     }
 }
@@ -39,13 +33,15 @@ impl SensorFilters {
 /// update
 impl SensorFilters {
     pub fn update_gyro(&mut self, mut gyro: V3) -> V3 {
+        //
+
         // if self.gyro_iir.0 {
         //     gyro = self.gyro_iir.1.iir_update(gyro);
         // }
 
-        // if self.gyro_biquad_lowpass.0 {
-        //     gyro = self.gyro_biquad_lowpass.1.run(gyro);
-        // }
+        if self.gyro_biquad_lowpass.0 {
+            gyro = self.gyro_biquad_lowpass.1.apply(gyro);
+        }
 
         gyro
     }
@@ -60,6 +56,53 @@ impl SensorFilters {
 
     pub fn update_baro(&mut self, baro: V3) -> V3 {
         baro
+    }
+}
+
+mod biquad_wrapper {
+    use super::V3;
+    use biquad::*;
+
+    #[derive(Clone, Copy)]
+    pub struct BiquadFilter {
+        x: DirectForm2Transposed<f32>,
+        y: DirectForm2Transposed<f32>,
+        z: DirectForm2Transposed<f32>,
+    }
+
+    /// new
+    impl BiquadFilter {
+        pub fn new(
+            cutoff_freq: biquad::Hertz<f32>,
+            sampling_freq: biquad::Hertz<f32>,
+            filter_type: Type<f32>,
+        ) -> Self {
+            // let cutoff = 100.hz();
+            // let sampling = 6660.hz();
+            let coeffs = Coefficients::<f32>::from_params(
+                filter_type,
+                sampling_freq,
+                cutoff_freq,
+                Q_BUTTERWORTH_F32,
+            )
+            .unwrap();
+            let x = DirectForm2Transposed::<f32>::new(coeffs);
+            let y = DirectForm2Transposed::<f32>::new(coeffs);
+            let z = DirectForm2Transposed::<f32>::new(coeffs);
+
+            Self { x, y, z }
+        }
+    }
+
+    /// apply
+    impl BiquadFilter {
+        pub fn apply(&mut self, input: V3) -> V3 {
+            let x = self.x.run(input.x);
+            let y = self.y.run(input.y);
+            let z = self.z.run(input.z);
+
+            V3::new(x, y, z)
+        }
     }
 }
 
@@ -96,6 +139,38 @@ mod pt1 {
         pub fn apply(&mut self, input: f32) -> f32 {
             self.state = self.state + self.cutoff_freq * (input - self.state);
             self.state
+        }
+    }
+}
+
+mod rpm {
+    use crate::flight_control::MotorOutputs;
+
+    use super::V3;
+
+    #[derive(Default, Clone, Copy)]
+    pub struct RPMFilter {}
+
+    impl RPMFilter {
+        pub fn apply(&self, throttle: &MotorOutputs) {
+            unimplemented!()
+        }
+    }
+
+    #[derive(Default, Clone, Copy)]
+    pub struct NotchFilter {
+        low_freq:  f32,
+        high_freq: f32,
+        band:      f32,
+    }
+
+    impl NotchFilter {
+        pub fn new(low_freq: f32, high_freq: f32, band: f32) -> Self {
+            Self {
+                low_freq,
+                high_freq,
+                band,
+            }
         }
     }
 }

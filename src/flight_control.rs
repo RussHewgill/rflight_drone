@@ -248,6 +248,9 @@ impl DroneController {
         /// output meanings:
         /// pid_pitch_stab:  desired pitch rate in rad/s
 
+        // pid_pitch_rate.kp = 0.1;
+        // pid_pitch_stab.kp = 0.1;
+
         // #[cfg(feature = "nope")]
         /// starting point
         {

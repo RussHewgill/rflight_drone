@@ -20,8 +20,15 @@ def main():
     # path = "gyro.log"
     # path = "gyro_iir.log"
     # path = "gyro_no_iir.log"
-    path = "gyro_builtin_filter_on.log"
+    # path = "gyro_builtin_filter_on.log"
     # path = "gyro_builtin_filter_off.log"
+    # path = "gyro_iir_0.5.log"
+    # path = "gyro_iir_1.0.log"
+    # path = "gyro_iir_1.5.log"
+    # path = "gyro_iir_2.0.log"
+
+    # path = "gyro_iir_st.log"
+    path = "gyro_iir_biquad.log"
 
     with open("".join(["logs/", path])) as csv_file:
         csv_reader = csv.DictReader(csv_file, fieldnames=names)
@@ -40,9 +47,11 @@ def main():
                 # zs.append(row["Z"])
             line_count += 1
 
-    # xs = np.array(xs)
-    # ys = np.array(ys)
-    # zs = np.array(zs)
+    # fig, axs = plt.subplots(4, 2)
+    # axs[0, 1].axes.xaxis.set_visible(False)
+    # axs[0, 3].axes.xaxis.set_visible(False)
+    # axs[1, 1].axes.xaxis.set_visible(False)
+    # axs[1, 3].axes.xaxis.set_visible(False)
 
     plt.subplot(211)
     ax = plt.gca()
@@ -54,14 +63,14 @@ def main():
     plt.xlabel('Sample')
     plt.ylabel('Amplitude')
 
-    samplingFrequency = 400
+    samplingFrequency = 3330
+
+    # nfft = 128
+    nfft = 256
+    # nfft = 512
 
     plt.subplot(212)
-    # ax = plt.gca()
-    # ax.axes.xaxis.set_visible(False)
-    # ax.axes.yaxis.set_visible(False)
-
-    powerSpectrum, freqenciesFound, time, imageAxis = plt.specgram(xs, Fs=samplingFrequency)
+    powerSpectrum, freqenciesFound, time, imageAxis = plt.specgram(xs, Fs=samplingFrequency, NFFT=nfft)
     plt.xlabel('Time')
     plt.ylabel('Frequency')
 
