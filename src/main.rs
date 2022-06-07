@@ -361,11 +361,11 @@ mod app {
             cx.local.sensors.read_data_mag(sd, filters);
             let read_imu = cx.local.sensors.read_data_imu(sd, filters);
 
-            // if !read_imu {
-            //     rprintln!("no IMU");
-            // } else {
-            //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
-            // }
+            if !read_imu {
+                // rprintln!("no IMU");
+            } else {
+                print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+            }
 
             // TODO: read baro
             // cx.local.sensors.read_data_baro(sd);

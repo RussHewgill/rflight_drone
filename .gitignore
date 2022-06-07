@@ -6,6 +6,7 @@ itm.txt
 serial.data
 rtt.data
 gyro.log
+gyro*.log
 gyro.csv
 gyro.ods
 .~lock.*
