@@ -28,7 +28,8 @@ def main():
     # path = "gyro_iir_2.0.log"
 
     # path = "gyro_iir_st.log"
-    path = "gyro_iir_biquad.log"
+    # path = "gyro_iir_biquad.log"
+    path = "gyro_iir_biquad_notched.log"
 
     with open("".join(["logs/", path])) as csv_file:
         csv_reader = csv.DictReader(csv_file, fieldnames=names)

@@ -13,19 +13,22 @@ pub use self::rpm::*;
 
 #[derive(Clone, Copy)]
 pub struct SensorFilters {
-    gyro_iir:            (bool, IIRFilter),
-    gyro_biquad_lowpass: (bool, BiquadFilter),
+    gyro_iir: (bool, IIRFilter),
+    // gyro_biquad_lowpass: (bool, BiquadFilter),
 }
 
 /// new
 impl SensorFilters {
     pub fn new() -> Self {
-        let gyro_biquad_lowpass =
-            (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::LowPass));
+        // let gyro_biquad_lowpass =
+        //     (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::LowPass));
+
+        // let gyro_biquad_notch =
+        //     (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::Notch));
 
         Self {
             gyro_iir: (true, IIRFilter::default()),
-            gyro_biquad_lowpass,
+            // gyro_biquad_lowpass,
         }
     }
 }
@@ -35,13 +38,13 @@ impl SensorFilters {
     pub fn update_gyro(&mut self, mut gyro: V3) -> V3 {
         //
 
-        // if self.gyro_iir.0 {
-        //     gyro = self.gyro_iir.1.iir_update(gyro);
-        // }
-
-        if self.gyro_biquad_lowpass.0 {
-            gyro = self.gyro_biquad_lowpass.1.apply(gyro);
+        if self.gyro_iir.0 {
+            gyro = self.gyro_iir.1.iir_update(gyro);
         }
+
+        // if self.gyro_biquad_lowpass.0 {
+        //     gyro = self.gyro_biquad_lowpass.1.apply(gyro);
+        // }
 
         gyro
     }
@@ -61,6 +64,7 @@ impl SensorFilters {
 
 mod biquad_wrapper {
     use super::V3;
+
     use biquad::*;
 
     #[derive(Clone, Copy)]
@@ -146,7 +150,9 @@ mod pt1 {
 mod rpm {
     use crate::flight_control::MotorOutputs;
 
+    use super::BiquadFilter;
     use super::V3;
+    use biquad::*;
 
     #[derive(Default, Clone, Copy)]
     pub struct RPMFilter {}
@@ -159,17 +165,25 @@ mod rpm {
 
     #[derive(Default, Clone, Copy)]
     pub struct NotchFilter {
-        low_freq:  f32,
-        high_freq: f32,
-        band:      f32,
+        // low_pass: BiquadFilter,
+        // high_pass: BiquadFilter,
+        // low_freq:  f32,
+        // high_freq: f32,
+        // band:      f32,
     }
 
     impl NotchFilter {
-        pub fn new(low_freq: f32, high_freq: f32, band: f32) -> Self {
+        pub fn new(low_freq: f32, high_freq: f32, sampling_freq: f32, band: f32) -> Self {
+            // let lowpass =
+            //     BiquadFilter::new(low_freq.hz(), sampling_freq.hz(), Type::Notch);
+
+            // let highpass =
+            //     BiquadFilter::new(high_freq.hz(), sampling_freq.hz(), Type::HighPass);
+
             Self {
-                low_freq,
-                high_freq,
-                band,
+                // low_freq,
+                // high_freq,
+                // band,
             }
         }
     }
