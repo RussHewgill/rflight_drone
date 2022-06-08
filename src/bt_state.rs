@@ -101,6 +101,7 @@ where
     GpioError: core::fmt::Debug,
 {
     /// attribute handle is 1 greater than characteristic handle ??
+    /// returns Some(true) when motors are set to armed
     pub fn handle_input(
         &mut self,
         motors: &mut MotorsPWM,
@@ -108,11 +109,11 @@ where
         controller: &mut DroneController,
         voltage: f32,
         event: &BTEvent,
-    ) {
+    ) -> Option<bool> {
         let input = if let Some(input) = self.services.input {
             input
         } else {
-            return;
+            return None;
         };
 
         /// 24 = input att = input char + 1
@@ -128,12 +129,17 @@ where
                     // rprintln!("input update");
                     // rprintln!("data.len() = {:?}", data.len());
                     if let Some(ci) = ControlInputs::deserialize(att.data()) {
+                        let mut out = false;
                         /// arm or disarm motors if changed
                         if control_inputs.motors_armed != ci.motors_armed {
                             motors.set_armed(ci.motors_armed);
+                            out = true;
                         }
                         /// set new inputs
                         *control_inputs = ci;
+                        if out {
+                            return Some(out);
+                        }
                     }
                 }
 
@@ -176,42 +182,6 @@ where
             _ => {}
         }
 
-        #[cfg(feature = "nope")]
-        match event {
-            Event::Vendor(BlueNRGEvent::GattAttributeModified(att)) => {
-                if let Some(input) = self.services.input {
-                    /// received input changed event
-                    if att.attr_handle.0 + 1 == input.input_char.0 {
-                        if let Some(ci) = ControlInputs::deserialize(att.data()) {
-                            /// arm or disarm motors if changed
-                            if control_inputs.motors_armed != ci.motors_armed {
-                                motors.set_armed(ci.motors_armed);
-                            }
-                            /// set new inputs
-                            *control_inputs = ci;
-                        }
-                    }
-                    if att.attr_handle.0 + 1 == input.input_pid_cfg_char.0 {
-                        let data = att.data();
-
-                        rprintln!(
-                            "input.input_pid_cfg_char.0 = {:?}",
-                            input.input_pid_cfg_char.0
-                        );
-                        rprintln!("att.attr_handle.0 = {:?}", att.attr_handle.0);
-                        rprintln!("data.len() = {:?}", data.len());
-
-                        let id = IdPID::from_u8(data[0]).unwrap();
-                        let param = PIDParam::from_u8(data[1]).unwrap();
-                        let val = f32::from_be_bytes(data[2..6].try_into().unwrap());
-
-                        rprintln!("setting {:?} {:?} = {:?}", id, param, val);
-                        controller[id][param] = val;
-                    }
-                }
-                // if Some(att.attr_handle) == self.services.input.map(|x| )
-            }
-            _ => {}
-        }
+        None
     }
 }

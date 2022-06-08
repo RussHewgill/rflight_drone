@@ -13,8 +13,9 @@ pub use self::rpm::*;
 
 #[derive(Clone, Copy)]
 pub struct SensorFilters {
-    gyro_iir: (bool, IIRFilter),
+    gyro_iir:          (bool, IIRFilter),
     // gyro_biquad_lowpass: (bool, BiquadFilter),
+    gyro_biquad_notch: (bool, BiquadFilter),
 }
 
 /// new
@@ -23,12 +24,13 @@ impl SensorFilters {
         // let gyro_biquad_lowpass =
         //     (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::LowPass));
 
-        // let gyro_biquad_notch =
-        //     (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::Notch));
+        let gyro_biquad_notch =
+            (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::Notch));
 
         Self {
             gyro_iir: (true, IIRFilter::default()),
             // gyro_biquad_lowpass,
+            gyro_biquad_notch,
         }
     }
 }
@@ -38,13 +40,17 @@ impl SensorFilters {
     pub fn update_gyro(&mut self, mut gyro: V3) -> V3 {
         //
 
-        if self.gyro_iir.0 {
-            gyro = self.gyro_iir.1.iir_update(gyro);
-        }
+        // if self.gyro_iir.0 {
+        //     gyro = self.gyro_iir.1.iir_update(gyro);
+        // }
 
         // if self.gyro_biquad_lowpass.0 {
         //     gyro = self.gyro_biquad_lowpass.1.apply(gyro);
         // }
+
+        if self.gyro_biquad_notch.0 {
+            gyro = self.gyro_biquad_notch.1.apply(gyro);
+        }
 
         gyro
     }

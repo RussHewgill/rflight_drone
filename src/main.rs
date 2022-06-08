@@ -161,6 +161,7 @@ mod app {
         motor_outputs: MotorOutputs,
         inputs:        ControlInputs,
         controller:    DroneController,
+        dbg_gyro:      bool,
     }
 
     #[local]
@@ -290,6 +291,7 @@ mod app {
             motor_outputs: MotorOutputs::default(),
             inputs: ControlInputs::default(),
             controller,
+            dbg_gyro: false,
         };
 
         let local = Local {
@@ -304,37 +306,47 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
         // timer_pid::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
-        test_motors::spawn().unwrap();
-        kill_motors::spawn_after(5_000.millis()).unwrap();
+        // test_motors::spawn().unwrap();
+        // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
+        // set_dbg_gyro::spawn(true).unwrap();
+        // kill_motors::spawn_after(10_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
     }
 
-    #[task(shared = [motors, inputs], priority = 6)]
-    fn test_motors(mut cx: test_motors::Context) {
-        (cx.shared.motors, cx.shared.inputs).lock(|motors, inputs| {
-            inputs.motors_armed = true;
-            inputs.throttle = 0.1;
-            motors.set_armed(true);
-        });
+    #[task(shared = [dbg_gyro], priority = 7)]
+    fn set_dbg_gyro(mut cx: set_dbg_gyro::Context, enable: bool) {
+        cx.shared.dbg_gyro.lock(|d| *d = enable);
     }
 
-    #[task(shared = [motors], priority = 7)]
+    #[task(shared = [motors, inputs, dbg_gyro], priority = 6)]
+    fn test_motors(mut cx: test_motors::Context) {
+        (cx.shared.motors, cx.shared.inputs, cx.shared.dbg_gyro).lock(
+            |motors, inputs, dbg_gyro| {
+                // *dbg_gyro = true;
+                inputs.motors_armed = true;
+                inputs.throttle = 0.1;
+                motors.set_armed(true);
+            },
+        );
+    }
+
+    #[task(shared = [motors, dbg_gyro], priority = 7)]
     fn kill_motors(mut cx: kill_motors::Context) {
         rprintln!("disarming motors");
-        cx.shared.motors.lock(|motors| {
+        (cx.shared.motors, cx.shared.dbg_gyro).lock(|motors, dbg_gyro| {
+            *dbg_gyro = false;
             motors.set_armed(false);
         });
     }
 
     #[task(
         binds = TIM1_UP_TIM10,
-        // shared = [sens_data, sens_filters],
-        shared = [sens_data, sens_filters, motors],
+        shared = [sens_data, sens_filters, dbg_gyro],
         local = [tim10, sensors, counter: u32 = 0],
         priority = 4
     )]
@@ -349,9 +361,9 @@ mod app {
         (
             cx.shared.sens_data,
             cx.shared.sens_filters,
-            cx.shared.motors,
+            cx.shared.dbg_gyro,
         )
-            .lock(|sd, filters, motors| {
+            .lock(|sd, filters, dbg_gyro| {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd, filters);
                 let read_imu = cx.local.sensors.read_data_imu(sd, filters);
@@ -362,7 +374,7 @@ mod app {
                 //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
                 // }
 
-                if motors.is_armed() {
+                if *dbg_gyro {
                     let gyro = sd.imu_gyro.read_and_reset();
                     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
                 }
@@ -547,7 +559,8 @@ mod app {
                             // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                             // bt.unpause_interrupt(exti);
 
-                            let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                            // let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                            let pids = [IdPID::YawRate];
                             for id in pids {
                                 bt.pause_interrupt(exti);
                                 bt.log_write_pid(id, &controller[id]).unwrap();
@@ -801,7 +814,19 @@ mod app {
                     //     motors.set_armed(false);
                     // }
 
-                    bt.handle_input(motors, inputs, controller, adc.last_reading, &event);
+                    /// XXX: For safely testing unplugged: kill motors, delayed after arming
+                    match bt.handle_input(
+                        motors,
+                        inputs,
+                        controller,
+                        adc.last_reading,
+                        &event,
+                    ) {
+                        Some(true) => {
+                            // kill_motors::spawn_after(1_000.millis()).unwrap();
+                        }
+                        _ => {}
+                    }
 
                     if !bt.data_ready().unwrap() {
                         break;

@@ -386,7 +386,7 @@ impl DroneController {
     }
 }
 
-/// update
+/// update PIDs
 impl DroneController {
     pub fn update(
         &mut self,
@@ -410,28 +410,30 @@ impl DroneController {
 
         let err0_roll = i_roll - ahrs_roll;
         let err0_pitch = i_pitch - ahrs_pitch;
-        let err0_yaw = i_yaw - ahrs_yaw;
+        // let err0_yaw = i_yaw - ahrs_yaw;
 
         // let out0_roll = self.pid_roll_stab.step(err0_roll);
-        let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
+        // let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
         // let out0_yaw = self.pid_yaw_stab.step(err0_yaw);
 
         let out0_roll = 0.0;
-        // let out0_pitch = 0.0;
-        let out0_yaw = 0.0;
+        let out0_pitch = 0.0;
+        // let out0_yaw = 0.0;
 
         /// Roll  = y
         /// Pitch = x
         let err1_roll = out0_roll - gyro.y;
         let err1_pitch = out0_pitch - gyro.x;
-        let err1_yaw = out0_yaw - gyro.z;
+        // let err1_yaw = out0_yaw - gyro.z;
+        let err1_yaw = i_yaw - gyro.z;
 
         // let out1_roll = self.pid_roll_rate.step(err1_roll);
-        let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
-        // let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+        // let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
+        let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
         let out1_roll = 0.0;
-        let out1_yaw = 0.0;
+        let out1_pitch = 0.0;
+        // let out1_yaw = 0.0;
 
         use crate::math::rad_to_deg;
         use crate::utils::r;
