@@ -10,3 +10,5 @@ gyro*.log
 gyro.csv
 gyro.ods
 .~lock.*
+*.wav
+*.png

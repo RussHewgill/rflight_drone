@@ -5,6 +5,7 @@ import numpy as np
 import csv
 from scipy import linalg, optimize
 import math
+from scipy.io import wavfile
 
 def read_csv(path):
     xs = np.empty([0])
@@ -78,6 +79,31 @@ def plot_spectrogram(path, ax0, ax1):
     # ax1.set_ylabel('Frequency')
 
     # plt.show()
+
+def plot_wav(path):
+    samplingFrequency, signalData = wavfile.read(path)
+
+    plt.subplot(211)
+
+    plt.title('Spectrogram of a wav file with piano music')
+
+    plt.plot(signalData)
+    plt.xlabel('Sample')
+    plt.ylabel('Amplitude')
+
+    plt.subplot(212)
+    plt.specgram(signalData,Fs=samplingFrequency)
+    plt.xlabel('Time')
+    plt.ylabel('Frequency')
+
+    ax = plt.gca()
+    ax.set_ylim([0, 2000])
+
+    plt.show()
+
+# plot_wav("test01.wav")
+# plot_wav("test02.wav")
+# plot_wav("test03.wav")
 
 def plot_allen(path):
     (gx, gy, gz) = read_csv(path)
@@ -195,9 +221,13 @@ def main():
 
     # path = "gyro03.log"
     # path = "gyro_post.log"
+    # path = "gyro_post2.log"
     # path = "gyro06_grounded.log"
     # path = "gyro07.log"
-    path = "gyro07_off.log"
+    # path = "gyro07_off.log"
+    # path = "gyro08.log"
+    # path = "gyro09_nofilters.log"
+    path = "gyro10_lp_3notch.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1])

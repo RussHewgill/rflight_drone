@@ -13,23 +13,41 @@ pub use self::rpm::*;
 
 #[derive(Clone, Copy)]
 pub struct SensorFilters {
-    gyro_iir:          (bool, IIRFilter),
-    // gyro_biquad_lowpass: (bool, BiquadFilter),
-    gyro_biquad_notch: (bool, BiquadFilter),
+    gyro_iir:            (bool, IIRFilter),
+    gyro_biquad_lowpass: (bool, BiquadFilter),
+    gyro_biquad_notch:   [(bool, BiquadFilter); 3],
 }
+
+// pub trait SensFilter {
+//     fn get_enabled(&self) -> bool;
+//     fn apply(&mut self, gyro: V3) -> V3;
+// }
 
 /// new
 impl SensorFilters {
     pub fn new() -> Self {
-        // let gyro_biquad_lowpass =
-        //     (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::LowPass));
+        let gyro_biquad_lowpass = (
+            true,
+            BiquadFilter::new(120.hz(), 3330.hz(), Type::LowPass, Q_BUTTERWORTH_F32),
+        );
 
-        let gyro_biquad_notch =
-            (true, BiquadFilter::new(200.hz(), 3330.hz(), Type::Notch));
+        let gyro_biquad_notch1 = BiquadFilter::new(165.hz(), 3330.hz(), Type::Notch, 3.0);
+
+        let gyro_biquad_notch2 =
+            BiquadFilter::new(330.hz(), 3330.hz(), Type::Notch, 10.0);
+
+        let gyro_biquad_notch3 =
+            BiquadFilter::new(810.hz(), 3330.hz(), Type::Notch, Q_BUTTERWORTH_F32);
+
+        let gyro_biquad_notch = [
+            (true, gyro_biquad_notch1),
+            (true, gyro_biquad_notch2),
+            (true, gyro_biquad_notch3),
+        ];
 
         Self {
             gyro_iir: (true, IIRFilter::default()),
-            // gyro_biquad_lowpass,
+            gyro_biquad_lowpass,
             gyro_biquad_notch,
         }
     }
@@ -44,12 +62,18 @@ impl SensorFilters {
         //     gyro = self.gyro_iir.1.iir_update(gyro);
         // }
 
-        // if self.gyro_biquad_lowpass.0 {
-        //     gyro = self.gyro_biquad_lowpass.1.apply(gyro);
+        // if self.gyro_biquad_notch.0 {
+        //     gyro = self.gyro_biquad_notch.1.apply(gyro);
         // }
 
-        if self.gyro_biquad_notch.0 {
-            gyro = self.gyro_biquad_notch.1.apply(gyro);
+        for (b, notch) in self.gyro_biquad_notch.iter_mut() {
+            if *b {
+                gyro = notch.apply(gyro);
+            }
+        }
+
+        if self.gyro_biquad_lowpass.0 {
+            gyro = self.gyro_biquad_lowpass.1.apply(gyro);
         }
 
         gyro
@@ -86,6 +110,7 @@ mod biquad_wrapper {
             cutoff_freq: biquad::Hertz<f32>,
             sampling_freq: biquad::Hertz<f32>,
             filter_type: Type<f32>,
+            q_value: f32,
         ) -> Self {
             // let cutoff = 100.hz();
             // let sampling = 6660.hz();
@@ -93,7 +118,8 @@ mod biquad_wrapper {
                 filter_type,
                 sampling_freq,
                 cutoff_freq,
-                Q_BUTTERWORTH_F32,
+                // Q_BUTTERWORTH_F32,
+                q_value,
             )
             .unwrap();
             let x = DirectForm2Transposed::<f32>::new(coeffs);

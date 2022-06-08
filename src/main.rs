@@ -306,12 +306,12 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
         // timer_pid::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
-        // test_motors::spawn().unwrap();
-        // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
-        // set_dbg_gyro::spawn(true).unwrap();
-        // kill_motors::spawn_after(10_000.millis()).unwrap();
+        test_motors::spawn().unwrap();
+        // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
+        set_dbg_gyro::spawn(true).unwrap();
+        kill_motors::spawn_after(10_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
