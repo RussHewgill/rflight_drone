@@ -308,10 +308,10 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        test_motors::spawn().unwrap();
-        // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
-        set_dbg_gyro::spawn(true).unwrap();
-        kill_motors::spawn_after(10_000.millis()).unwrap();
+        // test_motors::spawn().unwrap();
+        // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
+        // set_dbg_gyro::spawn(true).unwrap();
+        // kill_motors::spawn_after(5_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -329,7 +329,7 @@ mod app {
             |motors, inputs, dbg_gyro| {
                 // *dbg_gyro = true;
                 inputs.motors_armed = true;
-                inputs.throttle = 0.1;
+                inputs.throttle = 0.225;
                 motors.set_armed(true);
             },
         );

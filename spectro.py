@@ -65,7 +65,6 @@ def plot_spectrogram(path, ax0, ax1):
     # plt.subplot(p1)
 
     # # ax1.set_yscale('log')
-    # ax1.ylim([0, 1000])
 
     spec = xs
 
@@ -74,6 +73,7 @@ def plot_spectrogram(path, ax0, ax1):
     )
     ax1.set_xlabel('Time')
     ax1.set_ylabel('Frequency')
+    ax1.set_ylim([0, 400])
 
     # ax1.hist(xs, bins='auto')
     # ax1.set_ylabel('Frequency')
@@ -219,15 +219,16 @@ def main2():
 
 def main():
 
-    # path = "gyro03.log"
     # path = "gyro_post.log"
-    # path = "gyro_post2.log"
-    # path = "gyro06_grounded.log"
-    # path = "gyro07.log"
-    # path = "gyro07_off.log"
-    # path = "gyro08.log"
     # path = "gyro09_nofilters.log"
-    path = "gyro10_lp_3notch.log"
+    # path = "gyro10_lp_3notch.log"
+
+    path = "throttle_0.125.log"
+    # path = "throttle_0.10.log"
+    # path = "throttle_0.15.log"
+    # path = "throttle_0.20.log"
+    # path = "throttle_0.25.log"
+    # path = "throttle_0.3.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1])

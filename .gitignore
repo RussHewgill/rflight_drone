@@ -8,7 +8,8 @@ rtt.data
 gyro.log
 gyro*.log
 gyro.csv
-gyro.ods
+*.ods
 .~lock.*
 *.wav
 *.png
+logs/*

@@ -28,7 +28,12 @@ impl SensorFilters {
     pub fn new() -> Self {
         let gyro_biquad_lowpass = (
             true,
-            BiquadFilter::new(120.hz(), 3330.hz(), Type::LowPass, Q_BUTTERWORTH_F32),
+            BiquadFilter::new(
+                120.hz(),
+                3330.hz(),
+                Type::SinglePoleLowPass,
+                Q_BUTTERWORTH_F32,
+            ),
         );
 
         let gyro_biquad_notch1 = BiquadFilter::new(165.hz(), 3330.hz(), Type::Notch, 3.0);
@@ -62,20 +67,20 @@ impl SensorFilters {
         //     gyro = self.gyro_iir.1.iir_update(gyro);
         // }
 
-        // if self.gyro_biquad_notch.0 {
-        //     gyro = self.gyro_biquad_notch.1.apply(gyro);
+        /// motor freq:
+        /// 0.05    125
+        /// 0.1     160
+        /// 0.15    205
+        /// 0.2     235
+        // for (b, notch) in self.gyro_biquad_notch.iter_mut() {
+        //     if *b {
+        //         gyro = notch.apply(gyro);
+        //     }
         // }
 
-        for (b, notch) in self.gyro_biquad_notch.iter_mut() {
-            if *b {
-                gyro = notch.apply(gyro);
-            }
-        }
-
-        if self.gyro_biquad_lowpass.0 {
-            gyro = self.gyro_biquad_lowpass.1.apply(gyro);
-        }
-
+        // if self.gyro_biquad_lowpass.0 {
+        //     gyro = self.gyro_biquad_lowpass.1.apply(gyro);
+        // }
         gyro
     }
 
