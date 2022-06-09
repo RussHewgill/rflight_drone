@@ -236,8 +236,8 @@ pub fn init_sensors(sensors: &mut Sensors) {
     // imu_cfg.gyro_power = GyroPowerModes::High416; // default in ST firmware
     // imu_cfg.gyro_power = GyroPowerModes::High833; // matches 800 Hz update rate
     // imu_cfg.gyro_power = GyroPowerModes::High1660;
-    imu_cfg.gyro_power = GyroPowerModes::High3330;
-    // imu_cfg.gyro_power = GyroPowerModes::High6660; // fastest possible
+    // imu_cfg.gyro_power = GyroPowerModes::High3330;
+    imu_cfg.gyro_power = GyroPowerModes::High6660; // fastest possible
     imu_cfg.gyro_scale = GyroScaleFactor::S2000;
 
     // // gyro low-pass filter

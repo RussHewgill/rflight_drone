@@ -388,6 +388,9 @@ impl DroneController {
 
 /// update PIDs
 impl DroneController {
+    /// +roll  = left wing up
+    /// +pitch = nose up
+    /// +yaw   = nose right
     pub fn update(
         &mut self,
         inputs: ControlInputs,
@@ -431,6 +434,9 @@ impl DroneController {
         // let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
         let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
+        // let out1_yaw = 0.1;
+        // let out1_yaw = -0.1;
+
         let out1_roll = 0.0;
         let out1_pitch = 0.0;
         // let out1_yaw = 0.0;
@@ -447,9 +453,9 @@ impl DroneController {
         // );
 
         // rprintln!(
-        //     "yaw = {:?}\nout0 = {:?}\nout1 = {:?}",
-        //     r(rad_to_deg(ahrs_yaw)),
-        //     r(out0_yaw),
+        //     "yaw = {:?}\nerr1_yaw = {:?}\nout1_yaw = {:?}",
+        //     r(ahrs_yaw),
+        //     r(err1_yaw),
         //     r(out1_yaw),
         // );
 

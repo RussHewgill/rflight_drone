@@ -219,14 +219,14 @@ def main2():
 
 def main():
 
-    path = "gyro_post.log"
+    # path = "gyro_post.log"
     # path = "gyro09_nofilters.log"
     # path = "gyro10_lp_3notch.log"
 
     # path = "throttle_0.225.log"
     # path = "throttle_0.225.log"
     # path = "throttle_0.1_0.15.log"
-    # path = "pitch_pid02_filtered.log"
+    path = "pitch_pid02_filtered.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1])

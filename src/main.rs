@@ -185,8 +185,9 @@ mod app {
 
         // let sensor_period: HertzU32 = 1600.Hz();
         // let sensor_period: HertzU32 = 6700.Hz();
-        // let sensor_period: HertzU32 = 6660.Hz(); // XXX: gyro doesn't work above this??
-        let sensor_period: HertzU32 = 3330.Hz();
+        let sensor_period: HertzU32 = 6660.Hz(); // XXX: gyro doesn't work at this rate??
+
+        // let sensor_period: HertzU32 = 3330.Hz();
 
         let pid_period: HertzU32 = 1600.Hz();
         // let pid_period: HertzU32 = 3200.Hz();
@@ -268,9 +269,9 @@ mod app {
         tim10.start(sensor_period).unwrap();
         tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start PID timer
-        tim3.start(pid_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start PID timer
+        // tim3.start(pid_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
@@ -308,7 +309,7 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
         // timer_pid::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         // test_motors::spawn(0.1).unwrap();
         // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
@@ -351,7 +352,7 @@ mod app {
     #[task(
         binds = TIM1_UP_TIM10,
         shared = [sens_data, sens_filters, dbg_gyro],
-        local = [tim10, sensors, counter: u32 = 0],
+        local = [tim10, sensors, counter: (u32,u32,u32) = (0,0,0)],
         priority = 4
     )]
     fn timer_sensors(mut cx: timer_sensors::Context) {
@@ -370,18 +371,47 @@ mod app {
             .lock(|sd, filters, dbg_gyro| {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd, filters);
-                let read_imu = cx.local.sensors.read_data_imu(sd, filters);
+                let (gyro_rdy, acc_rdy) = cx.local.sensors.read_data_imu(sd, filters);
 
                 // if !read_imu {
-                //     rprintln!("no IMU");
+                //     // rprintln!("no IMU");
+                //     cx.local.counter.1 += 1;
                 // } else {
-                //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+                //     // print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+                //     cx.local.counter.0 += 1;
+                //     cx.local.counter.1 += 1;
                 // }
 
-                if *dbg_gyro {
-                    let gyro = sd.imu_gyro.read_and_reset();
-                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                if gyro_rdy {
+                    cx.local.counter.0 += 1;
+                    print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
                 }
+                if acc_rdy {
+                    cx.local.counter.1 += 1;
+                }
+
+                cx.local.counter.2 += 1;
+
+                if cx.local.counter.1 > 3330 {
+                    // rprintln!(
+                    //     "hits / misses = {:?} / {:?} = {:?}",
+                    //     cx.local.counter.1,
+                    //     cx.local.counter.0,
+                    //     cx.local.counter.0 as f32 / cx.local.counter.1 as f32,
+                    // );
+                    rprintln!(
+                        "gyro: {:?}\nacc: {:?}\ntotal: {:?}",
+                        cx.local.counter.0 as f32 / cx.local.counter.2 as f32,
+                        cx.local.counter.1 as f32 / cx.local.counter.2 as f32,
+                        cx.local.counter.2,
+                    );
+                    *cx.local.counter = (0, 0, 0);
+                }
+
+                // if *dbg_gyro {
+                //     let gyro = sd.imu_gyro.read_and_reset();
+                //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                // }
 
                 // TODO: read baro
                 // cx.local.sensors.read_data_baro(sd);
@@ -457,6 +487,8 @@ mod app {
                         // let (roll, pitch, yaw) = fd.get_euler_angles();
                         // rprintln!(
                         //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                        //     // "  3,   2\n{:08}, {:08}\n{:08}, {:08}\n  4,
+                        //     // 1\n(r,p,y) = {:08}, {:08}, {:08}",
                         //     round_to(motor_outputs.back_right, 4),
                         //     round_to(motor_outputs.back_left, 4),
                         //     round_to(motor_outputs.front_right, 4), // XXX: rotate 180
@@ -590,152 +622,6 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
         main_loop::spawn().unwrap();
-    }
-
-    #[cfg(feature = "nope")]
-    // #[task(
-    //     // binds = TIM3,
-    //     // shared = [bt, exti, dwt, inputs, controller],
-    //     shared = [bt, exti, dwt, ahrs, sens_data, flight_data, motors, tim9_flag, inputs, controller],
-    //     local = [x: f32 = 0.0, tim3, sensors],
-    //     priority = 3)
-    // ]
-    fn bt_test(mut cx: bt_test::Context) {
-        #[cfg(feature = "nope")]
-        (cx.shared.bt, cx.shared.exti, cx.shared.controller).lock(
-            |bt, exti, controller| {
-                controller.pid_altitude_rate.step(-1.0);
-
-                rprintln!("sending: {:?}", controller.pid_altitude_rate);
-                bt.pause_interrupt(exti);
-                bt.log_write_pid(IdPID::AltitudeRate, &controller.pid_altitude_rate)
-                    .unwrap();
-                bt.unpause_interrupt(exti);
-
-                #[cfg(feature = "nope")]
-                if let BTState::Connected(conn) = bt.state {
-                    // let handle = match bt.services.input {
-                    //     Some(i) => i.throttle_char,
-                    //     _ => panic!("no throttle handle"),
-                    // };
-
-                    // let quat = UQuat::from_euler_angles(deg_to_rad(*cx.local.x), 0.0, 0.0);
-                    // *cx.local.x += 1.0;
-                    // rprintln!("cx.local.x = {:?}", *cx.local.x);
-
-                    // // rprintln!("sending");
-                    // bt.log_write_quat(&quat).unwrap();
-
-                    controller.pid_altitude_rate.step(-1.0);
-
-                    rprintln!("sending: {:?}", controller.pid_altitude_rate);
-                    bt.pause_interrupt(exti);
-                    bt.log_write_pid(IdPID::AltitudeRate, &controller.pid_altitude_rate)
-                        .unwrap();
-                    bt.unpause_interrupt(exti);
-
-                    // bt.read_event_uart().unwrap();
-                    // rprintln!("finished read");
-                }
-            },
-        );
-
-        let ahrs = cx.shared.ahrs;
-        let flight_data = cx.shared.flight_data;
-        let sens_data = cx.shared.sens_data;
-        let tim9_flag = cx.shared.tim9_flag;
-        let motors = cx.shared.motors;
-        let inputs = cx.shared.inputs;
-        let controller = cx.shared.controller;
-
-        cx.local
-            .tim3
-            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-
-        cx.shared.dwt.lock(|dwt| {
-            let t = dwt.measure(|| {
-                (
-                    ahrs,
-                    sens_data,
-                    flight_data,
-                    tim9_flag,
-                    motors,
-                    inputs,
-                    controller,
-                )
-                    .lock(
-                        |ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
-                            // (cx.shared.dwt, cx.shared.controller, cx.shared.inputs).lock(
-                            // |dwt, controller, inputs| {
-                            //
-
-                            // XXX: takes 50 us without, reading data
-                            // XXX: or 204 with
-
-                            // cx.local.sensors.read_data_mag(sd); // 15-30 us
-                            // cx.local.sensors.read_data_imu(sd, false); // 110 us
-
-                            // cx.local.sensors.read_data_baro(sd); // 10-20 us
-
-                            // for _ in 0..15 {
-                            //     cx.local.sensors.read_data_mag(sd); // 15-30 us
-                            // }
-
-                            // for _ in 0..5 {
-                            //     cx.local.sensors.read_data_imu(sd, false); // 110 us
-                            // }
-
-                            // let gyro = sd.imu_gyro.read_and_reset();
-                            // let acc = sd.imu_acc.read_and_reset();
-                            // let mag = sd.magnetometer.read_and_reset();
-
-                            let gyro_acc = cx.local.sensors._read_data_imu(); // 110 us
-                            let mag: Option<V3> = cx.local.sensors._read_data_mag();
-
-                            // let gyro = [0.0, 0.0, 0.0].into();
-                            // let acc = [0.0, 0.0, 0.0].into();
-                            // let mag = [0.0, 0.0, 0.0].into();
-
-                            match (gyro_acc, mag) {
-                                (Some((gyro, acc)), Some(mag)) => {
-                                    rprintln!("wat 0");
-                                    ahrs.update(gyro, acc, mag);
-
-                                    /// update FlightData
-                                    fd.update(ahrs);
-
-                                    /// update PIDs
-                                    let motor_outputs =
-                                        controller.update(*inputs, &fd.quat, gyro);
-                                }
-                                (Some((gyro, _)), _) => {
-                                    rprintln!("wat 1");
-                                    /// update PIDs
-                                    let motor_outputs =
-                                        controller.update(*inputs, &fd.quat, gyro);
-                                }
-                                _ => {
-                                    rprintln!("wat 2");
-                                }
-                            }
-
-                            // let t = dwt.measure(|| {
-                            //     let out0_roll = controller.pid_roll_stab.step(err0_roll);
-                            //     let out1_roll = controller.pid_pitch_stab.step(err0_roll);
-                            //     let out2_roll = controller.pid_yaw_stab.step(err0_roll);
-                            //     let k = out0_roll + out1_roll + out2_roll;
-                            //     defmt::trace!("k: {:?}", k);
-                            // });
-
-                            // rprintln!("t = {:?} ns", t.as_nanos());
-                        },
-                    );
-            });
-
-            rprintln!("t = {:?} ns", t.as_nanos());
-        });
-
-        // bt_test::spawn_after(250.millis()).unwrap();
     }
 
     #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds, adc], priority = 8)]

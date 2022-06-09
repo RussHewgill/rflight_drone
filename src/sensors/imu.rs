@@ -109,14 +109,60 @@ where
     pub fn read_new_data_available(
         &mut self,
         spi: &mut Spi3,
-    ) -> nb::Result<[bool; 3], SpiError> {
+    ) -> nb::Result<(bool, bool, bool), SpiError> {
         const TDA: u8 = 0b0100;
         const GDA: u8 = 0b0010;
         const XLDA: u8 = 0b0001;
 
         let b = self.read_reg(spi, IMURegister::STATUS_REG)?;
 
-        Ok([(b & TDA) == TDA, (b & GDA) == GDA, (b & XLDA) == XLDA])
+        Ok(((b & TDA) == TDA, (b & GDA) == GDA, (b & XLDA) == XLDA))
+    }
+
+    pub fn read_data_gyro(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
+        let mut gyro_data = [0u8; 6];
+        self.read_reg_mult(spi, IMURegister::OUTX_L_G, &mut gyro_data)?;
+
+        Ok([
+            Self::convert_raw_data(
+                gyro_data[0],
+                gyro_data[1],
+                self.cfg.gyro_scale.to_sensitivity(),
+            ),
+            Self::convert_raw_data(
+                gyro_data[2],
+                gyro_data[3],
+                self.cfg.gyro_scale.to_sensitivity(),
+            ),
+            Self::convert_raw_data(
+                gyro_data[4],
+                gyro_data[5],
+                self.cfg.gyro_scale.to_sensitivity(),
+            ),
+        ])
+    }
+
+    pub fn read_data_acc(&mut self, spi: &mut Spi3) -> nb::Result<[f32; 3], SpiError> {
+        let mut acc_data = [0u8; 6];
+        self.read_reg_mult(spi, IMURegister::OUTX_L_XL, &mut acc_data)?;
+
+        Ok([
+            Self::convert_raw_data(
+                acc_data[0],
+                acc_data[1],
+                self.cfg.acc_scale.to_sensitivity(),
+            ),
+            Self::convert_raw_data(
+                acc_data[2],
+                acc_data[3],
+                self.cfg.acc_scale.to_sensitivity(),
+            ),
+            Self::convert_raw_data(
+                acc_data[4],
+                acc_data[5],
+                self.cfg.acc_scale.to_sensitivity(),
+            ),
+        ])
     }
 
     pub fn read_data(

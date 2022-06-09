@@ -198,14 +198,55 @@ impl Sensors {
 
 /// read data to SensorData, and swap axes
 impl Sensors {
-    /// skips updating if data not ready
+    #[cfg(feature = "nope")]
     pub fn read_data_imu(
         &mut self,
         data: &mut SensorData,
         filters: &mut SensorFilters,
-    ) -> bool {
+    ) -> (bool, bool) {
         self.with_spi_imu(|spi, imu| {
-            if imu.read_new_data_available(spi).unwrap().iter().any(|x| *x) {
+            let (temp_rdy, gyro_rdy, acc_rdy) = imu.read_new_data_available(spi).unwrap();
+            match (gyro_rdy, acc_rdy) {
+                (true, true) => {
+                    let (data_gyro, data_acc) = imu.read_data(spi).unwrap();
+
+                    let data_gyro = V3::new(
+                        -data_gyro[1], // pitch
+                        data_gyro[0],  // roll
+                        data_gyro[2],  // yaw
+                    );
+
+                    let data_gyro = filters.update_gyro(data_gyro);
+
+                    data.imu_gyro.update(data_gyro);
+
+                    /// roll, pitch, yaw to match na::Quat
+                    let data_acc = V3::new(
+                        -data_acc[0], //
+                        data_acc[1],
+                        data_acc[2],
+                    );
+
+                    let data_acc = filters.update_acc(data_acc);
+
+                    data.imu_acc.update(data_acc);
+                }
+                (false, false) => {}
+            }
+            (gyro_rdy, acc_rdy)
+        });
+    }
+
+    /// skips updating if data not ready
+    // #[cfg(feature = "nope")]
+    pub fn read_data_imu(
+        &mut self,
+        data: &mut SensorData,
+        filters: &mut SensorFilters,
+    ) -> (bool, bool) {
+        self.with_spi_imu(|spi, imu| {
+            let (temp_rdy, gyro_rdy, acc_rdy) = imu.read_new_data_available(spi).unwrap();
+            if gyro_rdy || acc_rdy {
                 let (data_gyro, data_acc) = imu.read_data(spi).unwrap();
 
                 let data_gyro = V3::new(
@@ -228,10 +269,9 @@ impl Sensors {
                 let data_acc = filters.update_acc(data_acc);
 
                 data.imu_acc.update(data_acc);
-                true
-            } else {
-                false
+                ()
             }
+            (gyro_rdy, acc_rdy)
         })
     }
 
@@ -254,9 +294,26 @@ impl Sensors {
             }
         });
     }
+
+    pub fn read_data_baro(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
+        self.with_spi_baro(|spi, baro| {
+            let (pressure, temp) = baro.read_new_data_available(spi).unwrap();
+            if pressure {
+                let pressure = baro.read_data(spi).unwrap();
+                let pressure = filters.update_baro(pressure);
+                data.baro_pressure.update(pressure);
+            }
+            if temp {
+                let temp = baro.read_temperature_data(spi).unwrap();
+                let temp = filters.update_baro_temp(temp);
+                data.baro_temperature.update(temp);
+            }
+        });
+    }
 }
 
 /// read data to SensorData, and swap axes
+#[cfg(feature = "nope")]
 impl Sensors {
     #[cfg(feature = "nope")]
     pub fn read_data_imu(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
@@ -330,6 +387,7 @@ impl Sensors {
         }
     }
 
+    #[cfg(feature = "nope")]
     pub fn read_data_baro(&mut self, data: &mut SensorData) {
         self.with_spi_baro(|spi, baro| {
             let (pressure, temp) = baro.read_new_data_available(spi).unwrap();
