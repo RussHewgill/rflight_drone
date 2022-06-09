@@ -185,9 +185,8 @@ mod app {
 
         // let sensor_period: HertzU32 = 1600.Hz();
         // let sensor_period: HertzU32 = 6700.Hz();
-        let sensor_period: HertzU32 = 6660.Hz(); // XXX: gyro doesn't work at this rate??
-
-        // let sensor_period: HertzU32 = 3330.Hz();
+        // let sensor_period: HertzU32 = 6660.Hz(); // XXX: gyro doesn't work at this rate??
+        let sensor_period: HertzU32 = 3330.Hz();
 
         let pid_period: HertzU32 = 1600.Hz();
         // let pid_period: HertzU32 = 3200.Hz();
@@ -269,9 +268,9 @@ mod app {
         tim10.start(sensor_period).unwrap();
         tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start PID timer
-        // tim3.start(pid_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start PID timer
+        tim3.start(pid_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
@@ -309,7 +308,7 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
         // timer_pid::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
         // test_motors::spawn(0.1).unwrap();
         // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
@@ -372,41 +371,6 @@ mod app {
                 /// Read sensor data
                 cx.local.sensors.read_data_mag(sd, filters);
                 let (gyro_rdy, acc_rdy) = cx.local.sensors.read_data_imu(sd, filters);
-
-                // if !read_imu {
-                //     // rprintln!("no IMU");
-                //     cx.local.counter.1 += 1;
-                // } else {
-                //     // print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
-                //     cx.local.counter.0 += 1;
-                //     cx.local.counter.1 += 1;
-                // }
-
-                if gyro_rdy {
-                    cx.local.counter.0 += 1;
-                    print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
-                }
-                if acc_rdy {
-                    cx.local.counter.1 += 1;
-                }
-
-                cx.local.counter.2 += 1;
-
-                if cx.local.counter.1 > 3330 {
-                    // rprintln!(
-                    //     "hits / misses = {:?} / {:?} = {:?}",
-                    //     cx.local.counter.1,
-                    //     cx.local.counter.0,
-                    //     cx.local.counter.0 as f32 / cx.local.counter.1 as f32,
-                    // );
-                    rprintln!(
-                        "gyro: {:?}\nacc: {:?}\ntotal: {:?}",
-                        cx.local.counter.0 as f32 / cx.local.counter.2 as f32,
-                        cx.local.counter.1 as f32 / cx.local.counter.2 as f32,
-                        cx.local.counter.2,
-                    );
-                    *cx.local.counter = (0, 0, 0);
-                }
 
                 // if *dbg_gyro {
                 //     let gyro = sd.imu_gyro.read_and_reset();
@@ -595,8 +559,8 @@ mod app {
                             // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                             // bt.unpause_interrupt(exti);
 
-                            // let pids = [IdPID::PitchRate, IdPID::PitchStab];
-                            let pids = [IdPID::YawRate];
+                            let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                            // let pids = [IdPID::YawRate];
                             for id in pids {
                                 bt.pause_interrupt(exti);
                                 bt.log_write_pid(id, &controller[id]).unwrap();

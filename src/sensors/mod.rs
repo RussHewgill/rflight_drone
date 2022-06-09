@@ -269,7 +269,6 @@ impl Sensors {
                 let data_acc = filters.update_acc(data_acc);
 
                 data.imu_acc.update(data_acc);
-                ()
             }
             (gyro_rdy, acc_rdy)
         })

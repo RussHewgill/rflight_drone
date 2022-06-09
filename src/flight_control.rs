@@ -82,7 +82,7 @@ mod control_inputs {
     use crate::math::rad_to_deg;
 
     /// Received from remote control
-    #[derive(Default, Clone, Copy, Format)]
+    #[derive(Clone, Copy, Format)]
     pub struct ControlInputs {
         /// Range: -1.0 to 1.0
         pub roll:         f32,
@@ -97,6 +97,21 @@ mod control_inputs {
         pub calibrate:    bool,
         pub motors_armed: bool,
         pub level_mode:   bool,
+    }
+
+    impl Default for ControlInputs {
+        fn default() -> Self {
+            Self {
+                roll:         0.0,
+                pitch:        0.0,
+                yaw:          0.0,
+                throttle:     0.0,
+                takeoff:      false,
+                calibrate:    false,
+                motors_armed: false,
+                level_mode:   true,
+            }
+        }
     }
 
     /// deserialize
@@ -137,6 +152,7 @@ mod control_inputs {
         }
     }
 
+    /// TODO: not correct
     /// get_values
     impl ControlInputs {
         /// gyro is in deg/s, so pid inputs/outputs must be as well
@@ -397,6 +413,29 @@ impl DroneController {
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
+        if inputs.level_mode {
+            self.update_level_mode(inputs, ahrs_quat, gyro)
+        } else {
+            self.update_acro_mode(inputs, ahrs_quat, gyro)
+        }
+    }
+
+    /// TODO:
+    pub fn update_acro_mode(
+        &mut self,
+        inputs: ControlInputs,
+        ahrs_quat: &UQuat,
+        gyro: V3,
+    ) -> MotorOutputs {
+        panic!("TODO: Acro mode");
+    }
+
+    pub fn update_level_mode(
+        &mut self,
+        inputs: ControlInputs,
+        ahrs_quat: &UQuat,
+        gyro: V3,
+    ) -> MotorOutputs {
         /// in radians
         let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
         /// convert to degrees since gyro is in deg/s
@@ -416,12 +455,16 @@ impl DroneController {
         // let err0_yaw = i_yaw - ahrs_yaw;
 
         // let out0_roll = self.pid_roll_stab.step(err0_roll);
-        // let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
+        let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
         // let out0_yaw = self.pid_yaw_stab.step(err0_yaw);
 
-        let out0_roll = 0.0;
-        let out0_pitch = 0.0;
-        // let out0_yaw = 0.0;
+        let out0_roll = 0.0f32;
+        // let out0_pitch = 0.0f32;
+        // let out0_yaw = 0.0f32;
+
+        // let out0_roll = self.config.limit_roll_rate(out0_roll);
+        // let out0_pitch = self.config.limit_pitch_rate(out0_pitch);
+        // let out0_yaw = self.config.limit_yaw_rate(i_yaw);
 
         /// Roll  = y
         /// Pitch = x
@@ -431,15 +474,15 @@ impl DroneController {
         let err1_yaw = i_yaw - gyro.z;
 
         // let out1_roll = self.pid_roll_rate.step(err1_roll);
-        // let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
-        let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+        let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
+        // let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
         // let out1_yaw = 0.1;
         // let out1_yaw = -0.1;
 
         let out1_roll = 0.0;
-        let out1_pitch = 0.0;
-        // let out1_yaw = 0.0;
+        // let out1_pitch = 0.0;
+        let out1_yaw = 0.0;
 
         use crate::math::rad_to_deg;
         use crate::utils::r;
@@ -568,8 +611,8 @@ pub struct FlightConfig {
     pub max_pitch: f32,
     pub max_roll:  f32,
 
-    pub max_rate_pitch: f32,
     pub max_rate_roll:  f32,
+    pub max_rate_pitch: f32,
     pub max_rate_yaw:   f32,
 }
 
@@ -579,12 +622,24 @@ impl Default for FlightConfig {
             max_pitch: 60.0,
             max_roll:  60.0,
 
-            max_rate_pitch: 180.0,
             max_rate_roll:  180.0,
+            max_rate_pitch: 180.0,
             // max_rate_pitch: 250.0,
             // max_rate_roll: 250.0,
             max_rate_yaw:   270.0,
         }
+    }
+}
+
+impl FlightConfig {
+    pub fn limit_roll_rate(&self, roll: f32) -> f32 {
+        roll.clamp(-self.max_rate_roll, self.max_rate_roll)
+    }
+    pub fn limit_pitch_rate(&self, pitch: f32) -> f32 {
+        pitch.clamp(-self.max_rate_pitch, self.max_rate_pitch)
+    }
+    pub fn limit_yaw_rate(&self, yaw: f32) -> f32 {
+        yaw.clamp(-self.max_rate_yaw, self.max_rate_yaw)
     }
 }
 
