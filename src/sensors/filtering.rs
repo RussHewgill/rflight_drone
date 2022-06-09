@@ -15,7 +15,7 @@ pub use self::rpm::*;
 pub struct SensorFilters {
     gyro_iir:            (bool, IIRFilter),
     gyro_biquad_lowpass: (bool, BiquadFilter),
-    gyro_biquad_notch:   [(bool, BiquadFilter); 3],
+    gyro_biquad_notch:   [(bool, BiquadFilter); 2],
 }
 
 // pub trait SensFilter {
@@ -36,16 +36,16 @@ impl SensorFilters {
             ),
         );
 
-        let gyro_biquad_notch1 = BiquadFilter::new(165.hz(), 3330.hz(), Type::Notch, 3.0);
+        // /// XXX: Motor Freq filtering only works at specific throttle
+        // let gyro_biquad_notch1 = BiquadFilter::new(165.hz(), 3330.hz(), Type::Notch, 3.0);
 
         let gyro_biquad_notch2 =
             BiquadFilter::new(330.hz(), 3330.hz(), Type::Notch, 10.0);
 
-        let gyro_biquad_notch3 =
-            BiquadFilter::new(810.hz(), 3330.hz(), Type::Notch, Q_BUTTERWORTH_F32);
+        let gyro_biquad_notch3 = BiquadFilter::new(810.hz(), 3330.hz(), Type::Notch, 2.5);
 
         let gyro_biquad_notch = [
-            (true, gyro_biquad_notch1),
+            // (true, gyro_biquad_notch1),
             (true, gyro_biquad_notch2),
             (true, gyro_biquad_notch3),
         ];

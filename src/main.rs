@@ -275,6 +275,8 @@ mod app {
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
 
+        // controller.pid_pitch_rate.kp = 0.005;
+
         let shared = Shared {
             freqs: (sensor_period, pid_period),
             dwt,
@@ -306,9 +308,10 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
         // timer_pid::spawn_after(100.millis()).unwrap();
 
-        // main_loop::spawn_after(100.millis()).unwrap();
+        main_loop::spawn_after(100.millis()).unwrap();
 
-        // test_motors::spawn().unwrap();
+        // test_motors::spawn(0.1).unwrap();
+        // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
         // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
         // set_dbg_gyro::spawn(true).unwrap();
         // kill_motors::spawn_after(5_000.millis()).unwrap();
@@ -323,13 +326,14 @@ mod app {
         cx.shared.dbg_gyro.lock(|d| *d = enable);
     }
 
-    #[task(shared = [motors, inputs, dbg_gyro], priority = 6)]
-    fn test_motors(mut cx: test_motors::Context) {
+    #[task(shared = [motors, inputs, dbg_gyro], priority = 6, capacity = 2)]
+    fn test_motors(mut cx: test_motors::Context, throttle: f32) {
         (cx.shared.motors, cx.shared.inputs, cx.shared.dbg_gyro).lock(
             |motors, inputs, dbg_gyro| {
                 // *dbg_gyro = true;
                 inputs.motors_armed = true;
-                inputs.throttle = 0.225;
+                // inputs.throttle = 0.225;
+                inputs.throttle = throttle;
                 motors.set_armed(true);
             },
         );
