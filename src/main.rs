@@ -334,7 +334,7 @@ mod app {
                 inputs.motors_armed = true;
                 // inputs.throttle = 0.225;
                 inputs.throttle = throttle;
-                motors.set_armed(true);
+                motors.set_armed_unchecked(true);
             },
         );
     }
@@ -344,7 +344,7 @@ mod app {
         rprintln!("disarming motors");
         (cx.shared.motors, cx.shared.dbg_gyro).lock(|motors, dbg_gyro| {
             *dbg_gyro = false;
-            motors.set_armed(false);
+            motors.set_disarmed();
         });
     }
 
@@ -541,7 +541,7 @@ mod app {
                                     let v = adc.sample();
                                     if motors.is_armed() && v <= adc.min_voltage {
                                         rprintln!("Low Battery, disarming motors");
-                                        motors.set_armed(false);
+                                        motors.set_disarmed();
                                     }
                                     bt.pause_interrupt(exti);
                                     bt.log_write_batt(v).unwrap();
@@ -588,7 +588,7 @@ mod app {
         main_loop::spawn().unwrap();
     }
 
-    #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds, adc], priority = 8)]
+    #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds, adc, flight_data], priority = 8)]
     fn bt_irq(mut cx: bt_irq::Context) {
         (
             cx.shared.bt,
@@ -597,8 +597,9 @@ mod app {
             cx.shared.motors,
             cx.shared.inputs,
             cx.shared.adc,
+            cx.shared.flight_data,
         )
-            .lock(|bt, exti, controller, motors, inputs, adc| {
+            .lock(|bt, exti, controller, motors, inputs, adc, fd| {
                 rprintln!("bt_irq");
 
                 bt.clear_interrupt();
@@ -656,7 +657,7 @@ mod app {
                         // }
                         Some(ConnectionChange::Disconnect) => {
                             rprintln!("Disconnected, disarming motors");
-                            motors.set_armed(false);
+                            motors.set_armed(false, &bt.state, *inputs, fd.quat);
                         }
                         _ => {}
                     }
@@ -673,6 +674,7 @@ mod app {
                         motors,
                         inputs,
                         controller,
+                        fd.quat,
                         adc.last_reading,
                         &event,
                     ) {

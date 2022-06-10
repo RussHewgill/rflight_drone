@@ -9,6 +9,11 @@ use stm32f4xx_hal::{
 
 use defmt::{debug, println as rprintln};
 
+use crate::{
+    bt_control::BTController, bt_state::BTState, flight_control::ControlInputs,
+    sensors::UQuat,
+};
+
 /// 3 - 2
 /// 4 - 1
 /// M1: CW,  back right
@@ -107,9 +112,63 @@ impl MotorsPWM {
     }
 }
 
+/// Motor arming safety checks
+impl MotorsPWM {
+    pub fn motor_arming_check(
+        bt: &BTState,
+        inputs: ControlInputs,
+        quat: UQuat,
+        //
+    ) -> bool {
+        if !Self::check_throttle(inputs.throttle) {
+            rprintln!("Motor arming check failed: Throttle");
+            return false;
+        }
+        if !Self::check_bt(bt) {
+            rprintln!("Motor arming check failed: Bluetooth");
+            return false;
+        }
+        if !Self::check_quat(quat) {
+            rprintln!("Motor arming check failed: Quat");
+            return false;
+        }
+        true
+    }
+
+    fn check_bt(bt: &BTState) -> bool {
+        bt.is_connected()
+    }
+    fn check_throttle(throttle: f32) -> bool {
+        throttle <= 1e-4
+    }
+    fn check_quat(quat: UQuat) -> bool {
+        use nalgebra::ComplexField;
+
+        let (roll, pitch, yaw) = quat.euler_angles();
+
+        /// 10 degrees in radians
+        const MAX_ANGLE: f32 = 0.175;
+
+        roll.abs() <= MAX_ANGLE && pitch.abs() <= MAX_ANGLE
+    }
+}
+
 /// set_armed
 impl MotorsPWM {
-    pub fn set_armed(&mut self, armed: bool) {
+    pub fn set_armed(
+        &mut self,
+        armed: bool,
+        bt: &BTState,
+        inputs: ControlInputs,
+        quat: UQuat,
+    ) {
+        if Self::motor_arming_check(bt, inputs, quat) {
+            self.set_armed_unchecked(armed)
+        } else {
+        }
+    }
+
+    pub fn set_armed_unchecked(&mut self, armed: bool) {
         rprintln!("setting motors armed = {:?}", armed);
 
         // rprintln!("DEBUG: motors bypassed");
@@ -127,6 +186,11 @@ impl MotorsPWM {
         }
 
         //
+    }
+
+    pub fn set_disarmed(&mut self) {
+        self.armed = false;
+        self.disable_all();
     }
 
     pub fn is_armed(&self) -> bool {

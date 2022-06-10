@@ -8,6 +8,7 @@ use crate::bluetooth::{events::BlueNRGEvent, BTError, BluetoothSpi};
 use crate::flight_control::{ControlInputs, DroneController, IdPID};
 use crate::motors::MotorsPWM;
 use crate::pid::PIDParam;
+use crate::sensors::UQuat;
 
 use bluetooth_hci_defmt::event::command::ReturnParameters;
 use bluetooth_hci_defmt::event::{Event, VendorEvent};
@@ -107,6 +108,7 @@ where
         motors: &mut MotorsPWM,
         control_inputs: &mut ControlInputs,
         controller: &mut DroneController,
+        quat: UQuat,
         voltage: f32,
         event: &BTEvent,
     ) -> Option<bool> {
@@ -132,7 +134,12 @@ where
                         let mut out = false;
                         /// arm or disarm motors if changed
                         if control_inputs.motors_armed != ci.motors_armed {
-                            motors.set_armed(ci.motors_armed);
+                            motors.set_armed(
+                                ci.motors_armed,
+                                &self.state,
+                                *control_inputs,
+                                quat,
+                            );
                             out = true;
                         }
                         /// set new inputs
