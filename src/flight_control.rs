@@ -187,6 +187,49 @@ mod control_inputs {
     }
 }
 
+mod control_rates {
+
+    #[derive(Default, Clone, Copy)]
+    pub struct ControlRates {
+        pub roll:     ControlRateAxis,
+        pub pitch:    ControlRateAxis,
+        pub yaw:      ControlRateAxis,
+        pub throttle: ControlRateThrottle,
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct ControlRateAxis {
+        pub rc_rate:    f32,
+        pub super_rate: f32,
+        pub rc_expo:    f32,
+    }
+
+    impl Default for ControlRateAxis {
+        fn default() -> Self {
+            Self {
+                rc_rate:    1.0,
+                super_rate: 0.0,
+                rc_expo:    0.0,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct ControlRateThrottle {
+        pub mid:  f32,
+        pub expo: f32,
+    }
+
+    impl Default for ControlRateThrottle {
+        fn default() -> Self {
+            Self {
+                mid:  0.5,
+                expo: 0.0,
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Format)]
 #[repr(u8)]
 pub enum IdPID {

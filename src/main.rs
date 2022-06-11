@@ -41,6 +41,7 @@ pub mod sensors;
 pub mod spi;
 pub mod time;
 // pub mod uart;
+pub mod misc;
 pub mod utils;
 
 use crate::{
