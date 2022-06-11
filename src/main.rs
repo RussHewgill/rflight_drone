@@ -194,6 +194,7 @@ mod app {
         // let pid_period: HertzU32 = 3200.Hz();
 
         let main_loop_period: HertzU32 = 20.Hz();
+        // let main_loop_period: HertzU32 = 10.Hz();
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 2.Hz();
         // let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
@@ -272,17 +273,21 @@ mod app {
         //     50522.0, //
         // ));
 
-        /// start Sensor timer
-        tim10.start(sensor_period).unwrap();
-        tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        /// Start timers
+        // #[cfg(feature = "nope")]
+        {
+            /// start Sensor timer
+            tim10.start(sensor_period).unwrap();
+            tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start PID timer
-        tim3.start(pid_period).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+            /// start PID timer
+            tim3.start(pid_period).unwrap();
+            tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start Main Loop timer
-        tim9.start(main_loop_period).unwrap();
-        tim9.listen(stm32f4xx_hal::timer::Event::Update);
+            /// start Main Loop timer
+            tim9.start(main_loop_period).unwrap();
+            tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        }
 
         // let v = init_struct.adc.sample();
         // rprintln!("Battery = {:?} V", v);
@@ -568,13 +573,14 @@ mod app {
                     *cx.local.bat_counter += 1;
                 }
 
-                // let gyro0 = sd.imu_gyro.read_and_reset();
+                let gyro0 = sd.imu_gyro.read_and_reset();
                 // let acc0 = sd.imu_acc.read_and_reset();
                 // let mag0 = sd.magnetometer.read_and_reset();
 
-                // bt.pause_interrupt(exti);
+                bt.pause_interrupt(exti);
                 // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                // bt.unpause_interrupt(exti);
+                bt.log_write_sens_gyro(gyro0).unwrap();
+                bt.unpause_interrupt(exti);
 
                 // let pids = [IdPID::PitchRate, IdPID::PitchStab];
                 let pids = [IdPID::YawRate];

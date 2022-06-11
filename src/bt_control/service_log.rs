@@ -124,6 +124,35 @@ where
         Ok(())
     }
 
+    pub fn log_write_sens_gyro(
+        &mut self,
+        gyro: V3,
+    ) -> nb::Result<(), BTError<SpiError, GpioError>> {
+        let logger = if let Some(logger) = self.services.logger {
+            logger
+        } else {
+            panic!("no logger?");
+        };
+
+        let mut data = [0u8; 12];
+        /// gyro
+        data[0..4].copy_from_slice(&gyro.x.to_be_bytes());
+        data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
+        data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
+
+        let val = UpdateCharacteristicValueParameters {
+            service_handle:        logger.service_handle,
+            characteristic_handle: logger.char_handle_sens,
+            offset:                0,
+            value:                 &data,
+        };
+        block!(self.update_characteristic_value(&val)).unwrap();
+
+        let result = self.ignore_event_timeout(None)?;
+
+        Ok(())
+    }
+
     pub fn log_write_sens(
         &mut self,
         gyro: V3,
@@ -340,9 +369,9 @@ where
         let handle_sens = self.add_log_char(
             service.service_handle,
             UUID_LOG_SENS_CHAR,
-            40,
-            // 1,
-            CharacteristicProperty::NOTIFY | CharacteristicProperty::READ,
+            // 40,
+            18,
+            CharacteristicProperty::NOTIFY,
             1,
         )?;
 

@@ -67,17 +67,17 @@ impl SensorFilters {
         //     gyro = self.gyro_iir.1.iir_update(gyro);
         // }
 
-        /// Notch filters
-        for (b, notch) in self.gyro_biquad_notch.iter_mut() {
-            if *b {
-                gyro = notch.apply(gyro);
-            }
-        }
+        // /// Notch filters
+        // for (b, notch) in self.gyro_biquad_notch.iter_mut() {
+        //     if *b {
+        //         gyro = notch.apply(gyro);
+        //     }
+        // }
 
-        /// Biquad Low Pass filter
-        if self.gyro_biquad_lowpass.0 {
-            gyro = self.gyro_biquad_lowpass.1.apply(gyro);
-        }
+        // /// Biquad Low Pass filter
+        // if self.gyro_biquad_lowpass.0 {
+        //     gyro = self.gyro_biquad_lowpass.1.apply(gyro);
+        // }
 
         gyro
     }
