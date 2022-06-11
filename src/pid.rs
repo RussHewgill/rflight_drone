@@ -73,6 +73,10 @@ impl PID {
     }
 }
 
+/// TODO: apply d-term filtering
+impl PID {
+}
+
 /// step
 impl PID {
     pub fn step(&mut self, input: f32) -> f32 {

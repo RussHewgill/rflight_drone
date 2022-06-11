@@ -25,6 +25,16 @@ impl BatteryAdc {
         out
     }
 
+    pub fn sample_avg(&mut self, n: usize) -> f32 {
+        let mut x = 0.0;
+        for _ in 0..n {
+            x += self.sample();
+        }
+        let out = x / n as f32;
+        self.last_reading = out;
+        out
+    }
+
     pub fn sample(&mut self) -> f32 {
         const V_REF: f32 = 3.3;
         const R_UP: f32 = 10_000.0;

@@ -284,8 +284,11 @@ mod app {
         tim9.start(main_loop_period).unwrap();
         tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
-        let v = init_struct.adc.sample();
-        rprintln!("Battery = {:?} V", v);
+        // let v = init_struct.adc.sample();
+        // rprintln!("Battery = {:?} V", v);
+
+        let v = init_struct.adc.sample_avg(5);
+        rprintln!("Battery/5 = {:?} V", v);
 
         // controller.pid_pitch_rate.kp = 0.005;
 
@@ -372,8 +375,6 @@ mod app {
             .tim10
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
 
-        rprintln!("timer_sensors");
-
         /// mag: 23394 ns, 42.75 kHz
         /// imu: 33955 ns, 29.5 kHz
         // (cx.shared.sens_data, cx.shared.sens_filters).lock(|sd, filters| {
@@ -408,8 +409,6 @@ mod app {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-
-        rprintln!("timer_pid");
 
         /// ahrs update: 34.5 - 37.8 us, 27.6 kHz
         /// PID updates: ~120 us, 8.3 kHz
@@ -503,7 +502,8 @@ mod app {
     #[task(
         binds = TIM1_BRK_TIM9,
         shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
-        local = [tim9, counter: u32 = 0, bat_counter: u32 = 0],
+        // local = [tim9, counter: u32 = 0, bat_counter: u32 = 0],
+        local = [tim9, bat_counter: u32 = 0],
         priority = 2
     )]
     fn main_loop(mut cx: main_loop::Context) {
@@ -511,7 +511,7 @@ mod app {
             .tim9
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
 
-        rprintln!("main loop");
+        const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
 
         // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
         // const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
@@ -523,12 +523,12 @@ mod app {
         // const COUNTER_TIMES: u32 = 80; // 1600 hz => 20 hz
         // const COUNTER_TIMES: u32 = 40; // 1600 hz => 40 hz
 
-        /// For a single quat characteristic:
-        /// 80 Hz is ok
-        /// 100 Hz is too much
+        // /// For a single quat characteristic:
+        // /// 80 Hz is ok
+        // /// 100 Hz is too much
+        // // const COUNTER_TIMES: u32 = 1600 / 16;
         // const COUNTER_TIMES: u32 = 1600 / 16;
-        const COUNTER_TIMES: u32 = 1600 / 16;
-        const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
+        // const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
 
         // /// Send data on BT at 20 Hz
         // let COUNTER_TIMES: u32 = cx.shared.freqs.0.to_Hz() / 20;
@@ -542,11 +542,61 @@ mod app {
         // let inputs = cx.shared.inputs;
         let motors = cx.shared.motors;
         let controller = cx.shared.controller;
-        // let adc = cx.shared.adc;
 
-        // *cx.local.bat_counter += 1;
-        // if *cx.local.bat_counter
+        (flight_data, sens_data, bt, exti, controller, motors).lock(
+            |fd, sd, bt, exti, controller, motors| {
+                /// send orientation
+                bt.pause_interrupt(exti);
+                bt.log_write_quat(&fd.quat).unwrap();
+                bt.unpause_interrupt(exti);
 
+                /// send battery voltage
+                if *cx.local.bat_counter >= BATT_TIMES {
+                    *cx.local.bat_counter = 0;
+                    cx.shared.adc.lock(|adc| {
+                        // let v = adc.sample();
+                        let v = adc.sample_avg(3);
+                        if motors.is_armed() && v <= adc.min_voltage {
+                            rprintln!("Low Battery, disarming motors");
+                            motors.set_disarmed();
+                        }
+                        bt.pause_interrupt(exti);
+                        bt.log_write_batt(v).unwrap();
+                        bt.unpause_interrupt(exti);
+                    });
+                } else {
+                    *cx.local.bat_counter += 1;
+                }
+
+                // let gyro0 = sd.imu_gyro.read_and_reset();
+                // let acc0 = sd.imu_acc.read_and_reset();
+                // let mag0 = sd.magnetometer.read_and_reset();
+
+                // bt.pause_interrupt(exti);
+                // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                // bt.unpause_interrupt(exti);
+
+                // let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                let pids = [IdPID::YawRate];
+                for id in pids {
+                    bt.pause_interrupt(exti);
+                    bt.log_write_pid(id, &controller[id]).unwrap();
+                    bt.unpause_interrupt(exti);
+                }
+
+                // #[cfg(feature = "nope")]
+                // for id in IdPID::ITER {
+                //     bt.pause_interrupt(exti);
+                //     bt.log_write_pid(id, &controller[id]).unwrap();
+                //     bt.unpause_interrupt(exti);
+                // }
+
+                // //
+                // unimplemented!()
+            },
+        );
+
+        #[cfg(feature = "nope")]
         /// send telemetry over bluetooth, at 20-30 Hz
         cx.shared.tim9_flag.lock(|tim9_flag| {
             if *tim9_flag {
@@ -566,7 +616,8 @@ mod app {
                             if *cx.local.bat_counter >= BATT_TIMES {
                                 *cx.local.bat_counter = 0;
                                 cx.shared.adc.lock(|adc| {
-                                    let v = adc.sample();
+                                    // let v = adc.sample();
+                                    let v = adc.sample_avg(3);
                                     if motors.is_armed() && v <= adc.min_voltage {
                                         rprintln!("Low Battery, disarming motors");
                                         motors.set_disarmed();
