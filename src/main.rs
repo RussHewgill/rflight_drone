@@ -99,7 +99,7 @@ mod app {
 
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::{HertzU32, MillisDurationU32};
-    use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM4, TIM5};
+    use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM4, TIM5, TIM9};
 
     // use rtt_target::{rprint, rprintln, rtt_init_print};
     use defmt::println as rprintln;
@@ -170,6 +170,7 @@ mod app {
         //
         sensors: Sensors,
         tim3:    CounterHz<TIM3>,
+        tim9:    CounterHz<TIM9>,
         tim10:   CounterHz<TIM10>,
         // t_imu:   u32,
         // t_mag:   u32,
@@ -192,8 +193,11 @@ mod app {
         let pid_period: HertzU32 = 1600.Hz();
         // let pid_period: HertzU32 = 3200.Hz();
 
+        let main_loop_period: HertzU32 = 20.Hz();
+
         // let sensor_period: stm32f4xx_hal::time::Hertz = 2.Hz();
         // let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
+        // let main_loop_period: stm32f4xx_hal::time::Hertz = 1.Hz();
 
         let mut init_struct = init_all(cp, dp);
 
@@ -234,6 +238,9 @@ mod app {
         let mut tim10: stm32f4xx_hal::timer::CounterHz<TIM10> =
             init_struct.tim10.counter_hz(&clocks);
 
+        let mut tim9: stm32f4xx_hal::timer::CounterHz<TIM9> =
+            init_struct.tim9.counter_hz(&clocks);
+
         /// enable sensors and configure settings
         init_sensors(&mut sensors);
 
@@ -273,6 +280,10 @@ mod app {
         tim3.start(pid_period).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
+        /// start Main Loop timer
+        tim9.start(main_loop_period).unwrap();
+        tim9.listen(stm32f4xx_hal::timer::Event::Update);
+
         let v = init_struct.adc.sample();
         rprintln!("Battery = {:?} V", v);
 
@@ -300,6 +311,7 @@ mod app {
         let local = Local {
             sensors,
             tim3,
+            tim9,
             tim10,
             // t_imu,
             // t_mag,
@@ -309,7 +321,7 @@ mod app {
         // timer_sensors::spawn_after(100.millis()).unwrap();
         // timer_pid::spawn_after(100.millis()).unwrap();
 
-        main_loop::spawn_after(100.millis()).unwrap();
+        // main_loop::spawn_after(100.millis()).unwrap();
 
         // test_motors::spawn(0.1).unwrap();
         // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
@@ -332,9 +344,9 @@ mod app {
         (cx.shared.motors, cx.shared.inputs, cx.shared.dbg_gyro).lock(
             |motors, inputs, dbg_gyro| {
                 // *dbg_gyro = true;
-                inputs.motors_armed = true;
+                inputs.set_motors_armed(true);
                 // inputs.throttle = 0.225;
-                inputs.throttle = throttle;
+                inputs.set_throttle(throttle);
                 motors.set_armed_unchecked(true);
             },
         );
@@ -359,6 +371,8 @@ mod app {
         cx.local
             .tim10
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+
+        rprintln!("timer_sensors");
 
         /// mag: 23394 ns, 42.75 kHz
         /// imu: 33955 ns, 29.5 kHz
@@ -394,6 +408,8 @@ mod app {
         cx.local
             .tim3
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+
+        rprintln!("timer_pid");
 
         /// ahrs update: 34.5 - 37.8 us, 27.6 kHz
         /// PID updates: ~120 us, 8.3 kHz
@@ -448,16 +464,9 @@ mod app {
                     // /// 6700, 67 => 100 Hz
                     // if *cx.local.counter >= 67 * 2 {
                     /// 3330, 33 => 100 Hz
-                    #[cfg(feature = "nope")]
+                    // #[cfg(feature = "nope")]
                     if *cx.local.counter >= 33 {
                         *cx.local.counter = 0;
-
-                        // rprintln!(
-                        //     "{:08}\n{:08}\n{:08}",
-                        //     inputs.roll,
-                        //     inputs.pitch,
-                        //     inputs.yaw,
-                        // );
 
                         // let (roll, pitch, yaw) = fd.get_euler_angles();
                         // rprintln!(
@@ -492,11 +501,18 @@ mod app {
     }
 
     #[task(
+        binds = TIM1_BRK_TIM9,
         shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
-        local = [counter: u32 = 0, bat_counter: u32 = 0],
+        local = [tim9, counter: u32 = 0, bat_counter: u32 = 0],
         priority = 2
     )]
     fn main_loop(mut cx: main_loop::Context) {
+        cx.local
+            .tim9
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+
+        rprintln!("main loop");
+
         // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
         // const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
         // const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
@@ -510,7 +526,8 @@ mod app {
         /// For a single quat characteristic:
         /// 80 Hz is ok
         /// 100 Hz is too much
-        const COUNTER_TIMES: u32 = 1600 / 10; // 1600 hz => 10
+        // const COUNTER_TIMES: u32 = 1600 / 16;
+        const COUNTER_TIMES: u32 = 1600 / 16;
         const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
 
         // /// Send data on BT at 20 Hz
@@ -570,8 +587,8 @@ mod app {
                             // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                             // bt.unpause_interrupt(exti);
 
-                            let pids = [IdPID::PitchRate, IdPID::PitchStab];
-                            // let pids = [IdPID::YawRate];
+                            // let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                            let pids = [IdPID::YawRate];
                             for id in pids {
                                 bt.pause_interrupt(exti);
                                 bt.log_write_pid(id, &controller[id]).unwrap();
@@ -596,7 +613,7 @@ mod app {
         });
 
         // main_loop::spawn_after(100.millis()).unwrap();
-        main_loop::spawn().unwrap();
+        // main_loop::spawn().unwrap();
     }
 
     #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds, adc, flight_data], priority = 8)]

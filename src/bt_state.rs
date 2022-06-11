@@ -133,13 +133,18 @@ where
                     if let Some(ci) = ControlInputs::deserialize(att.data()) {
                         let mut out = false;
                         /// arm or disarm motors if changed
-                        if control_inputs.motors_armed != ci.motors_armed {
+                        if !control_inputs.get_motors_armed() && ci.get_motors_armed() {
                             motors.set_armed(
-                                ci.motors_armed,
+                                ci.get_motors_armed(),
                                 &self.state,
                                 *control_inputs,
                                 quat,
                             );
+                            out = true;
+                        } else if control_inputs.get_motors_armed()
+                            && !ci.get_motors_armed()
+                        {
+                            motors.set_disarmed();
                             out = true;
                         }
                         /// set new inputs

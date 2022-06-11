@@ -120,17 +120,20 @@ impl MotorsPWM {
         quat: UQuat,
         //
     ) -> bool {
-        if !Self::check_throttle(inputs.throttle) {
+        if !Self::check_throttle(inputs.get_raw_throttle()) {
             rprintln!("Motor arming check failed: Throttle");
             return false;
+            // panic!();
         }
         if !Self::check_bt(bt) {
             rprintln!("Motor arming check failed: Bluetooth");
             return false;
+            // panic!();
         }
         if !Self::check_quat(quat) {
             rprintln!("Motor arming check failed: Quat");
             return false;
+            // panic!();
         }
         true
     }

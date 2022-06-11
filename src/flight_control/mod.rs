@@ -77,17 +77,17 @@ pub struct DroneController {
 /// new
 impl DroneController {
     pub fn new_default_params() -> Self {
-        let mut pid_roll_stab = PID::new(0.0, 0.0, 0.0);
-        let mut pid_roll_rate = PID::new(0.0, 0.0, 0.0);
+        let mut pid_roll_stab = PID::new_limited(0.0, 0.0, 0.0);
+        let mut pid_roll_rate = PID::new_limited(0.0, 0.0, 0.0);
 
-        let mut pid_pitch_stab = PID::new(0.0, 0.0, 0.0);
-        let mut pid_pitch_rate = PID::new(0.0, 0.0, 0.0);
+        let mut pid_pitch_stab = PID::new_limited(0.0, 0.0, 0.0);
+        let mut pid_pitch_rate = PID::new_limited(0.0, 0.0, 0.0);
 
-        let mut pid_yaw_stab = PID::new(0.0, 0.0, 0.0);
-        let mut pid_yaw_rate = PID::new(0.0, 0.0, 0.0);
+        let mut pid_yaw_stab = PID::new_limited(0.0, 0.0, 0.0);
+        let mut pid_yaw_rate = PID::new_limited(0.0, 0.0, 0.0);
 
-        let mut pid_altitude_stab = PID::new(0.0, 0.0, 0.0);
-        let mut pid_altitude_rate = PID::new(0.0, 0.0, 0.0);
+        let mut pid_altitude_stab = PID::new_limited(0.0, 0.0, 0.0);
+        let mut pid_altitude_rate = PID::new_limited(0.0, 0.0, 0.0);
 
         /// output meanings:
         /// pid_pitch_stab:  desired pitch rate in rad/s
@@ -207,6 +207,7 @@ impl DroneController {
         }
     }
 
+    #[cfg(feature = "nope")]
     pub fn new(
         pid_roll_stab: PID,
         pid_roll_rate: PID,
@@ -243,34 +244,19 @@ impl DroneController {
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
-        if inputs.level_mode {
-            self.update_level_mode(inputs, ahrs_quat, gyro)
-        } else {
-            self.update_acro_mode(inputs, ahrs_quat, gyro)
-        }
+        // if inputs.level_mode {
+        //     self.update_level_mode(inputs, ahrs_quat, gyro)
+        // } else {
+        //     self.update_acro_mode(inputs, ahrs_quat, gyro)
+        // }
+
+        // defmt::warn!("overriding level mode, using acro mode");
+        self.update_acro_mode(inputs, ahrs_quat, gyro)
     }
+}
 
-    /// TODO:
-    pub fn update_acro_mode(
-        &mut self,
-        inputs: ControlInputs,
-        ahrs_quat: &UQuat,
-        gyro: V3,
-    ) -> MotorOutputs {
-        /// in radians
-        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
-        /// convert to degrees since gyro is in deg/s
-        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = (
-            rad_to_deg(ahrs_roll),
-            rad_to_deg(ahrs_pitch),
-            rad_to_deg(ahrs_yaw),
-        );
-
-        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values(&self.rates);
-
-        panic!("TODO: Acro mode");
-    }
-
+/// Level mode
+impl DroneController {
     pub fn update_level_mode(
         &mut self,
         inputs: ControlInputs,
@@ -314,16 +300,16 @@ impl DroneController {
         // let err1_yaw = out0_yaw - gyro.z;
         let err1_yaw = i_yaw - gyro.z;
 
-        // let out1_roll = self.pid_roll_rate.step(err1_roll);
+        let out1_roll = self.pid_roll_rate.step(err1_roll);
         let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
-        // let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+        let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
         // let out1_yaw = 0.1;
         // let out1_yaw = -0.1;
 
-        let out1_roll = 0.0;
+        // let out1_roll = 0.0;
         // let out1_pitch = 0.0;
-        let out1_yaw = 0.0;
+        // let out1_yaw = 0.0;
 
         use crate::math::rad_to_deg;
         use crate::utils::r;
@@ -351,6 +337,39 @@ impl DroneController {
         // );
 
         /// TODO: add pitch, roll limits
+        self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
+    }
+}
+
+/// Acro mode
+impl DroneController {
+    pub fn update_acro_mode(
+        &mut self,
+        inputs: ControlInputs,
+        ahrs_quat: &UQuat,
+        gyro: V3,
+    ) -> MotorOutputs {
+        /// in radians
+        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
+        /// convert to degrees since gyro is in deg/s
+        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = (
+            rad_to_deg(ahrs_roll),
+            rad_to_deg(ahrs_pitch),
+            rad_to_deg(ahrs_yaw),
+        );
+
+        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values(&self.rates);
+
+        /// Roll  = y
+        /// Pitch = x
+        let err1_roll = i_roll - gyro.y;
+        let err1_pitch = i_pitch - gyro.x;
+        let err1_yaw = i_yaw - gyro.z;
+
+        let out1_roll = self.pid_roll_rate.step(err1_roll);
+        let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
+        let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+
         self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
     }
 }

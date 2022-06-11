@@ -1,4 +1,3 @@
-
 use core::f32::consts::PI;
 
 use defmt::{println as rprintln, Format};
@@ -11,18 +10,27 @@ use super::ControlRates;
 #[derive(Clone, Copy, Format)]
 pub struct ControlInputs {
     /// Range: -1.0 to 1.0
-    pub roll:         f32,
+    roll:         f32,
     /// Range: -1.0 to 1.0
-    pub pitch:        f32,
+    pitch:        f32,
     /// Range: -2Pi to 2Pi
-    pub yaw:          f32,
+    yaw:          f32,
     /// Range: 0.0 to 1.0
-    pub throttle:     f32,
+    throttle:     f32,
     /// Toggles
-    pub takeoff:      bool,
-    pub calibrate:    bool,
-    pub motors_armed: bool,
-    pub level_mode:   bool,
+    takeoff:      bool,
+    calibrate:    bool,
+    motors_armed: bool,
+    level_mode:   bool,
+}
+
+impl ControlInputs {
+    pub fn set_motors_armed(&mut self, armed: bool) {
+        self.motors_armed = armed;
+    }
+    pub fn get_motors_armed(&self) -> bool {
+        self.motors_armed
+    }
 }
 
 impl Default for ControlInputs {
@@ -78,9 +86,24 @@ impl ControlInputs {
     }
 }
 
-/// TODO: not correct
-/// get_values
+/// get_values /// TODO: not correct
 impl ControlInputs {
+    pub fn get_roll(&self, rates: &ControlRates) -> f32 {
+        rates.roll.apply(self.roll)
+    }
+    pub fn get_pitch(&self, rates: &ControlRates) -> f32 {
+        rates.pitch.apply(self.pitch)
+    }
+    pub fn get_yaw(&self, rates: &ControlRates) -> f32 {
+        rates.yaw.apply(self.yaw)
+    }
+    pub fn get_throttle(&self, rates: &ControlRates) -> f32 {
+        rates.throttle.apply(self.throttle)
+    }
+    pub fn get_raw_throttle(&self) -> f32 {
+        self.throttle
+    }
+
     pub fn get_values(&self, rates: &ControlRates) -> (f32, f32, f32, f32) {
         let roll = rates.roll.apply(self.roll);
         let pitch = rates.pitch.apply(self.pitch);
@@ -115,10 +138,11 @@ impl ControlInputs {
         self.pitch = pitch.clamp(-1.0, 1.0);
     }
     pub fn set_yaw(&mut self, yaw: f32) {
-        // self.yaw = yaw.clamp(-1.0, 1.0);
-        self.yaw = yaw % (2.0 * PI);
+        self.yaw = yaw.clamp(-1.0, 1.0);
+        // self.yaw = yaw % (2.0 * PI);
     }
     pub fn set_throttle(&mut self, throttle: f32) {
-        self.throttle = throttle.clamp(-1.0, 1.0);
+        // self.throttle = throttle.clamp(-1.0, 1.0);
+        self.throttle = throttle.clamp(0.0, 1.0);
     }
 }

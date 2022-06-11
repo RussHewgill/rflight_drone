@@ -2,7 +2,7 @@ use cortex_m::peripheral::NVIC;
 use embedded_hal::spi::MODE_3;
 // use dwt_systick_monotonic::DwtSystick;
 use stm32f4::stm32f401::{
-    self, ADC1, EXTI, RCC, SPI1, SPI2, TIM10, TIM2, TIM3, TIM4, TIM5,
+    self, ADC1, EXTI, RCC, SPI1, SPI2, TIM10, TIM2, TIM3, TIM4, TIM5, TIM9,
 };
 use stm32f401::{CorePeripherals, Peripherals};
 use stm32f4xx_hal::adc::Adc;
@@ -39,6 +39,7 @@ use crate::bt_control::BTController;
 /// 3: PID interrupt
 /// 4: Motor PWM
 /// 5: Main monotonic
+/// 9: Main Loop interrupt
 /// 10: Sensors interrupt
 
 pub fn init_all_pre(rcc: &mut RCC) {
@@ -69,6 +70,7 @@ pub struct InitStruct {
     /// clocks and timers
     pub clocks:  Clocks,
     pub tim3:    TIM3,
+    pub tim9:    TIM9,
     pub tim10:   TIM10,
     pub mono:    MonoTimer<TIM5, 1_000_000>,
     /// wrappers
@@ -126,6 +128,7 @@ pub fn init_all(mut cp: CorePeripherals, mut dp: Peripherals) -> InitStruct {
         exti: dp.EXTI,
         clocks,
         tim3: dp.TIM3,
+        tim9: dp.TIM9,
         tim10: dp.TIM10,
         mono,
         sensors,
