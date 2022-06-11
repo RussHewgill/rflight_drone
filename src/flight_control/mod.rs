@@ -1,4 +1,8 @@
+mod control_inputs;
+mod control_rates;
+
 use crate::{
+    math::rad_to_deg,
     motors::MotorsPWM,
     pid::PID,
     sensors::{UQuat, V3},
@@ -7,228 +11,7 @@ use crate::{
 use defmt::{println as rprintln, Format};
 
 pub use self::control_inputs::*;
-
-#[cfg(feature = "nope")]
-mod prev_inputs {
-
-    /// Received from remote control
-    #[derive(Default, Clone, Copy, Format)]
-    pub struct ControlInputs {
-        pub roll:         i16,
-        pub pitch:        i16,
-        pub yaw:          i16,
-        pub throttle:     i16,
-        pub takeoff:      bool,
-        pub calibrate:    bool,
-        pub motors_armed: bool,
-    }
-
-    /// deserialize
-    impl ControlInputs {
-        pub fn deserialize(data: &[u8]) -> Option<ControlInputs> {
-            if data.len() != 9 {
-                return None;
-            }
-            let throttle = i16::from_be_bytes(data[0..2].try_into().unwrap());
-            let roll = i16::from_be_bytes(data[2..4].try_into().unwrap());
-            let pitch = i16::from_be_bytes(data[4..6].try_into().unwrap());
-            let yaw = i16::from_be_bytes(data[6..8].try_into().unwrap());
-
-            let takeoff = (data[8] & 0b0001) != 0;
-            let calibrate = (data[8] & 0b0010) != 0;
-            let motors_armed = (data[8] & 0b0100) != 0;
-
-            Some(ControlInputs {
-                roll,
-                pitch,
-                yaw,
-                throttle,
-                takeoff,
-                calibrate,
-                motors_armed,
-            })
-        }
-
-        pub fn as_f32(&self) -> (f32, f32, f32, f32) {
-            (
-                Self::to_f32(self.roll),
-                Self::to_f32(self.pitch),
-                Self::to_f32(self.yaw),
-                Self::to_f32(self.throttle),
-            )
-        }
-
-        pub fn to_f32(x: i16) -> f32 {
-            x as f32 / (i16::MAX as f32)
-        }
-        // pub fn from_f32(x: f32) -> i16 {
-        //     let x = x.clamp(-1.0, 1.0);
-        //     (x * i16::MAX as f32) as i16
-        // }
-    }
-
-    impl ControlInputs {
-        pub fn set_roll(&mut self, roll: f32) {
-            self.roll = Self::from_f32(roll);
-        }
-    }
-}
-
-mod control_inputs {
-    use core::f32::consts::PI;
-
-    use defmt::{println as rprintln, Format};
-
-    use crate::math::rad_to_deg;
-
-    /// Received from remote control
-    #[derive(Clone, Copy, Format)]
-    pub struct ControlInputs {
-        /// Range: -1.0 to 1.0
-        pub roll:         f32,
-        /// Range: -1.0 to 1.0
-        pub pitch:        f32,
-        /// Range: -2Pi to 2Pi
-        pub yaw:          f32,
-        /// Range: 0.0 to 1.0
-        pub throttle:     f32,
-        /// Toggles
-        pub takeoff:      bool,
-        pub calibrate:    bool,
-        pub motors_armed: bool,
-        pub level_mode:   bool,
-    }
-
-    impl Default for ControlInputs {
-        fn default() -> Self {
-            Self {
-                roll:         0.0,
-                pitch:        0.0,
-                yaw:          0.0,
-                throttle:     0.0,
-                takeoff:      false,
-                calibrate:    false,
-                motors_armed: false,
-                level_mode:   true,
-            }
-        }
-    }
-
-    /// deserialize
-    impl ControlInputs {
-        pub fn deserialize(data: &[u8]) -> Option<ControlInputs> {
-            if data.len() != 9 {
-                return None;
-            }
-            let roll = i16::from_be_bytes(data[0..2].try_into().unwrap());
-            let pitch = i16::from_be_bytes(data[2..4].try_into().unwrap());
-            let yaw = i16::from_be_bytes(data[4..6].try_into().unwrap());
-            let throttle = i16::from_be_bytes(data[6..8].try_into().unwrap());
-
-            let takeoff = (data[8] & 0b0001) != 0;
-            let calibrate = (data[8] & 0b0010) != 0;
-            let motors_armed = (data[8] & 0b0100) != 0;
-            let level_mode = (data[8] & 0b1000) != 0;
-
-            /// negative throttle probably won't work with motors?
-            let throttle = Self::to_f32(throttle).clamp(0.0, 1.0);
-
-            // eprintln!("motors_armed = {:?}", motors_armed);
-
-            Some(ControlInputs {
-                roll: Self::to_f32(roll),
-                pitch: Self::to_f32(pitch),
-                yaw: Self::to_f32(yaw),
-                throttle,
-                takeoff,
-                calibrate,
-                motors_armed,
-                level_mode,
-            })
-        }
-
-        pub fn to_f32(x: i16) -> f32 {
-            x as f32 / (i16::MAX as f32)
-        }
-    }
-
-    /// TODO: not correct
-    /// get_values
-    impl ControlInputs {
-        /// gyro is in deg/s, so pid inputs/outputs must be as well
-        pub fn get_values(&self) -> (f32, f32, f32, f32) {
-            (
-                rad_to_deg(self.roll),
-                rad_to_deg(self.pitch),
-                rad_to_deg(self.yaw),
-                // self.roll,
-                // self.pitch,
-                // self.yaw,
-                self.throttle,
-            )
-        }
-    }
-
-    /// set values
-    impl ControlInputs {
-        pub fn set_roll(&mut self, roll: f32) {
-            self.roll = roll.clamp(-1.0, 1.0);
-        }
-        pub fn set_pitch(&mut self, pitch: f32) {
-            self.pitch = pitch.clamp(-1.0, 1.0);
-        }
-        pub fn set_yaw(&mut self, yaw: f32) {
-            // self.yaw = yaw.clamp(-1.0, 1.0);
-            self.yaw = yaw % (2.0 * PI);
-        }
-        pub fn set_throttle(&mut self, throttle: f32) {
-            self.throttle = throttle.clamp(-1.0, 1.0);
-        }
-    }
-}
-
-mod control_rates {
-
-    #[derive(Default, Clone, Copy)]
-    pub struct ControlRates {
-        pub roll:     ControlRateAxis,
-        pub pitch:    ControlRateAxis,
-        pub yaw:      ControlRateAxis,
-        pub throttle: ControlRateThrottle,
-    }
-
-    #[derive(Clone, Copy)]
-    pub struct ControlRateAxis {
-        pub rc_rate:    f32,
-        pub super_rate: f32,
-        pub rc_expo:    f32,
-    }
-
-    impl Default for ControlRateAxis {
-        fn default() -> Self {
-            Self {
-                rc_rate:    1.0,
-                super_rate: 0.0,
-                rc_expo:    0.0,
-            }
-        }
-    }
-
-    #[derive(Clone, Copy)]
-    pub struct ControlRateThrottle {
-        pub mid:  f32,
-        pub expo: f32,
-    }
-
-    impl Default for ControlRateThrottle {
-        fn default() -> Self {
-            Self {
-                mid:  0.5,
-                expo: 0.0,
-            }
-        }
-    }
-}
+pub use self::control_rates::*;
 
 #[derive(Clone, Copy, Format)]
 #[repr(u8)]
@@ -285,6 +68,8 @@ pub struct DroneController {
     /// Throttle
     pub pid_altitude_stab: PID,
     pub pid_altitude_rate: PID,
+    /// Rates
+    pub rates:             ControlRates,
     /// Config
     pub config:            FlightConfig,
 }
@@ -417,6 +202,7 @@ impl DroneController {
             pid_yaw_rate,
             pid_altitude_stab,
             pid_altitude_rate,
+            rates: ControlRates::default(),
             config: FlightConfig::default(),
         }
     }
@@ -440,6 +226,7 @@ impl DroneController {
             pid_yaw_rate,
             pid_altitude_stab,
             pid_altitude_rate,
+            rates: ControlRates::default(),
             config: FlightConfig::default(),
         }
     }
@@ -470,6 +257,17 @@ impl DroneController {
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
+        /// in radians
+        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
+        /// convert to degrees since gyro is in deg/s
+        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = (
+            rad_to_deg(ahrs_roll),
+            rad_to_deg(ahrs_pitch),
+            rad_to_deg(ahrs_yaw),
+        );
+
+        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values(&self.rates);
+
         panic!("TODO: Acro mode");
     }
 
@@ -488,7 +286,7 @@ impl DroneController {
             rad_to_deg(ahrs_yaw),
         );
 
-        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values();
+        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values(&self.rates);
 
         // /// XXX: testing PID
         // let i_pitch = 15.0;
