@@ -193,8 +193,8 @@ mod app {
         let pid_period: HertzU32 = 1600.Hz();
         // let pid_period: HertzU32 = 3200.Hz();
 
-        let main_loop_period: HertzU32 = 20.Hz();
-        // let main_loop_period: HertzU32 = 10.Hz();
+        // let main_loop_period: HertzU32 = 20.Hz();
+        let main_loop_period: HertzU32 = 10.Hz();
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 2.Hz();
         // let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();

@@ -370,13 +370,13 @@ impl DroneController {
         let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
         let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
 
-        rprintln!(
-            "yaw = {:?}\ngyro = {:?}\nerr1_yaw = {:?}\nout1_yaw = {:?}",
-            ahrs_yaw,
-            gyro.z,
-            err1_yaw,
-            out1_yaw,
-        );
+        // rprintln!(
+        //     "yaw = {:?}\ngyro = {:?}\nerr1_yaw = {:?}\nout1_yaw = {:?}",
+        //     ahrs_yaw,
+        //     gyro.z,
+        //     err1_yaw,
+        //     out1_yaw,
+        // );
 
         self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
     }
