@@ -445,23 +445,33 @@ mod app {
                     // );
 
                     /// print at FREQ / X Hz
-                    /// 6700, 67 => 100 Hz
-                    if *cx.local.counter >= 67 * 2 {
+                    // /// 6700, 67 => 100 Hz
+                    // if *cx.local.counter >= 67 * 2 {
+                    /// 3330, 33 => 100 Hz
+                    #[cfg(feature = "nope")]
+                    if *cx.local.counter >= 33 {
                         *cx.local.counter = 0;
 
-                        let (roll, pitch, yaw) = fd.get_euler_angles();
-                        rprintln!(
-                            "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
-                            // "  3,   2\n{:08}, {:08}\n{:08}, {:08}\n  4,
-                            // 1\n(r,p,y) = {:08}, {:08}, {:08}",
-                            round_to(motor_outputs.back_right, 4),
-                            round_to(motor_outputs.back_left, 4),
-                            round_to(motor_outputs.front_right, 4), // XXX: rotate 180
-                            round_to(motor_outputs.front_left, 4), // to match position on table
-                            r(rad_to_deg(roll)),
-                            r(rad_to_deg(pitch)),
-                            r(rad_to_deg(yaw)),
-                        );
+                        // rprintln!(
+                        //     "{:08}\n{:08}\n{:08}",
+                        //     inputs.roll,
+                        //     inputs.pitch,
+                        //     inputs.yaw,
+                        // );
+
+                        // let (roll, pitch, yaw) = fd.get_euler_angles();
+                        // rprintln!(
+                        //     "{:08}, {:08}\n{:08}, {:08}\n(r,p,y) = {:08}, {:08}, {:08}",
+                        //     // "  3,   2\n{:08}, {:08}\n{:08}, {:08}\n  4,
+                        //     // 1\n(r,p,y) = {:08}, {:08}, {:08}",
+                        //     round_to(motor_outputs.back_right, 4),
+                        //     round_to(motor_outputs.back_left, 4),
+                        //     round_to(motor_outputs.front_right, 4), // XXX: rotate 180
+                        //     round_to(motor_outputs.front_left, 4), // to match position on table
+                        //     r(rad_to_deg(roll)),
+                        //     r(rad_to_deg(pitch)),
+                        //     r(rad_to_deg(yaw)),
+                        // );
 
                         // let (roll, pitch, yaw) = fd.get_euler_angles();
                         // rprintln!(

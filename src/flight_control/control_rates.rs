@@ -40,7 +40,14 @@ impl Default for ControlRateAxis {
 
 impl ControlRateAxis {
     pub fn apply(&self, input: f32) -> f32 {
-        unimplemented!()
+        use nalgebra::ComplexField;
+        /// BF rcCommand factor
+        let q = (input.powi(4) * self.rc_expo) + input * (1.0 - self.rc_expo);
+        /// BF expo factor
+        let r = 200.0 * q * self.rc_rate;
+        /// BF super factor
+        let p = 1.0 / (1.0 - (input * self.super_rate));
+        r * p
     }
 }
 
@@ -61,6 +68,6 @@ impl Default for ControlRateThrottle {
 
 impl ControlRateThrottle {
     pub fn apply(&self, input: f32) -> f32 {
-        unimplemented!()
+        input
     }
 }
