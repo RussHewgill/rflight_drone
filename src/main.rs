@@ -730,7 +730,9 @@ mod app {
                         }
                         Err(e) => {
                             rprintln!("read event error = {:?}", e);
-                            unimplemented!()
+                            // unimplemented!()
+                            bt.unpause_interrupt(exti);
+                            return;
                         }
                     };
 

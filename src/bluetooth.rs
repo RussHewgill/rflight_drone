@@ -137,6 +137,8 @@ pub enum BTError<SpiError, GpioError> {
     /// GPIO errors occur if there is an underlying error resetting the pin, setting the chip select
     /// pin, or reading if data is available.
     Gpio(GpioError),
+
+    InsufficientResources,
 }
 
 impl<SpiError, GpioError> defmt::Format for BTError<SpiError, GpioError> {
@@ -144,6 +146,9 @@ impl<SpiError, GpioError> defmt::Format for BTError<SpiError, GpioError> {
         match self {
             Self::Spi(spi) => defmt::write!(f, "SpiError: ??"),
             Self::Gpio(gpio) => defmt::write!(f, "GpioError: ??"),
+            Self::InsufficientResources => {
+                defmt::write!(f, "BTError::InsufficientResources")
+            }
         }
     }
 }

@@ -490,7 +490,8 @@ where
                         rprintln!("error 2 = {:?}", e);
                     }
                 }
-                unimplemented!()
+                // unimplemented!()
+                Err(BTError::Spi(SpiError::ModeFault))
             }
         }
     }
@@ -550,7 +551,7 @@ where
                 let bluetooth_hci_defmt::host::uart::Packet::Event(e) = p;
                 e
             }
-            _ => unimplemented!(),
+            _ => return Err(BTError::Spi(SpiError::ModeFault)),
         };
 
         // uprintln!(uart, "event = {:?}", &e);
