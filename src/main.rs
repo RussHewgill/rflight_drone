@@ -189,14 +189,15 @@ mod app {
 
         // let sensor_period: HertzU32 = 1600.Hz();
         // let sensor_period: HertzU32 = 6700.Hz();
-        // let sensor_period: HertzU32 = 6660.Hz(); // XXX: gyro doesn't work at this rate??
-        let sensor_period: HertzU32 = 3330.Hz();
+        let sensor_period: HertzU32 = 6660.Hz(); // XXX: gyro doesn't work at this rate??
+
+        // let sensor_period: HertzU32 = 3330.Hz();
 
         let pid_period: HertzU32 = 1600.Hz();
         // let pid_period: HertzU32 = 3200.Hz();
 
-        // let main_loop_period: HertzU32 = 20.Hz();
-        let main_loop_period: HertzU32 = 10.Hz();
+        let main_loop_period: HertzU32 = 15.Hz();
+        // let main_loop_period: HertzU32 = 10.Hz();
 
         // let sensor_period: stm32f4xx_hal::time::Hertz = 2.Hz();
         // let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
@@ -275,9 +276,9 @@ mod app {
         //     50522.0, //
         // ));
 
-        // /// start Sensor timer
-        // tim10.start(sensor_period).unwrap();
-        // tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Sensor timer
+        tim10.start(sensor_period).unwrap();
+        tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         // /// start PID timer
         // tim3.start(pid_period).unwrap();
@@ -287,11 +288,10 @@ mod app {
         // tim9.start(main_loop_period).unwrap();
         // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
-        let bt_period = 200.Hz();
-
-        /// start bt_test timer
-        tim9.start(bt_period).unwrap();
-        tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        // let bt_period = 200.Hz();
+        // /// start bt_test timer
+        // tim9.start(bt_period).unwrap();
+        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let v = init_struct.adc.sample();
         // rprintln!("Battery = {:?} V", v);
@@ -401,6 +401,38 @@ mod app {
 
                 // let gyro = sd.imu_gyro.read_and_reset();
                 // rprintln!("{}\n{}\n{}", gyro.x, gyro.y, gyro.z);
+
+                // let gyro_rdy = if gyro_rdy { 1 } else { 0 };
+                // let acc_rdy = if acc_rdy { 1 } else { 0 };
+
+                // rprintln!("gyro_rdy, acc_rdy = {:?}, {:?}", gyro_rdy, acc_rdy);
+
+                if gyro_rdy {
+                    cx.local.counter.0 += 1;
+                    print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+                }
+                if acc_rdy {
+                    cx.local.counter.1 += 1;
+                }
+
+                cx.local.counter.2 += 1;
+
+                // if cx.local.counter.1 > 3330 {
+                if cx.local.counter.1 > 3330 * 2 {
+                    // rprintln!(
+                    //     "hits / misses = {:?} / {:?} = {:?}",
+                    //     cx.local.counter.1,
+                    //     cx.local.counter.0,
+                    //     cx.local.counter.0 as f32 / cx.local.counter.1 as f32,
+                    // );
+                    rprintln!(
+                        "gyro: {:?}\nacc: {:?}\ntotal: {:?}",
+                        cx.local.counter.0 as f32 / cx.local.counter.2 as f32,
+                        cx.local.counter.1 as f32 / cx.local.counter.2 as f32,
+                        cx.local.counter.2,
+                    );
+                    *cx.local.counter = (0, 0, 0);
+                }
 
                 // if *dbg_gyro {
                 //     let gyro = sd.imu_gyro.read_and_reset();
@@ -513,14 +545,12 @@ mod app {
             );
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(
-    //     binds = TIM1_BRK_TIM9,
-    //     shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
-    //     // local = [tim9, counter: u32 = 0, bat_counter: u32 = 0],
-    //     local = [tim9, bat_counter: u32 = 0],
-    //     priority = 2
-    // )]
+    #[task(
+        binds = TIM1_BRK_TIM9,
+        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
+        local = [tim9, bat_counter: u32 = 0],
+        priority = 2
+    )]
     fn main_loop(mut cx: main_loop::Context) {
         cx.local
             .tim9
@@ -683,12 +713,13 @@ mod app {
         // main_loop::spawn().unwrap();
     }
 
-    #[task(
-        binds = TIM1_BRK_TIM9,
-        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
-        local = [tim9, roll: f32 = 0.0],
-        priority = 2
-    )]
+    #[cfg(feature = "nope")]
+    // #[task(
+    //     binds = TIM1_BRK_TIM9,
+    //     shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
+    //     local = [tim9, roll: f32 = 0.0],
+    //     priority = 2
+    // )]
     fn bt_test(mut cx: bt_test::Context) {
         cx.local
             .tim9
@@ -809,6 +840,7 @@ mod app {
                 }
 
                 bt.unpause_interrupt(exti);
+                // rprintln!("bt_irq done");
             });
     }
 
