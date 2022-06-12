@@ -335,12 +335,12 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        // let throttle = 0.1;
-        // test_motors::spawn(throttle).unwrap();
-        // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
-        // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
-        // set_dbg_gyro::spawn(true).unwrap();
-        // kill_motors::spawn_after(5_000.millis()).unwrap();
+        let throttle = 0.1;
+        test_motors::spawn(throttle).unwrap();
+        // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
+        // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
+        set_dbg_gyro::spawn(true).unwrap();
+        kill_motors::spawn_after(5_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -411,28 +411,28 @@ mod app {
 
                 // rprintln!("gyro_rdy, acc_rdy = {:?}, {:?}", gyro_rdy, acc_rdy);
 
-                if gyro_rdy {
-                    cx.local.counter.0 += 1;
-                    // print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
-                }
-                if acc_rdy {
-                    cx.local.counter.1 += 1;
-                }
-                cx.local.counter.2 += 1;
-                if cx.local.counter.2 > 3330 * 2 {
-                    rprintln!(
-                        "gyro: {:?}\nacc: {:?}\ntotal: {:?}",
-                        cx.local.counter.0 as f32 / cx.local.counter.2 as f32,
-                        cx.local.counter.1 as f32 / cx.local.counter.2 as f32,
-                        cx.local.counter.2,
-                    );
-                    *cx.local.counter = (0, 0, 0);
-                }
-
-                // if *dbg_gyro {
-                //     let gyro = sd.imu_gyro.read_and_reset();
-                //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                // if gyro_rdy {
+                //     cx.local.counter.0 += 1;
+                //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
                 // }
+                // if acc_rdy {
+                //     cx.local.counter.1 += 1;
+                // }
+                // cx.local.counter.2 += 1;
+                // if cx.local.counter.2 > 3330 * 2 {
+                //     rprintln!(
+                //         "gyro: {:?}\nacc: {:?}\ntotal: {:?}",
+                //         cx.local.counter.0 as f32 / cx.local.counter.2 as f32,
+                //         cx.local.counter.1 as f32 / cx.local.counter.2 as f32,
+                //         cx.local.counter.2,
+                //     );
+                //     *cx.local.counter = (0, 0, 0);
+                // }
+
+                if *dbg_gyro {
+                    let gyro = sd.imu_gyro.read_and_reset();
+                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                }
 
                 // TODO: read baro
                 // cx.local.sensors.read_data_baro(sd);

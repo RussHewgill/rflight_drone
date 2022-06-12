@@ -18,21 +18,21 @@ def read_csv(path):
         csv_reader = csv.DictReader(csv_file, fieldnames=names)
         line_count = 0
         for row in csv_reader:
-            if line_count == 0:
-                # print(f'Column names are {", ".join(row)}')
-                pass
+            # if line_count == 0:
+            #     # print(f'Column names are {", ".join(row)}')
+            #     pass
             # elif line_count >= 100:
             #     break
-            else:
-                try:
-                    x = float(row["X"])
-                    y = float(row["Y"])
-                    z = float(row["Z"])
-                    xs = np.append(xs, float(row["X"]))
-                    ys = np.append(ys, y)
-                    zs = np.append(zs, z)
-                except:
-                    pass
+            # else:
+            try:
+                x = float(row["X"])
+                y = float(row["Y"])
+                z = float(row["Z"])
+                xs = np.append(xs, float(row["X"]))
+                ys = np.append(ys, y)
+                zs = np.append(zs, z)
+            except:
+                pass
 
                 # xs.append(row["X"])
                 # ys.append(row["Y"])
@@ -234,6 +234,9 @@ def main():
     # path = "yaw_01_all.log"
     # path = "yaw_02_ground_unfiltered.log"
     # path = "yaw_02_ground_builtin.log"
+    # path = "yaw_03_unfiltered.log"
+    # path = "yaw_03_builtin_narrow.log"
+    # path = "yaw_03_builtin_verynarrow.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1])
