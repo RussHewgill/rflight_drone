@@ -280,13 +280,13 @@ mod app {
         tim10.start(sensor_period).unwrap();
         tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start PID timer
-        // tim3.start(pid_period).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start PID timer
+        tim3.start(pid_period).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start Main Loop timer
-        // tim9.start(main_loop_period).unwrap();
-        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Main Loop timer
+        tim9.start(main_loop_period).unwrap();
+        tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
         // /// start bt_test timer
@@ -335,12 +335,12 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        let throttle = 0.1;
-        test_motors::spawn(throttle).unwrap();
-        // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
-        // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
-        set_dbg_gyro::spawn(true).unwrap();
-        kill_motors::spawn_after(5_000.millis()).unwrap();
+        // let throttle = 0.1;
+        // test_motors::spawn(throttle).unwrap();
+        // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
+        // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
+        // set_dbg_gyro::spawn(true).unwrap();
+        // kill_motors::spawn_after(5_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -429,10 +429,10 @@ mod app {
                 //     *cx.local.counter = (0, 0, 0);
                 // }
 
-                if *dbg_gyro {
-                    let gyro = sd.imu_gyro.read_and_reset();
-                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
-                }
+                // if *dbg_gyro {
+                //     let gyro = sd.imu_gyro.read_and_reset();
+                //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                // }
 
                 // TODO: read baro
                 // cx.local.sensors.read_data_baro(sd);
