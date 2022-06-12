@@ -198,7 +198,24 @@ impl Sensors {
 
 /// read data to SensorData, and swap axes
 impl Sensors {
-    #[cfg(feature = "nope")]
+    fn align_data_gyro(gyro: [f32; 3]) -> V3 {
+        V3::new(
+            -gyro[1], // pitch
+            gyro[0],  // roll
+            gyro[2],  // yaw
+        )
+    }
+    /// roll, pitch, yaw to match na::Quat
+    fn align_data_acc(acc: [f32; 3]) -> V3 {
+        V3::new(
+            -acc[0], //
+            acc[1],  //
+            acc[2],
+        )
+    }
+
+    // #[cfg(feature = "nope")]
+    /// only reads from sensor that has data ready
     pub fn read_data_imu(
         &mut self,
         data: &mut SensorData,
@@ -210,35 +227,34 @@ impl Sensors {
                 (true, true) => {
                     let (data_gyro, data_acc) = imu.read_data(spi).unwrap();
 
-                    let data_gyro = V3::new(
-                        -data_gyro[1], // pitch
-                        data_gyro[0],  // roll
-                        data_gyro[2],  // yaw
-                    );
-
+                    let data_gyro = Self::align_data_gyro(data_gyro);
                     let data_gyro = filters.update_gyro(data_gyro);
-
                     data.imu_gyro.update(data_gyro);
 
-                    /// roll, pitch, yaw to match na::Quat
-                    let data_acc = V3::new(
-                        -data_acc[0], //
-                        data_acc[1],
-                        data_acc[2],
-                    );
-
+                    let data_acc = Self::align_data_acc(data_acc);
                     let data_acc = filters.update_acc(data_acc);
-
                     data.imu_acc.update(data_acc);
                 }
                 (false, false) => {}
+                (true, false) => {
+                    let data_gyro = imu.read_data_gyro(spi).unwrap();
+                    let data_gyro = Self::align_data_gyro(data_gyro);
+                    let data_gyro = filters.update_gyro(data_gyro);
+                    data.imu_gyro.update(data_gyro);
+                }
+                (false, true) => {
+                    let data_acc = imu.read_data_acc(spi).unwrap();
+                    let data_acc = Self::align_data_acc(data_acc);
+                    let data_acc = filters.update_acc(data_acc);
+                    data.imu_acc.update(data_acc);
+                }
             }
             (gyro_rdy, acc_rdy)
-        });
+        })
     }
 
     /// skips updating if data not ready
-    // #[cfg(feature = "nope")]
+    #[cfg(feature = "nope")]
     pub fn read_data_imu(
         &mut self,
         data: &mut SensorData,

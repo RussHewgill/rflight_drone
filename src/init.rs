@@ -229,9 +229,9 @@ pub fn init_sensors(sensors: &mut Sensors) {
     /// 1660 Hz or greater needed for analog filter chain
     // imu_cfg.acc_power = AccelPowerModes::High1660; // default in ST firmware
     // imu_cfg.acc_power = AccelPowerModes::High1660;
+    // imu_cfg.acc_power = AccelPowerModes::High3330; // gyro doesn't work at 6660
     imu_cfg.acc_power = AccelPowerModes::High6660; // fastest possible
 
-    // imu_cfg.acc_power = AccelPowerModes::High3330; // gyro doesn't work at 6660
     imu_cfg.acc_scale = AccelScaleFactor::S4;
 
     imu_cfg.acc_analog_lp_bandwidth = AccelAnalogBandwidth::BW1500;
@@ -242,6 +242,7 @@ pub fn init_sensors(sensors: &mut Sensors) {
     // imu_cfg.gyro_power = GyroPowerModes::High833; // matches 800 Hz update rate
     // imu_cfg.gyro_power = GyroPowerModes::High1660;
     // imu_cfg.gyro_power = GyroPowerModes::High3330;
+
     imu_cfg.gyro_power = GyroPowerModes::High6660; // fastest possible
     imu_cfg.gyro_scale = GyroScaleFactor::S2000;
 
@@ -249,9 +250,10 @@ pub fn init_sensors(sensors: &mut Sensors) {
     imu_cfg.gyro_lp_filter_enable = true;
     imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
 
-    // sensors.with_spi_imu(|spi, imu| {
-    //     imu.init(spi, imu_cfg).unwrap();
-    // });
+    sensors.with_spi_imu(|spi, imu| {
+        imu.reset(spi).unwrap();
+        imu.init(spi, imu_cfg).unwrap();
+    });
 
     sensors.with_spi_mag(|spi, mag| {
         mag.init_continuous(spi, crate::sensors::magneto::MagDataRate::R100)

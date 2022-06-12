@@ -399,8 +399,12 @@ mod app {
                 cx.local.sensors.read_data_mag(sd, filters);
                 let (gyro_rdy, acc_rdy) = cx.local.sensors.read_data_imu(sd, filters);
 
-                // let gyro = sd.imu_gyro.read_and_reset();
-                // rprintln!("{}\n{}\n{}", gyro.x, gyro.y, gyro.z);
+                // if gyro_rdy {
+                //     let gyro = sd.imu_gyro.read_and_reset();
+                //     rprintln!("{}\n{}\n{}", gyro.x, gyro.y, gyro.z);
+                // } else {
+                //     rprintln!("no Gyro");
+                // }
 
                 // let gyro_rdy = if gyro_rdy { 1 } else { 0 };
                 // let acc_rdy = if acc_rdy { 1 } else { 0 };
@@ -409,22 +413,13 @@ mod app {
 
                 if gyro_rdy {
                     cx.local.counter.0 += 1;
-                    print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+                    // print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
                 }
                 if acc_rdy {
                     cx.local.counter.1 += 1;
                 }
-
                 cx.local.counter.2 += 1;
-
-                // if cx.local.counter.1 > 3330 {
-                if cx.local.counter.1 > 3330 * 2 {
-                    // rprintln!(
-                    //     "hits / misses = {:?} / {:?} = {:?}",
-                    //     cx.local.counter.1,
-                    //     cx.local.counter.0,
-                    //     cx.local.counter.0 as f32 / cx.local.counter.1 as f32,
-                    // );
+                if cx.local.counter.2 > 3330 * 2 {
                     rprintln!(
                         "gyro: {:?}\nacc: {:?}\ntotal: {:?}",
                         cx.local.counter.0 as f32 / cx.local.counter.2 as f32,

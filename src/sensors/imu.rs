@@ -707,7 +707,7 @@ pub mod config {
             High833   = 0b0111,
             High1660  = 0b1000,
             High3330  = 0b1001,
-            High6660  = 0b1011,
+            High6660  = 0b1010,
         }
 
         impl GyroPowerModes {
