@@ -273,21 +273,17 @@ mod app {
         //     50522.0, //
         // ));
 
-        /// Start timers
-        // #[cfg(feature = "nope")]
-        {
-            /// start Sensor timer
-            tim10.start(sensor_period).unwrap();
-            tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Sensor timer
+        tim10.start(sensor_period).unwrap();
+        tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-            /// start PID timer
-            tim3.start(pid_period).unwrap();
-            tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start PID timer
+        // tim3.start(pid_period).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-            /// start Main Loop timer
-            tim9.start(main_loop_period).unwrap();
-            tim9.listen(stm32f4xx_hal::timer::Event::Update);
-        }
+        // /// start Main Loop timer
+        // tim9.start(main_loop_period).unwrap();
+        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let v = init_struct.adc.sample();
         // rprintln!("Battery = {:?} V", v);
@@ -331,11 +327,12 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        // test_motors::spawn(0.1).unwrap();
-        // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
-        // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
-        // set_dbg_gyro::spawn(true).unwrap();
-        // kill_motors::spawn_after(5_000.millis()).unwrap();
+        let throttle = 0.1;
+        test_motors::spawn(throttle).unwrap();
+        // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
+        // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
+        set_dbg_gyro::spawn(true).unwrap();
+        kill_motors::spawn_after(5_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -356,6 +353,7 @@ mod app {
                 // inputs.throttle = 0.225;
                 inputs.set_throttle(throttle);
                 motors.set_armed_unchecked(true);
+                motors.set_all_f32(throttle);
             },
         );
     }
@@ -393,10 +391,13 @@ mod app {
                 cx.local.sensors.read_data_mag(sd, filters);
                 let (gyro_rdy, acc_rdy) = cx.local.sensors.read_data_imu(sd, filters);
 
-                // if *dbg_gyro {
-                //     let gyro = sd.imu_gyro.read_and_reset();
-                //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
-                // }
+                // let gyro = sd.imu_gyro.read_and_reset();
+                // rprintln!("{}\n{}\n{}", gyro.x, gyro.y, gyro.z);
+
+                if *dbg_gyro {
+                    let gyro = sd.imu_gyro.read_and_reset();
+                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                }
 
                 // TODO: read baro
                 // cx.local.sensors.read_data_baro(sd);
@@ -644,7 +645,7 @@ mod app {
                             // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                             // bt.unpause_interrupt(exti);
 
-                            // let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                            // let pids = [IdPID::PitchRate];
                             let pids = [IdPID::YawRate];
                             for id in pids {
                                 bt.pause_interrupt(exti);

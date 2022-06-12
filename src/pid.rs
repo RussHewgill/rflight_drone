@@ -41,7 +41,7 @@ pub struct PIDOutput {
 impl PID {
     pub fn new_limited(kp: f32, ki: f32, kd: f32) -> Self {
         let mut out = Self::new(kp, ki, kd);
-        out.p_limit = 1.0;
+        // out.p_limit = 1.0;
         out.i_limit = 1.0;
         out.d_limit = 1.0;
         out.output_limit = 1.0;

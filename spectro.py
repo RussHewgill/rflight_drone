@@ -50,8 +50,12 @@ def plot_spectrogram(path, ax0, ax1):
     ax0.axes.xaxis.set_visible(False)
     ax0.axes.yaxis.set_visible(False)
 
-    ax0.set_title(f"Spectrogram of gyro X-axis, {path}")
-    ax0.plot(xs)
+    # spec = xs
+    spec = zs
+
+    # ax0.set_title(f"Spectrogram of gyro X-axis, {path}")
+    ax0.set_title(f"Spectrogram of gyro Z-axis, {path}")
+    ax0.plot(spec)
     ax0.set_xlabel('Sample')
     ax0.set_ylabel('Amplitude')
 
@@ -65,8 +69,6 @@ def plot_spectrogram(path, ax0, ax1):
     # plt.subplot(p1)
 
     # # ax1.set_yscale('log')
-
-    spec = xs
 
     powerSpectrum, freqenciesFound, time, imageAxis = ax1.specgram(
         spec, Fs=samplingFrequency, NFFT=nfft
@@ -219,14 +221,19 @@ def main2():
 
 def main():
 
-    # path = "gyro_post.log"
+    path = "gyro_post.log"
     # path = "gyro09_nofilters.log"
     # path = "gyro10_lp_3notch.log"
 
     # path = "throttle_0.225.log"
     # path = "throttle_0.225.log"
     # path = "throttle_0.1_0.15.log"
-    path = "pitch_pid02_filtered.log"
+    # path = "pitch_pid02_filtered.log"
+    # path = "yaw_01_unfiltered.log"
+    # path = "yaw_01_builtin.log"
+    path = "yaw_01_all.log"
+    # path = "yaw_02_ground_unfiltered.log"
+    # path = "yaw_02_ground_builtin.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1])
