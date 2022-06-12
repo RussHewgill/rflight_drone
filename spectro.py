@@ -231,7 +231,7 @@ def main():
     # path = "pitch_pid02_filtered.log"
     # path = "yaw_01_unfiltered.log"
     # path = "yaw_01_builtin.log"
-    path = "yaw_01_all.log"
+    # path = "yaw_01_all.log"
     # path = "yaw_02_ground_unfiltered.log"
     # path = "yaw_02_ground_builtin.log"
 

@@ -97,6 +97,8 @@ use core::convert::Infallible;
 #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,SPI4,EXTI0])]
 mod app {
 
+    use core::f32::consts::PI;
+
     use cortex_m_semihosting::{debug, hprintln};
     use fugit::{HertzU32, MillisDurationU32};
     use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM4, TIM5, TIM9};
@@ -273,9 +275,9 @@ mod app {
         //     50522.0, //
         // ));
 
-        /// start Sensor timer
-        tim10.start(sensor_period).unwrap();
-        tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start Sensor timer
+        // tim10.start(sensor_period).unwrap();
+        // tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         // /// start PID timer
         // tim3.start(pid_period).unwrap();
@@ -284,6 +286,12 @@ mod app {
         // /// start Main Loop timer
         // tim9.start(main_loop_period).unwrap();
         // tim9.listen(stm32f4xx_hal::timer::Event::Update);
+
+        let bt_period = 200.Hz();
+
+        /// start bt_test timer
+        tim9.start(bt_period).unwrap();
+        tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let v = init_struct.adc.sample();
         // rprintln!("Battery = {:?} V", v);
@@ -327,12 +335,12 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        let throttle = 0.1;
-        test_motors::spawn(throttle).unwrap();
-        // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
-        // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
-        set_dbg_gyro::spawn(true).unwrap();
-        kill_motors::spawn_after(5_000.millis()).unwrap();
+        // let throttle = 0.1;
+        // test_motors::spawn(throttle).unwrap();
+        // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
+        // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
+        // set_dbg_gyro::spawn(true).unwrap();
+        // kill_motors::spawn_after(5_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -394,10 +402,10 @@ mod app {
                 // let gyro = sd.imu_gyro.read_and_reset();
                 // rprintln!("{}\n{}\n{}", gyro.x, gyro.y, gyro.z);
 
-                if *dbg_gyro {
-                    let gyro = sd.imu_gyro.read_and_reset();
-                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
-                }
+                // if *dbg_gyro {
+                //     let gyro = sd.imu_gyro.read_and_reset();
+                //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                // }
 
                 // TODO: read baro
                 // cx.local.sensors.read_data_baro(sd);
@@ -505,13 +513,14 @@ mod app {
             );
     }
 
-    #[task(
-        binds = TIM1_BRK_TIM9,
-        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
-        // local = [tim9, counter: u32 = 0, bat_counter: u32 = 0],
-        local = [tim9, bat_counter: u32 = 0],
-        priority = 2
-    )]
+    #[cfg(feature = "nope")]
+    // #[task(
+    //     binds = TIM1_BRK_TIM9,
+    //     shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
+    //     // local = [tim9, counter: u32 = 0, bat_counter: u32 = 0],
+    //     local = [tim9, bat_counter: u32 = 0],
+    //     priority = 2
+    // )]
     fn main_loop(mut cx: main_loop::Context) {
         cx.local
             .tim9
@@ -672,6 +681,28 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
         // main_loop::spawn().unwrap();
+    }
+
+    #[task(
+        binds = TIM1_BRK_TIM9,
+        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
+        local = [tim9, roll: f32 = 0.0],
+        priority = 2
+    )]
+    fn bt_test(mut cx: bt_test::Context) {
+        cx.local
+            .tim9
+            .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
+
+        (cx.shared.bt, cx.shared.exti).lock(|bt, exti| {
+            let quat = UQuat::from_euler_angles(*cx.local.roll, 0.0, 0.0);
+            *cx.local.roll = *cx.local.roll + 1.0;
+
+            /// send orientation
+            bt.pause_interrupt(exti);
+            bt.log_write_quat(&quat).unwrap();
+            bt.unpause_interrupt(exti);
+        });
     }
 
     #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds, adc, flight_data], priority = 8)]
