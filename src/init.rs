@@ -248,8 +248,8 @@ pub fn init_sensors(sensors: &mut Sensors) {
 
     // // gyro low-pass filter
     // imu_cfg.gyro_lp_filter_enable = true;
-    // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
-    // // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::VeryNarrow;
+    // // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
+    // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::VeryNarrow;
 
     sensors.with_spi_imu(|spi, imu| {
         imu.reset(spi).unwrap();

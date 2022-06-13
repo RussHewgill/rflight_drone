@@ -54,7 +54,7 @@ impl IdPID {
 }
 
 /// size: each PID is 60 bytes
-#[derive(Clone, Copy, Format)]
+#[derive(Clone, Copy)]
 pub struct DroneController {
     /// Roll
     pub pid_roll_stab:     PID,

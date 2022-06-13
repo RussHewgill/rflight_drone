@@ -193,8 +193,8 @@ mod app {
         let mut bt = init_struct.bt;
         let mut dwt = init_struct.dwt;
 
-        rprintln!("sensor_period = {:?}", SENSOR_PERIOD.to_Hz());
-        rprintln!("pid_period    = {:?}", PID_PERIOD);
+        rprintln!("sensor_period = {:?}", SENSOR_FREQ);
+        rprintln!("pid_period    = {:?}", PID_FREQ);
 
         bt.pause_interrupt(&mut exti);
         match bt.init_bt() {
@@ -231,16 +231,20 @@ mod app {
 
         let mut controller = DroneController::new_default_params();
 
+        controller
+            .pid_pitch_rate
+            .set_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
+
         /// Fusion
         let mut ahrs_alg = AhrsFusion::new(
-            SENSOR_PERIOD,
+            SENSOR_FREQ,
             // 0.5,
             7.5,
         );
         ahrs_alg.cfg_acc_rejection = 10.0;
         ahrs_alg.cfg_mag_rejection = 20.0;
 
-        let mut ahrs = AhrsController::new(ahrs_alg, SENSOR_PERIOD);
+        let mut ahrs = AhrsController::new(ahrs_alg, SENSOR_FREQ);
 
         ahrs.calibration.hard_iron_offset = V3::new(
             -167175.0, //
@@ -258,15 +262,15 @@ mod app {
         // ));
 
         /// start Sensor timer
-        tim10.start(SENSOR_PERIOD).unwrap();
+        tim10.start(SENSOR_FREQ).unwrap();
         tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         /// start PID timer
-        tim3.start(PID_PERIOD).unwrap();
+        tim3.start(PID_FREQ).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         /// start Main Loop timer
-        tim9.start(MAIN_LOOP_PERIOD).unwrap();
+        tim9.start(MAIN_LOOP_FREQ).unwrap();
         tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
@@ -388,7 +392,6 @@ mod app {
 
                 // let gyro_rdy = if gyro_rdy { 1 } else { 0 };
                 // let acc_rdy = if acc_rdy { 1 } else { 0 };
-
                 // rprintln!("gyro_rdy, acc_rdy = {:?}, {:?}", gyro_rdy, acc_rdy);
 
                 // if gyro_rdy {
@@ -459,8 +462,8 @@ mod app {
                     // let gyro = ahrs.update(gyro, acc, mag);
                     let gyro2 = ahrs.update(gyro, acc, mag);
 
-                    cx.local.pitch.0 += gyro.x * (1.0 / 6660.0);
-                    cx.local.pitch.1 += gyro2.x * (1.0 / 6660.0);
+                    // cx.local.pitch.0 += gyro.y * (1.0 / PID_FREQ.to_Hz() as f32);
+                    // cx.local.pitch.1 += gyro2.y * (1.0 / PID_FREQ.to_Hz() as f32);
 
                     // print_v3("gyro = ", gyro, 5);
 
@@ -468,32 +471,22 @@ mod app {
                     fd.update(ahrs);
 
                     /// update PIDs
-                    let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+                    /// XXX: use offset adjusted gyro?
+                    // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
+                    let motor_outputs = controller.update(*inputs, &fd.quat, gyro2);
 
                     /// apply mixed PID outputs to motors
                     motor_outputs.apply(motors);
 
-                    // rprintln!(
-                    //     "gyro0 = {=f32:08}, {=f32:08}, {=f32:08}\ngyro1 = {=f32:08}, {=f32:08}, {=f32:08}",
-                    //     round_to(gyro0.x, 6),
-                    //     round_to(gyro0.y, 6),
-                    //     round_to(gyro0.z, 6),
-                    //     round_to(gyro.x, 6),
-                    //     round_to(gyro.y, 6),
-                    //     round_to(gyro.z, 6),
-                    // );
-
                     /// print at FREQ / X Hz
-                    // /// 6700, 67 => 100 Hz
-                    // if *cx.local.counter >= 67 * 2 {
-                    /// 3330, 33 => 100 Hz
-                    // #[cfg(feature = "nope")]
-                    if *cx.local.counter >= 33 {
+                    #[cfg(feature = "nope")]
+                    if *cx.local.counter >= PID_FREQ.to_Hz() / 100 {
                         *cx.local.counter = 0;
 
                         // let (roll, pitch, yaw) = fd.get_euler_angles();
                         // rprintln!(
-                        //     "ahrs: {:08}\nsum1:  {:08}\nsum2:  {:08}",
+                        //     "gyro: {}\nahrs: {}\nsum1:  {}\nsum2:  {}",
+                        //     gyro2.x,
                         //     rad_to_deg(pitch), //
                         //     cx.local.pitch.0,  //
                         //     cx.local.pitch.1,  //
@@ -544,28 +537,6 @@ mod app {
 
         const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
 
-        // const COUNTER_TIMES: u32 = 10; // 200 hz => 20 hz
-        // const COUNTER_TIMES: u32 = 5; // 100 hz => 20 hz
-        // const COUNTER_TIMES: u32 = 30; // 800 hz => 26.7 hz
-
-        // const COUNTER_TIMES: u32 = 40; // 800 hz => 20 hz
-        // const COUNTER_TIMES: u32 = 80; // 800 hz => 10 hz
-        // const COUNTER_TIMES: u32 = 160; // 1600 hz => 10 hz
-        // const COUNTER_TIMES: u32 = 80; // 1600 hz => 20 hz
-        // const COUNTER_TIMES: u32 = 40; // 1600 hz => 40 hz
-
-        // /// For a single quat characteristic:
-        // /// 80 Hz is ok
-        // /// 100 Hz is too much
-        // // const COUNTER_TIMES: u32 = 1600 / 16;
-        // const COUNTER_TIMES: u32 = 1600 / 16;
-        // const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
-
-        // /// Send data on BT at 20 Hz
-        // let COUNTER_TIMES: u32 = cx.shared.freqs.0.to_Hz() / 20;
-        // /// Send battery at 1 Hz
-        // let BATT_TIMES: u32 = cx.shared.freqs.0.to_Hz() / 20;
-
         let flight_data = cx.shared.flight_data;
         let sens_data = cx.shared.sens_data;
         let bt = cx.shared.bt;
@@ -576,6 +547,8 @@ mod app {
 
         (flight_data, sens_data, bt, exti, controller, motors).lock(
             |fd, sd, bt, exti, controller, motors| {
+                /// Write data to Bluetooth
+
                 /// send orientation
                 bt.pause_interrupt(exti);
                 bt.log_write_quat(&fd.quat).unwrap();
@@ -616,14 +589,6 @@ mod app {
                     bt.unpause_interrupt(exti);
                 }
 
-                // #[cfg(feature = "nope")]
-                // for id in IdPID::ITER {
-                //     bt.pause_interrupt(exti);
-                //     bt.log_write_pid(id, &controller[id]).unwrap();
-                //     bt.unpause_interrupt(exti);
-                // }
-
-                // //
                 // unimplemented!()
             },
         );

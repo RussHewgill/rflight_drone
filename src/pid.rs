@@ -1,10 +1,11 @@
 // use cortex_m_semihosting::hprintln;
 
+use biquad::*;
 use nalgebra::{self as na};
 
 use defmt::{println as rprintln, Format};
 
-#[derive(Clone, Copy, Format)]
+#[derive(Clone, Copy)]
 pub struct PID {
     pub kp: f32,
     pub ki: f32,
@@ -19,6 +20,8 @@ pub struct PID {
     pub prev_input: Option<f32>,
 
     pub prev_output: PIDOutput,
+
+    pub deriv_lowpass: Option<DirectForm2Transposed<f32>>,
 
     pub setpoint: f32,
 }
@@ -68,6 +71,8 @@ impl PID {
 
             prev_output: PIDOutput::default(),
 
+            deriv_lowpass: None,
+
             setpoint: 0.0,
         }
     }
@@ -113,12 +118,44 @@ impl PID {
             Some(prev_measurement) => input - *prev_measurement,
             None => 0.0,
         } * self.kd;
-        self.prev_input = Some(input);
-        let d = Self::apply_limit(self.d_limit, d_unbounded);
+
+        // let d_unbounded = if self.prev_deriv.is_none() {
+        //     /// Arducopter:
+        //     /// we've just done a reset, suppress the first derivative
+        //     /// term as we don't want a sudden change in input to cause
+        //     /// a large D output change
+        //     self.prev_deriv = Some(0.0);
+        //     0.0
+        // } else {
+        //     -match self.prev_input.as_ref() {
+        //         Some(prev_measurement) => input - *prev_measurement,
+        //         None => 0.0,
+        //     } * self.kd
+        // };
+
+        // /// Arducopter:
+        // /// discrete low pass filter, cuts out the
+        // /// high frequency noise that can drive the controller crazy
+        // const F_CUT = 20.0;
+        // let rc = 1.0 / (2.0 * core::f32::consts::PI * F_CUT);
+        // let d = if let Some(pd) = self.prev_deriv {
+        //     pd +
+        // } else {
+        //     d
+        // };
+
+        let d_filtered = if let Some(lowpass) = self.deriv_lowpass.as_mut() {
+            lowpass.run(d_unbounded)
+        } else {
+            d_unbounded
+        };
+
+        let d = Self::apply_limit(self.d_limit, d_filtered);
 
         let output = p + self.integral + d;
         let output = Self::apply_limit(self.output_limit, output);
 
+        self.prev_input = Some(input);
         let out = PIDOutput {
             p,
             i: self.integral,
@@ -134,15 +171,10 @@ impl PID {
 
 /// reset, apply limit
 impl PID {
+    /// Also derivative
     pub fn reset_integral(&mut self) {
         self.integral = 0.0;
-        // self.prev_input = None;
-        // self.prev_output = None;
-
-        // self.p_hist.clear();
-        // self.i_hist.clear();
-        // self.d_hist.clear();
-        // self.output_hist.clear();
+        // self.prev_deriv = None;
     }
 
     fn apply_limit(limit: f32, value: f32) -> f32 {
@@ -161,10 +193,15 @@ impl PID {
 
         self.integral = self.integral.clamp(self.i_limit.0, self.i_limit.1);
 
-        let mut d = -match self.prev_input.as_ref() {
-            Some(prev_measurement) => input - *prev_measurement,
-            None => 0.0,
-        } * self.kd;
+        let mut d = if self.prev_deriv.is_none() {
+            self.prev_deriv = Some(0.0);
+            0.0
+        } else {
+            -match self.prev_input.as_ref() {
+                Some(prev_measurement) => input - *prev_measurement,
+                None => 0.0,
+            } * self.kd
+        };
         self.prev_input = Some(input);
         d = d.clamp(self.d_limit.0, self.d_limit.1);
 
@@ -213,6 +250,22 @@ impl PID {
             KdLimit     => self.d_limit = val,
             OutputLimit => self.output_limit = val,
         }
+    }
+}
+
+/// set lowpass filter
+impl PID {
+    pub fn set_lowpass(&mut self, sampling_freq: f32, cutoff_freq: f32) {
+        let coeffs = Coefficients::<f32>::from_params(
+            Type::LowPass,
+            sampling_freq.hz(),
+            cutoff_freq.hz(),
+            Q_BUTTERWORTH_F32,
+            // q_value,
+        )
+        .unwrap();
+
+        self.deriv_lowpass = Some(DirectForm2Transposed::<f32>::new(coeffs));
     }
 }
 

@@ -203,7 +203,7 @@ pub mod offset {
                 || gyro.y > Self::THRESHOLD
                 || gyro.z > Self::THRESHOLD
             {
-                rprintln!("gyro not stationary, resetting timer");
+                // rprintln!("gyro not stationary, resetting timer");
                 self.timer = 0;
                 return gyro;
             }
@@ -211,11 +211,11 @@ pub mod offset {
             /// Increment timer while gyroscope stationary
             if self.timer < self.timeout {
                 self.timer += 1;
-                rprintln!("gyro stationary, ticking: {:?}", self.timer);
+                // rprintln!("gyro stationary, ticking: {:?}", self.timer);
                 return gyro;
             }
 
-            rprintln!("Adjusting gyro offset");
+            // rprintln!("Adjusting gyro offset");
             // Adjust offset if timer has elapsed
             self.gyro_offset += gyro * self.filter_coef;
 
