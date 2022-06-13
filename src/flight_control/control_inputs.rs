@@ -4,7 +4,7 @@ use defmt::{println as rprintln, Format};
 
 use crate::math::rad_to_deg;
 
-use super::ControlRates;
+use super::{ControlRates, FlightLimits};
 
 /// Received from remote control
 #[derive(Clone, Copy, Format)]
@@ -107,11 +107,19 @@ impl ControlInputs {
         self.throttle
     }
 
-    pub fn get_values(&self, rates: &ControlRates) -> (f32, f32, f32, f32) {
+    pub fn get_values(
+        &self,
+        rates: &ControlRates,
+        // limits: &FlightLimits,
+    ) -> (f32, f32, f32, f32) {
         let roll = rates.roll.apply(self.roll);
         let pitch = rates.pitch.apply(self.pitch);
         let yaw = rates.yaw.apply(self.yaw);
         let throttle = rates.throttle.apply(self.throttle);
+
+        // let roll = limits.limit_roll_rate(roll);
+        // let pitch = limits.limit_pitch_rate(pitch);
+        // let yaw = limits.limit_yaw_rate(yaw);
 
         (roll, pitch, yaw, throttle)
         // (self.roll, self.pitch, self.yaw, self.throttle)

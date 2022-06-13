@@ -70,8 +70,8 @@ pub struct DroneController {
     pub pid_altitude_rate: PID,
     /// Rates
     pub rates:             ControlRates,
-    /// Config
-    pub config:            FlightConfig,
+    /// Limits
+    pub limits:            FlightLimits,
 }
 
 /// new
@@ -203,7 +203,7 @@ impl DroneController {
             pid_altitude_stab,
             pid_altitude_rate,
             rates: ControlRates::default(),
-            config: FlightConfig::default(),
+            limits: FlightLimits::default(),
         }
     }
 
@@ -228,7 +228,7 @@ impl DroneController {
             pid_altitude_stab,
             pid_altitude_rate,
             rates: ControlRates::default(),
-            config: FlightConfig::default(),
+            config: FlightLimits::default(),
         }
     }
 }
@@ -361,6 +361,8 @@ impl DroneController {
         );
 
         let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values(&self.rates);
+
+        // rprintln!("i_pitch = {:?}", i_pitch);
 
         // let i_roll = self.config.limit_roll_rate(i_roll);
         // let i_pitch = self.config.limit_pitch_rate(i_pitch);
@@ -504,7 +506,7 @@ impl core::ops::IndexMut<IdPID> for DroneController {
 }
 
 #[derive(Clone, Copy, Format)]
-pub struct FlightConfig {
+pub struct FlightLimits {
     pub max_pitch: f32,
     pub max_roll:  f32,
 
@@ -513,7 +515,7 @@ pub struct FlightConfig {
     pub max_rate_yaw:   f32,
 }
 
-impl Default for FlightConfig {
+impl Default for FlightLimits {
     fn default() -> Self {
         Self {
             max_pitch: 60.0,
@@ -528,7 +530,7 @@ impl Default for FlightConfig {
     }
 }
 
-impl FlightConfig {
+impl FlightLimits {
     pub fn limit_roll_rate(&self, roll: f32) -> f32 {
         roll.clamp(-self.max_rate_roll, self.max_rate_roll)
     }
