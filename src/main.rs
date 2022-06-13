@@ -231,6 +231,11 @@ mod app {
 
         let mut controller = DroneController::new_default_params();
 
+        // controller.pid_pitch_rate.kp = 0.01;
+        // controller.pid_pitch_rate.kd = 0.01;
+        // controller.pid_roll_rate.kp = 0.01;
+        // controller.pid_roll_rate.kd = 0.01;
+
         controller
             .pid_pitch_rate
             .set_lowpass(PID_FREQ.to_Hz() as f32, 100.0);

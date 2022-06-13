@@ -244,14 +244,16 @@ impl DroneController {
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
-        if inputs.get_level_mode() {
-            self.update_level_mode(inputs, ahrs_quat, gyro)
-        } else {
-            self.update_acro_mode(inputs, ahrs_quat, gyro)
-        }
+        // if inputs.get_level_mode() {
+        //     self.update_level_mode(inputs, ahrs_quat, gyro)
+        // } else {
+        //     self.update_acro_mode(inputs, ahrs_quat, gyro)
+        // }
 
-        // defmt::warn!("overriding level mode, using acro mode");
-        // self.update_acro_mode(inputs, ahrs_quat, gyro)
+        defmt::warn!("overriding level mode, using acro mode");
+        self.update_acro_mode(inputs, ahrs_quat, gyro)
+
+        //
     }
 }
 
@@ -373,6 +375,23 @@ impl DroneController {
         let out1_roll = self.pid_roll_rate.step(err1_roll);
         let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
         let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+
+        // let out1_pitch2 = self.pid_roll_rate.step(err1_pitch);
+        // let out1_roll = 0.0;
+
+        // rprintln!(
+        //     // "err1_pitch = {:?}\nout1_pitch  = {:?}\nout1_pitch2 = {:?}",
+        //     "{},{},{}",
+        //     err1_pitch,
+        //     out1_pitch,
+        //     out1_pitch2,
+        // );
+
+        // rprintln!(
+        //     "err1_pitch = {:?}\nout1_pitch = {:?}",
+        //     err1_pitch,
+        //     out1_pitch
+        // );
 
         // rprintln!(
         //     "err1_pitch = {:?}\nout1_pitch = {:?}",
