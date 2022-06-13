@@ -31,6 +31,9 @@ impl ControlInputs {
     pub fn get_motors_armed(&self) -> bool {
         self.motors_armed
     }
+    pub fn get_level_mode(&self) -> bool {
+        self.level_mode
+    }
 }
 
 impl Default for ControlInputs {

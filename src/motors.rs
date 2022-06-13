@@ -130,11 +130,13 @@ impl MotorsPWM {
             return false;
             // panic!();
         }
-        if !Self::check_quat(quat) {
-            rprintln!("Motor arming check failed: Quat");
-            return false;
-            // panic!();
-        }
+
+        // if !Self::check_quat(quat) {
+        //     rprintln!("Motor arming check failed: Quat");
+        //     return false;
+        //     // panic!();
+        // }
+
         true
     }
 

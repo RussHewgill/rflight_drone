@@ -244,14 +244,14 @@ impl DroneController {
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
-        // if inputs.level_mode {
-        //     self.update_level_mode(inputs, ahrs_quat, gyro)
-        // } else {
-        //     self.update_acro_mode(inputs, ahrs_quat, gyro)
-        // }
+        if inputs.get_level_mode() {
+            self.update_level_mode(inputs, ahrs_quat, gyro)
+        } else {
+            self.update_acro_mode(inputs, ahrs_quat, gyro)
+        }
 
         // defmt::warn!("overriding level mode, using acro mode");
-        self.update_acro_mode(inputs, ahrs_quat, gyro)
+        // self.update_acro_mode(inputs, ahrs_quat, gyro)
     }
 }
 
@@ -281,11 +281,11 @@ impl DroneController {
         let err0_pitch = i_pitch - ahrs_pitch;
         // let err0_yaw = i_yaw - ahrs_yaw;
 
-        // let out0_roll = self.pid_roll_stab.step(err0_roll);
+        let out0_roll = self.pid_roll_stab.step(err0_roll);
         let out0_pitch = self.pid_pitch_stab.step(err0_pitch);
         // let out0_yaw = self.pid_yaw_stab.step(err0_yaw);
 
-        let out0_roll = 0.0f32;
+        // let out0_roll = 0.0f32;
         // let out0_pitch = 0.0f32;
         // let out0_yaw = 0.0f32;
 
@@ -360,6 +360,10 @@ impl DroneController {
 
         let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values(&self.rates);
 
+        // let i_roll = self.config.limit_roll_rate(i_roll);
+        // let i_pitch = self.config.limit_pitch_rate(i_pitch);
+        // let i_yaw = self.config.limit_yaw_rate(i_yaw);
+
         /// Roll  = y
         /// Pitch = x
         let err1_roll = i_roll - gyro.y;
@@ -369,6 +373,12 @@ impl DroneController {
         let out1_roll = self.pid_roll_rate.step(err1_roll);
         let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
         let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+
+        // rprintln!(
+        //     "err1_pitch = {:?}\nout1_pitch = {:?}",
+        //     err1_pitch,
+        //     out1_pitch
+        // );
 
         // rprintln!(
         //     "yaw = {:?}\ngyro = {:?}\nerr1_yaw = {:?}\nout1_yaw = {:?}",

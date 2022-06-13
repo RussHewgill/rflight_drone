@@ -31,6 +31,7 @@ pub mod battery;
 pub mod bluetooth;
 pub mod bt_control;
 pub mod bt_state;
+pub mod consts;
 pub mod flight_control;
 pub mod init;
 pub mod leds;
@@ -45,9 +46,9 @@ pub mod misc;
 pub mod utils;
 
 use crate::{
-    battery::*, bluetooth::*, bt_control::*, flight_control::*, init::init_all_pre,
-    math::*, sensors::barometer::*, sensors::imu::*, sensors::magneto::*, sensors::*,
-    spi::*, time::*, utils::*,
+    battery::*, bluetooth::*, bt_control::*, consts::*, flight_control::*,
+    init::init_all_pre, math::*, sensors::barometer::*, sensors::imu::*,
+    sensors::magneto::*, sensors::*, spi::*, time::*, utils::*,
 };
 
 use byteorder::ByteOrder;
@@ -99,7 +100,6 @@ mod app {
 
     use core::f32::consts::PI;
 
-    use cortex_m_semihosting::{debug, hprintln};
     use fugit::{HertzU32, MillisDurationU32};
     use stm32f4::stm32f401::{self, EXTI, TIM10, TIM2, TIM3, TIM4, TIM5, TIM9};
 
@@ -119,14 +119,19 @@ mod app {
         bluetooth::gap::Commands as GapCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bluetooth::{gap::ConnectionUpdateParameters, gatt::Commands as GattCommands},
+        bt_control::{BTController, BTEvent},
         bt_state::{BTState, ConnectionChange},
+        consts::*,
         flight_control::{ControlInputs, DroneController, IdPID, MotorOutputs},
+        init::*,
         leds::LEDs,
+        math::*,
         motors::MotorsPWM,
         pid::PID,
         sensors::{ahrs::*, V3},
         sensors::{filtering::SensorFilters, SensorData, Sensors, UQuat},
         time::MonoTimer,
+        utils::round_to,
         utils::*,
     };
 
@@ -136,16 +141,8 @@ mod app {
 
     use nalgebra as na;
 
-    use crate::{
-        bt_control::{BTController, BTEvent},
-        init::*,
-        math::*,
-        utils::round_to,
-    };
-
     #[shared]
     struct Shared {
-        freqs:         (HertzU32, HertzU32),
         dwt:           Dwt,
         exti:          EXTI,
         // ahrs:          AhrsController<AhrsComplementary>,
@@ -187,22 +184,6 @@ mod app {
         let mut cp: stm32f401::CorePeripherals = cx.core;
         let mut dp: stm32f401::Peripherals = cx.device;
 
-        // let sensor_period: HertzU32 = 1600.Hz();
-        // let sensor_period: HertzU32 = 6700.Hz();
-        let sensor_period: HertzU32 = 6660.Hz(); // XXX: gyro doesn't work at this rate??
-
-        // let sensor_period: HertzU32 = 3330.Hz();
-
-        let pid_period: HertzU32 = 1600.Hz();
-        // let pid_period: HertzU32 = 3200.Hz();
-
-        let main_loop_period: HertzU32 = 15.Hz();
-        // let main_loop_period: HertzU32 = 10.Hz();
-
-        // let sensor_period: stm32f4xx_hal::time::Hertz = 2.Hz();
-        // let pid_period: stm32f4xx_hal::time::Hertz = 2.Hz();
-        // let main_loop_period: stm32f4xx_hal::time::Hertz = 1.Hz();
-
         let mut init_struct = init_all(cp, dp);
 
         let clocks = init_struct.clocks;
@@ -212,8 +193,8 @@ mod app {
         let mut bt = init_struct.bt;
         let mut dwt = init_struct.dwt;
 
-        rprintln!("sensor_period = {:?}", sensor_period.to_Hz());
-        rprintln!("pid_period    = {:?}", pid_period);
+        rprintln!("sensor_period = {:?}", SENSOR_PERIOD.to_Hz());
+        rprintln!("pid_period    = {:?}", PID_PERIOD);
 
         bt.pause_interrupt(&mut exti);
         match bt.init_bt() {
@@ -252,14 +233,14 @@ mod app {
 
         /// Fusion
         let mut ahrs_alg = AhrsFusion::new(
-            sensor_period,
+            SENSOR_PERIOD,
             // 0.5,
             7.5,
         );
         ahrs_alg.cfg_acc_rejection = 10.0;
         ahrs_alg.cfg_mag_rejection = 20.0;
 
-        let mut ahrs = AhrsController::new(ahrs_alg, sensor_period);
+        let mut ahrs = AhrsController::new(ahrs_alg, SENSOR_PERIOD);
 
         ahrs.calibration.hard_iron_offset = V3::new(
             -167175.0, //
@@ -277,15 +258,15 @@ mod app {
         // ));
 
         /// start Sensor timer
-        tim10.start(sensor_period).unwrap();
+        tim10.start(SENSOR_PERIOD).unwrap();
         tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
         /// start PID timer
-        tim3.start(pid_period).unwrap();
+        tim3.start(PID_PERIOD).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
         /// start Main Loop timer
-        tim9.start(main_loop_period).unwrap();
+        tim9.start(MAIN_LOOP_PERIOD).unwrap();
         tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
@@ -302,7 +283,6 @@ mod app {
         // controller.pid_pitch_rate.kp = 0.005;
 
         let shared = Shared {
-            freqs: (sensor_period, pid_period),
             dwt,
             exti,
             ahrs,
@@ -442,7 +422,7 @@ mod app {
     #[task(
         binds = TIM3,
         shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller, dwt],
-        local = [tim3, counter: u32 = 0],
+        local = [tim3, counter: u32 = 0, pitch: (f32,f32) = (0.0, 0.0)],
         priority = 5,
         // priority = 3,
     )]
@@ -477,7 +457,10 @@ mod app {
 
                     // let gyro0 = gyro;
                     // let gyro = ahrs.update(gyro, acc, mag);
-                    ahrs.update(gyro, acc, mag);
+                    let gyro2 = ahrs.update(gyro, acc, mag);
+
+                    cx.local.pitch.0 += gyro.x * (1.0 / 6660.0);
+                    cx.local.pitch.1 += gyro2.x * (1.0 / 6660.0);
 
                     // print_v3("gyro = ", gyro, 5);
 
@@ -507,6 +490,14 @@ mod app {
                     // #[cfg(feature = "nope")]
                     if *cx.local.counter >= 33 {
                         *cx.local.counter = 0;
+
+                        // let (roll, pitch, yaw) = fd.get_euler_angles();
+                        // rprintln!(
+                        //     "ahrs: {:08}\nsum1:  {:08}\nsum2:  {:08}",
+                        //     rad_to_deg(pitch), //
+                        //     cx.local.pitch.0,  //
+                        //     cx.local.pitch.1,  //
+                        // );
 
                         // let (roll, pitch, yaw) = fd.get_euler_angles();
                         // rprintln!(
@@ -617,8 +608,8 @@ mod app {
                 bt.log_write_sens_gyro(gyro0).unwrap();
                 bt.unpause_interrupt(exti);
 
-                // let pids = [IdPID::PitchRate, IdPID::PitchStab];
-                let pids = [IdPID::YawRate];
+                let pids = [IdPID::PitchRate];
+                // let pids = [IdPID::YawRate];
                 for id in pids {
                     bt.pause_interrupt(exti);
                     bt.log_write_pid(id, &controller[id]).unwrap();
@@ -636,73 +627,6 @@ mod app {
                 // unimplemented!()
             },
         );
-
-        #[cfg(feature = "nope")]
-        /// send telemetry over bluetooth, at 20-30 Hz
-        cx.shared.tim9_flag.lock(|tim9_flag| {
-            if *tim9_flag {
-                *tim9_flag = false;
-
-                if *cx.local.counter >= COUNTER_TIMES {
-                    *cx.local.counter = 0;
-
-                    (flight_data, sens_data, bt, exti, controller, motors).lock(
-                        |fd, sd, bt, exti, controller, motors| {
-                            /// send orientation
-                            bt.pause_interrupt(exti);
-                            bt.log_write_quat(&fd.quat).unwrap();
-                            bt.unpause_interrupt(exti);
-
-                            /// send battery voltage
-                            if *cx.local.bat_counter >= BATT_TIMES {
-                                *cx.local.bat_counter = 0;
-                                cx.shared.adc.lock(|adc| {
-                                    // let v = adc.sample();
-                                    let v = adc.sample_avg(3);
-                                    if motors.is_armed() && v <= adc.min_voltage {
-                                        rprintln!("Low Battery, disarming motors");
-                                        motors.set_disarmed();
-                                    }
-                                    bt.pause_interrupt(exti);
-                                    bt.log_write_batt(v).unwrap();
-                                    bt.unpause_interrupt(exti);
-                                });
-                            } else {
-                                *cx.local.bat_counter += 1;
-                            }
-
-                            // let gyro0 = sd.imu_gyro.read_and_reset();
-                            // let acc0 = sd.imu_acc.read_and_reset();
-                            // let mag0 = sd.magnetometer.read_and_reset();
-
-                            // bt.pause_interrupt(exti);
-                            // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                            // bt.unpause_interrupt(exti);
-
-                            // let pids = [IdPID::PitchRate];
-                            let pids = [IdPID::YawRate];
-                            for id in pids {
-                                bt.pause_interrupt(exti);
-                                bt.log_write_pid(id, &controller[id]).unwrap();
-                                bt.unpause_interrupt(exti);
-                            }
-
-                            // #[cfg(feature = "nope")]
-                            // for id in IdPID::ITER {
-                            //     bt.pause_interrupt(exti);
-                            //     bt.log_write_pid(id, &controller[id]).unwrap();
-                            //     bt.unpause_interrupt(exti);
-                            // }
-
-                            // //
-                            // unimplemented!()
-                        },
-                    );
-                } else {
-                    *cx.local.counter += 1;
-                }
-            }
-        });
 
         // main_loop::spawn_after(100.millis()).unwrap();
         // main_loop::spawn().unwrap();
