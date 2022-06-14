@@ -2,9 +2,10 @@ mod control_inputs;
 mod control_rates;
 
 use crate::{
+    consts::PID_FREQ,
     math::rad_to_deg,
     motors::MotorsPWM,
-    pid::PID,
+    pid::{PIDParam, PID},
     sensors::{UQuat, V3},
 };
 
@@ -77,23 +78,34 @@ pub struct DroneController {
 /// new
 impl DroneController {
     pub fn new_default_params() -> Self {
-        let mut pid_roll_stab = PID::new_limited(0.0, 0.0, 0.0);
-        let mut pid_roll_rate = PID::new_limited(0.0, 0.0, 0.0);
+        // let t = PID_FREQ.into_duration().to_nanos() as f32;
+        let t = 1.0 / PID_FREQ.to_Hz() as f32;
 
-        let mut pid_pitch_stab = PID::new_limited(0.0, 0.0, 0.0);
-        let mut pid_pitch_rate = PID::new_limited(0.0, 0.0, 0.0);
+        let mut pid_roll_stab = PID::new_limited(0.0, 0.0, 0.0, t);
+        let mut pid_roll_rate = PID::new_limited(0.0, 0.0, 0.0, t);
 
-        let mut pid_yaw_stab = PID::new_limited(0.0, 0.0, 0.0);
-        let mut pid_yaw_rate = PID::new_limited(0.0, 0.0, 0.0);
+        let mut pid_pitch_stab = PID::new_limited(0.0, 0.0, 0.0, t);
+        let mut pid_pitch_rate = PID::new_limited(0.0, 0.0, 0.0, t);
 
-        let mut pid_altitude_stab = PID::new_limited(0.0, 0.0, 0.0);
-        let mut pid_altitude_rate = PID::new_limited(0.0, 0.0, 0.0);
+        let mut pid_yaw_stab = PID::new_limited(0.0, 0.0, 0.0, t);
+        let mut pid_yaw_rate = PID::new_limited(0.0, 0.0, 0.0, t);
+
+        let mut pid_altitude_stab = PID::new_limited(0.0, 0.0, 0.0, t);
+        let mut pid_altitude_rate = PID::new_limited(0.0, 0.0, 0.0, t);
 
         /// output meanings:
         /// pid_pitch_stab:  desired pitch rate in rad/s
 
         // pid_pitch_rate.kp = 0.1;
         // pid_pitch_stab.kp = 0.1;
+
+        // /// orders of magnitude
+        // pid_pitch_rate.set_param(crate::pid::PIDParam::Ki, 0.00001);
+
+        /// With sample_time
+        {
+            // pid_pitch_rate.set_param(PIDParam::Kp, )
+        }
 
         // #[cfg(feature = "nope")]
         /// starting point

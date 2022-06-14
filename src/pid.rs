@@ -7,23 +7,29 @@ use defmt::{println as rprintln, Format};
 
 #[derive(Clone, Copy)]
 pub struct PID {
-    pub kp: f32,
-    pub ki: f32,
-    pub kd: f32,
+    kp: f32,
+    ki: f32,
+    kd: f32,
 
-    pub p_limit:      f32,
-    pub i_limit:      f32,
-    pub d_limit:      f32,
-    pub output_limit: f32,
+    _ki: f32,
+    _kd: f32,
 
-    pub integral:   f32,
-    pub prev_input: Option<f32>,
+    p_limit:      f32,
+    i_limit:      f32,
+    d_limit:      f32,
+    output_limit: f32,
+
+    /// in seconds
+    sample_time: f32,
+
+    integral:   f32,
+    prev_input: Option<f32>,
 
     pub prev_output: PIDOutput,
 
-    pub deriv_lowpass: Option<DirectForm2Transposed<f32>>,
+    deriv_lowpass: Option<DirectForm2Transposed<f32>>,
 
-    pub setpoint: f32,
+    setpoint: f32,
 }
 
 #[derive(Default, Clone, Copy, Format)]
@@ -42,8 +48,8 @@ pub struct PIDOutput {
 
 /// new
 impl PID {
-    pub fn new_limited(kp: f32, ki: f32, kd: f32) -> Self {
-        let mut out = Self::new(kp, ki, kd);
+    pub fn new_limited(kp: f32, ki: f32, kd: f32, sample_time: f32) -> Self {
+        let mut out = Self::new(kp, ki, kd, sample_time);
         // out.p_limit = 1.0;
         out.i_limit = 1.0;
         out.d_limit = 1.0;
@@ -51,11 +57,14 @@ impl PID {
         out
     }
 
-    pub fn new(kp: f32, ki: f32, kd: f32) -> Self {
+    pub fn new(kp: f32, ki: f32, kd: f32, sample_time: f32) -> Self {
         Self {
             kp,
             ki,
             kd,
+
+            _ki: ki * sample_time,
+            _kd: kd / sample_time,
 
             // p_limit: (f32::MIN, f32::MAX),
             // i_limit: (f32::MIN, f32::MAX),
@@ -65,6 +74,8 @@ impl PID {
             i_limit: f32::MAX,
             d_limit: f32::MAX,
             output_limit: f32::MAX,
+
+            sample_time,
 
             integral: 0.0,
             prev_input: None,
@@ -106,7 +117,7 @@ impl PID {
         /// just the error (no ki), because we support ki changing dynamically,
         /// we store the entire term so that we don't need to remember previous
         /// ki values.
-        self.integral = self.integral + error * self.ki;
+        self.integral = self.integral + error * self._ki;
 
         /// Mitigate integral windup: Don't want to keep building up error
         /// beyond what i_limit will allow.
@@ -117,7 +128,7 @@ impl PID {
         let d_unbounded = -match self.prev_input.as_ref() {
             Some(prev_measurement) => input - *prev_measurement,
             None => 0.0,
-        } * self.kd;
+        } * self._kd;
 
         // let d_unbounded = if self.prev_deriv.is_none() {
         //     /// Arducopter:
@@ -243,19 +254,41 @@ impl PID {
         #[rustfmt::skip]
         match param {
             Kp        => self.kp = val,
-            Ki        => self.ki = val,
-            Kd        => self.kd = val,
+            Ki        => self.set_ki(val),
+            Kd        => self.set_kd(val),
             KpLimit     => self.p_limit = val,
-            KiLimit     => self.i_limit = val,
+            KiLimit     => {
+                if self.i_limit != val {
+                    self.reset_integral();
+                }
+                self.i_limit = val;
+            },
             KdLimit     => self.d_limit = val,
             OutputLimit => self.output_limit = val,
         }
+    }
+
+    pub fn set_kp(&mut self, kp: f32) {
+        self.kp = kp;
+    }
+
+    pub fn set_ki(&mut self, ki: f32) {
+        if self.ki != ki {
+            self.reset_integral();
+        }
+        self.ki = ki;
+        self._ki = ki * self.sample_time;
+    }
+
+    pub fn set_kd(&mut self, kd: f32) {
+        self.kd = kd;
+        self._kd = kd / self.sample_time;
     }
 }
 
 /// set lowpass filter
 impl PID {
-    pub fn set_lowpass(&mut self, sampling_freq: f32, cutoff_freq: f32) {
+    pub fn set_d_lowpass(&mut self, sampling_freq: f32, cutoff_freq: f32) {
         let coeffs = Coefficients::<f32>::from_params(
             Type::LowPass,
             sampling_freq.hz(),
@@ -320,31 +353,31 @@ impl PIDParam {
     }
 }
 
-impl core::ops::Index<PIDParam> for PID {
-    type Output = f32;
-    fn index(&self, index: PIDParam) -> &Self::Output {
-        match index {
-            PIDParam::Kp => &self.kp,
-            PIDParam::Ki => &self.ki,
-            PIDParam::Kd => &self.kd,
-            PIDParam::KpLimit => &self.p_limit,
-            PIDParam::KiLimit => &self.i_limit,
-            PIDParam::KdLimit => &self.d_limit,
-            PIDParam::OutputLimit => &self.output_limit,
-        }
-    }
-}
+// impl core::ops::Index<PIDParam> for PID {
+//     type Output = f32;
+//     fn index(&self, index: PIDParam) -> &Self::Output {
+//         match index {
+//             PIDParam::Kp => &self.kp,
+//             PIDParam::Ki => &self.ki,
+//             PIDParam::Kd => &self.kd,
+//             PIDParam::KpLimit => &self.p_limit,
+//             PIDParam::KiLimit => &self.i_limit,
+//             PIDParam::KdLimit => &self.d_limit,
+//             PIDParam::OutputLimit => &self.output_limit,
+//         }
+//     }
+// }
 
-impl core::ops::IndexMut<PIDParam> for PID {
-    fn index_mut(&mut self, index: PIDParam) -> &mut Self::Output {
-        match index {
-            PIDParam::Kp => &mut self.kp,
-            PIDParam::Ki => &mut self.ki,
-            PIDParam::Kd => &mut self.kd,
-            PIDParam::KpLimit => &mut self.p_limit,
-            PIDParam::KiLimit => &mut self.i_limit,
-            PIDParam::KdLimit => &mut self.d_limit,
-            PIDParam::OutputLimit => &mut self.output_limit,
-        }
-    }
-}
+// impl core::ops::IndexMut<PIDParam> for PID {
+//     fn index_mut(&mut self, index: PIDParam) -> &mut Self::Output {
+//         match index {
+//             PIDParam::Kp => &mut self.kp,
+//             PIDParam::Ki => &mut self.ki,
+//             PIDParam::Kd => &mut self.kd,
+//             PIDParam::KpLimit => &mut self.p_limit,
+//             PIDParam::KiLimit => &mut self.i_limit,
+//             PIDParam::KdLimit => &mut self.d_limit,
+//             PIDParam::OutputLimit => &mut self.output_limit,
+//         }
+//     }
+// }

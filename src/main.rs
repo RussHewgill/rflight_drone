@@ -119,7 +119,7 @@ mod app {
         bluetooth::gap::Commands as GapCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bluetooth::{gap::ConnectionUpdateParameters, gatt::Commands as GattCommands},
-        bt_control::{BTController, BTEvent},
+        bt_control::{service_log::BTMessQueue, BTController, BTEvent},
         bt_state::{BTState, ConnectionChange},
         consts::*,
         flight_control::{ControlInputs, DroneController, IdPID, MotorOutputs},
@@ -178,6 +178,8 @@ mod app {
 
     #[monotonic(binds = TIM5, default = true)]
     type MonoTick = MonoTimer<TIM5, 1_000_000>; // 1 MHz
+
+    // static BT_MESS_QUEUE: BTMessQueue = BTMessQueue::new();
 
     #[init(local = [])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -238,7 +240,7 @@ mod app {
 
         controller
             .pid_pitch_rate
-            .set_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
+            .set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
 
         /// Fusion
         let mut ahrs_alg = AhrsFusion::new(
@@ -266,17 +268,17 @@ mod app {
         //     50522.0, //
         // ));
 
-        /// start Sensor timer
-        tim10.start(SENSOR_FREQ).unwrap();
-        tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start Sensor timer
+        // tim10.start(SENSOR_FREQ).unwrap();
+        // tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start PID timer
-        tim3.start(PID_FREQ).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start PID timer
+        // tim3.start(PID_FREQ).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start Main Loop timer
-        tim9.start(MAIN_LOOP_FREQ).unwrap();
-        tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start Main Loop timer
+        // tim9.start(MAIN_LOOP_FREQ).unwrap();
+        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
         // /// start bt_test timer
@@ -331,6 +333,8 @@ mod app {
         // set_dbg_gyro::spawn(true).unwrap();
         // kill_motors::spawn_after(5_000.millis()).unwrap();
 
+        test_motors::spawn().unwrap();
+
         // bt_test::spawn_after(100.millis()).unwrap();
 
         (shared, local, init::Monotonics(mono))
@@ -341,7 +345,25 @@ mod app {
         cx.shared.dbg_gyro.lock(|d| *d = enable);
     }
 
-    #[task(shared = [motors, inputs, dbg_gyro], priority = 6, capacity = 2)]
+    #[task(
+        shared = [motors, inputs, dbg_gyro],
+        local = [counter: u32 = 0],
+        priority = 6,
+    )]
+    fn test_motors(mut cx: test_motors::Context) {
+        if *cx.local.counter < 10 {
+            let throttle = *cx.local.counter as f32 / 10.0;
+            rprintln!("setting throttle = {:?}", throttle);
+            // cx.shared.motors.lock(|motors| {
+            //     motors.set_armed_unchecked(true);
+            //     motors.set_all_f32(throttle);
+            // });
+            test_motors::spawn_after(500.millis()).unwrap();
+        }
+    }
+
+    #[cfg(feature = "nope")]
+    // #[task(shared = [motors, inputs, dbg_gyro], priority = 6, capacity = 2)]
     fn test_motors(mut cx: test_motors::Context, throttle: f32) {
         (cx.shared.motors, cx.shared.inputs, cx.shared.dbg_gyro).lock(
             |motors, inputs, dbg_gyro| {
@@ -787,6 +809,11 @@ mod app {
         timer: CounterHz<TIM10>,
     }
 
+    #[monotonic(binds = TIM5, default = true)]
+    type MonoTick = MonoTimer<TIM5, 1_000_000>; // 1 MHz
+
+    static Q: heapless::mpmc::Q4<u32> = heapless::mpmc::Q4::new();
+
     #[allow(unreachable_code)]
     #[cfg(feature = "nope")]
     // #[init]
@@ -863,24 +890,40 @@ mod app {
         rprintln!("sysclk()   core = {:?}", clocks.sysclk());
         rprintln!("hclk()     AHB1 = {:?}", clocks.hclk());
 
+        let mono = MonoTimer::<TIM5, 1_000_000>::new(dp.TIM5, &clocks);
+
         let mut tim3: stm32f4xx_hal::timer::CounterHz<TIM10> =
             dp.TIM10.counter_hz(&clocks);
 
         tim3.start(2.Hz()).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        (Shared {}, Local { timer: tim3 }, init::Monotonics())
+        wat::spawn().unwrap();
+
+        (Shared {}, Local { timer: tim3 }, init::Monotonics(mono))
     }
 
-    #[task(
-        binds = TIM1_UP_TIM10,
-        // binds = TIM3,
-        shared = [], local = [timer])]
+    #[task(binds = TIM1_UP_TIM10, shared = [], local = [timer])]
     fn foo(cx: foo::Context) {
         cx.local
             .timer
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
-        rprintln!("wat");
+
+        rprintln!("foo:");
+        while let Some(x) = Q.dequeue() {
+            rprintln!("x = {:?}", x);
+        }
+
+        // rprintln!("wat");
+    }
+
+    #[task(shared = [], local = [x: u32 = 0])]
+    fn wat(cx: wat::Context) {
+        Q.enqueue(*cx.local.x).unwrap();
+        *cx.local.x += 1;
+
+        wat::spawn_after(250.millis()).unwrap();
+        // wat::spawn().unwrap();
     }
 
     #[idle]

@@ -164,11 +164,12 @@ where
 
                     rprintln!("setting {:?} {:?} = {:?}", id, param, val);
 
-                    controller[id][param] = val;
+                    // controller[id][param] = val;
+                    controller[id].set_param(param, val);
 
-                    if param == PIDParam::Ki || param == PIDParam::KiLimit {
-                        controller[id].reset_integral();
-                    }
+                    // if param == PIDParam::Ki || param == PIDParam::KiLimit {
+                    //     controller[id].reset_integral();
+                    // }
 
                     // TODO:
                     // /// Pitch and Yaw should match

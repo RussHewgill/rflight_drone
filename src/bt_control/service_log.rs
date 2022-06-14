@@ -46,15 +46,40 @@ use crate::{
     bt_control::UUID_LOG_SERVICE,
 };
 
+pub use self::messages::*;
+
 use super::TimeoutResult;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SvLogger {
-    pub service_handle:   ServiceHandle,
-    pub char_handle_quat: CharacteristicHandle,
-    pub char_handle_sens: CharacteristicHandle,
-    pub char_handle_pid:  CharacteristicHandle,
-    pub char_handle_batt: CharacteristicHandle,
+    pub service_handle:      ServiceHandle,
+    pub char_handle_quat:    CharacteristicHandle,
+    pub char_handle_sens:    CharacteristicHandle,
+    pub char_handle_pid:     CharacteristicHandle,
+    pub char_handle_batt:    CharacteristicHandle,
+    pub char_handle_message: CharacteristicHandle,
+}
+
+mod messages {
+    use defmt::println as rprintln;
+
+    pub struct BTMessQueue {
+        queue: heapless::mpmc::Q16<u32>,
+    }
+
+    impl BTMessQueue {
+        pub const fn new() -> Self {
+            Self {
+                queue: heapless::mpmc::Q16::new(),
+            }
+        }
+
+        pub fn enqueue(&self, message: u32) {
+            self.queue
+                .enqueue(message)
+                .unwrap_or_else(|_| rprintln!("BTMessQueue::enqueue failed"));
+        }
+    }
 }
 
 /// write
@@ -313,7 +338,7 @@ where
     GpioError: core::fmt::Debug,
 {
     pub fn init_log_service(&mut self) -> Result<(), BTError<SpiError, GpioError>> {
-        const NUM_SERVICES: usize = 4;
+        const NUM_SERVICES: usize = 5;
         // const NUM_RECORDS: usize = 1 + 3 * NUM_SERVICES;
 
         let params = AddServiceParameters {
@@ -391,6 +416,14 @@ where
             3,
         )?;
 
+        let handle_message = self.add_log_char(
+            service.service_handle,
+            UUID_LOG_BATT_CHAR,
+            4,
+            CharacteristicProperty::NOTIFY,
+            4,
+        )?;
+
         // let params1 = AddCharacteristicParameters {
         //     service_handle:            service.service_handle,
         //     characteristic_uuid:       UUID_LOG_SENS_CHAR,
@@ -436,14 +469,12 @@ where
         // rprintln!("c 2 = {:?}", c2);
 
         let logger = SvLogger {
-            service_handle:   service.service_handle,
-            // char_handle_quat: c0.characteristic_handle,
-            // char_handle_sens: c1.characteristic_handle,
-            // char_handle_pid:  c2.characteristic_handle,
-            char_handle_quat: handle_quat,
-            char_handle_sens: handle_sens,
-            char_handle_pid:  handle_pid,
-            char_handle_batt: handle_batt,
+            service_handle:      service.service_handle,
+            char_handle_quat:    handle_quat,
+            char_handle_sens:    handle_sens,
+            char_handle_pid:     handle_pid,
+            char_handle_batt:    handle_batt,
+            char_handle_message: handle_message,
         };
 
         self.services.logger = Some(logger);
