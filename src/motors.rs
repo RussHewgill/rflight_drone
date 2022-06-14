@@ -125,11 +125,12 @@ impl MotorsPWM {
             return false;
             // panic!();
         }
-        if !Self::check_bt(bt) {
-            rprintln!("Motor arming check failed: Bluetooth");
-            return false;
-            // panic!();
-        }
+
+        // if !Self::check_bt(bt) {
+        //     rprintln!("Motor arming check failed: Bluetooth");
+        //     return false;
+        //     // panic!();
+        // }
 
         // if !Self::check_quat(quat) {
         //     rprintln!("Motor arming check failed: Quat");

@@ -268,28 +268,28 @@ mod app {
         //     50522.0, //
         // ));
 
-        // /// start Sensor timer
-        // tim10.start(SENSOR_FREQ).unwrap();
-        // tim10.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Sensor timer
+        tim10.start(SENSOR_FREQ).unwrap();
+        tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start PID timer
-        // tim3.start(PID_FREQ).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start PID timer
+        tim3.start(PID_FREQ).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start Main Loop timer
-        // tim9.start(MAIN_LOOP_FREQ).unwrap();
-        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Main Loop timer
+        tim9.start(MAIN_LOOP_FREQ).unwrap();
+        tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
         // /// start bt_test timer
         // tim9.start(bt_period).unwrap();
         // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // let v = init_struct.adc.sample();
-        // rprintln!("Battery = {:?} V", v);
+        let v = init_struct.adc.sample();
+        rprintln!("Battery = {:?} V", v);
 
-        let v = init_struct.adc.sample_avg(5);
-        rprintln!("Battery/5 = {:?} V", v);
+        // let v = init_struct.adc.sample_avg(5);
+        // rprintln!("Battery/5 = {:?} V", v);
 
         // controller.pid_pitch_rate.kp = 0.005;
 
@@ -333,7 +333,8 @@ mod app {
         // set_dbg_gyro::spawn(true).unwrap();
         // kill_motors::spawn_after(5_000.millis()).unwrap();
 
-        test_motors::spawn().unwrap();
+        // test_motors::spawn().unwrap();
+        show_battery::spawn().unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -345,25 +346,18 @@ mod app {
         cx.shared.dbg_gyro.lock(|d| *d = enable);
     }
 
-    #[task(
-        shared = [motors, inputs, dbg_gyro],
-        local = [counter: u32 = 0],
-        priority = 6,
-    )]
-    fn test_motors(mut cx: test_motors::Context) {
-        if *cx.local.counter < 10 {
-            let throttle = *cx.local.counter as f32 / 10.0;
-            rprintln!("setting throttle = {:?}", throttle);
-            // cx.shared.motors.lock(|motors| {
-            //     motors.set_armed_unchecked(true);
-            //     motors.set_all_f32(throttle);
-            // });
-            test_motors::spawn_after(500.millis()).unwrap();
-        }
+    #[task(shared = [adc], priority = 7)]
+    fn show_battery(mut cx: show_battery::Context) {
+        cx.shared.adc.lock(|adc| {
+            let v0 = adc.sample();
+            // let v = adc.sample_avg(5);
+            // rprintln!("v0 = {:?}\nv = {:?}", v0, v);
+            rprintln!("v0 = {:?}", v0);
+        });
+        show_battery::spawn_after(250.millis()).unwrap();
     }
 
-    #[cfg(feature = "nope")]
-    // #[task(shared = [motors, inputs, dbg_gyro], priority = 6, capacity = 2)]
+    #[task(shared = [motors, inputs, dbg_gyro], priority = 6, capacity = 2)]
     fn test_motors(mut cx: test_motors::Context, throttle: f32) {
         (cx.shared.motors, cx.shared.inputs, cx.shared.dbg_gyro).lock(
             |motors, inputs, dbg_gyro| {
@@ -554,7 +548,7 @@ mod app {
     #[task(
         binds = TIM1_BRK_TIM9,
         shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
-        local = [tim9, bat_counter: u32 = 0],
+        local = [tim9, batt_counter: u32 = 0, batt_warn: u32 = 0],
         priority = 2
     )]
     fn main_loop(mut cx: main_loop::Context) {
@@ -581,23 +575,46 @@ mod app {
                 bt.log_write_quat(&fd.quat).unwrap();
                 bt.unpause_interrupt(exti);
 
+                // /// send battery voltage
+                // if *cx.local.batt_counter >= BATT_TIMES {
+                //     *cx.local.batt_counter = 0;
+                //     cx.shared.adc.lock(|adc| {
+                //         let v = adc.sample();
+                //         // let v = adc.sample_avg(3);
+                //         if motors.is_armed() && v <= adc.min_voltage {
+                //             rprintln!("Low Battery, disarming motors");
+                //             motors.set_disarmed();
+                //         }
+                //         bt.pause_interrupt(exti);
+                //         bt.log_write_batt(v).unwrap();
+                //         bt.unpause_interrupt(exti);
+                //     });
+                // } else {
+                //     *cx.local.batt_counter += 1;
+                // }
+
                 /// send battery voltage
-                if *cx.local.bat_counter >= BATT_TIMES {
-                    *cx.local.bat_counter = 0;
-                    cx.shared.adc.lock(|adc| {
-                        // let v = adc.sample();
-                        let v = adc.sample_avg(3);
-                        if motors.is_armed() && v <= adc.min_voltage {
-                            rprintln!("Low Battery, disarming motors");
-                            motors.set_disarmed();
-                        }
-                        bt.pause_interrupt(exti);
-                        bt.log_write_batt(v).unwrap();
-                        bt.unpause_interrupt(exti);
-                    });
+                let send_bt = if *cx.local.batt_counter >= BATT_TIMES {
+                    *cx.local.batt_counter = 0;
+                    true
                 } else {
-                    *cx.local.bat_counter += 1;
-                }
+                    *cx.local.batt_counter += 1;
+                    false
+                };
+
+                /// check battery levels, disarm if below threshold
+                cx.shared.adc.lock(|adc| {
+                    if adc.battery_warning(
+                        bt,
+                        exti,
+                        cx.local.batt_warn,
+                        motors.is_armed(),
+                        send_bt,
+                    ) {
+                        rprintln!("Low Battery, disarming motors");
+                        motors.set_disarmed();
+                    }
+                });
 
                 let gyro0 = sd.imu_gyro.read_and_reset();
                 // let acc0 = sd.imu_acc.read_and_reset();
