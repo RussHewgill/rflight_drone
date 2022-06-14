@@ -328,13 +328,8 @@ mod app {
 
         // let throttle = 0.1;
         // test_motors::spawn(throttle).unwrap();
-        // // test_motors::spawn_after(5000.millis(), 0.15).unwrap();
-        // // set_dbg_gyro::spawn_after(500.millis(), true).unwrap();
         // set_dbg_gyro::spawn(true).unwrap();
-        // kill_motors::spawn_after(5_000.millis()).unwrap();
-
-        // test_motors::spawn().unwrap();
-        show_battery::spawn().unwrap();
+        // kill_motors::spawn_after(10_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -433,10 +428,10 @@ mod app {
                 //     *cx.local.counter = (0, 0, 0);
                 // }
 
-                // if *dbg_gyro {
-                //     let gyro = sd.imu_gyro.read_and_reset();
-                //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
-                // }
+                if *dbg_gyro {
+                    let gyro = sd.imu_gyro.read_and_reset();
+                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                }
 
                 // TODO: read baro
                 // cx.local.sensors.read_data_baro(sd);

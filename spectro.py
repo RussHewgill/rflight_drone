@@ -50,11 +50,11 @@ def plot_spectrogram(path, ax0, ax1):
     ax0.axes.xaxis.set_visible(False)
     ax0.axes.yaxis.set_visible(False)
 
-    # spec = xs
-    spec = zs
+    spec = xs
+    # spec = zs
 
-    # ax0.set_title(f"Spectrogram of gyro X-axis, {path}")
-    ax0.set_title(f"Spectrogram of gyro Z-axis, {path}")
+    ax0.set_title(f"Spectrogram of gyro X-axis, {path}")
+    # ax0.set_title(f"Spectrogram of gyro Z-axis, {path}")
     ax0.plot(spec)
     ax0.set_xlabel('Sample')
     ax0.set_ylabel('Amplitude')
@@ -230,13 +230,9 @@ def main():
     # path = "throttle_0.1_0.15.log"
     # path = "pitch_pid02_filtered.log"
     # path = "yaw_01_unfiltered.log"
-    # path = "yaw_01_builtin.log"
-    # path = "yaw_01_all.log"
-    # path = "yaw_02_ground_unfiltered.log"
-    # path = "yaw_02_ground_builtin.log"
-    # path = "yaw_03_unfiltered.log"
-    # path = "yaw_03_builtin_narrow.log"
     # path = "yaw_03_builtin_verynarrow.log"
+    # path = "pitch_02_unfiltered.log"
+    path = "pitch_02_builtin_verynarrow.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1])

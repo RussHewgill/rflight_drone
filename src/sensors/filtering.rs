@@ -4,6 +4,8 @@ use nalgebra::{self as na};
 
 use biquad::*;
 
+use crate::consts::SENSOR_FREQ;
+
 use super::V3;
 
 pub use self::biquad_wrapper::*;
@@ -30,19 +32,20 @@ impl SensorFilters {
             true,
             BiquadFilter::new(
                 120.hz(),
-                3330.hz(),
+                SENSOR_FREQ.to_Hz().hz(),
                 Type::SinglePoleLowPass,
                 Q_BUTTERWORTH_F32,
             ),
         );
 
         // /// XXX: Motor Freq filtering only works at specific throttle
-        // let gyro_biquad_notch1 = BiquadFilter::new(165.hz(), 3330.hz(), Type::Notch, 3.0);
+        // let gyro_biquad_notch1 = BiquadFilter::new(165.hz(), SENSOR_FREQ.to_Hz().hz(), Type::Notch, 3.0);
 
         let gyro_biquad_notch2 =
-            BiquadFilter::new(330.hz(), 3330.hz(), Type::Notch, 10.0);
+            BiquadFilter::new(330.hz(), SENSOR_FREQ.to_Hz().hz(), Type::Notch, 10.0);
 
-        let gyro_biquad_notch3 = BiquadFilter::new(810.hz(), 3330.hz(), Type::Notch, 2.5);
+        let gyro_biquad_notch3 =
+            BiquadFilter::new(810.hz(), SENSOR_FREQ.to_Hz().hz(), Type::Notch, 2.5);
 
         let gyro_biquad_notch = [
             // (true, gyro_biquad_notch1),

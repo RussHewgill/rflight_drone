@@ -246,10 +246,10 @@ pub fn init_sensors(sensors: &mut Sensors) {
     imu_cfg.gyro_power = GyroPowerModes::High6660; // fastest possible
     imu_cfg.gyro_scale = GyroScaleFactor::S2000;
 
-    // // gyro low-pass filter
-    // imu_cfg.gyro_lp_filter_enable = true;
-    // // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
-    // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::VeryNarrow;
+    // gyro low-pass filter
+    imu_cfg.gyro_lp_filter_enable = true;
+    // imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::Narrow;
+    imu_cfg.gyro_lp_bandwidth = GyroLpBandwidth::VeryNarrow;
 
     sensors.with_spi_imu(|spi, imu| {
         imu.reset(spi).unwrap();
