@@ -102,6 +102,13 @@ impl DroneController {
         // /// orders of magnitude
         // pid_pitch_rate.set_param(crate::pid::PIDParam::Ki, 0.00001);
 
+        /// Ku = 0.0001
+        /// Tu = 0.6-0.7
+
+        /// P = 0.00006a
+        /// I = 0.000185
+        /// D = 0.0000049
+
         /// With sample_time
         {
             // pid_pitch_rate.set_param(PIDParam::Kp, )
