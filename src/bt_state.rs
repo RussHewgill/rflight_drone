@@ -86,7 +86,7 @@ where
                 rprintln!("command complete: {:?}", params);
             }
             _ => {
-                rprintln!("unhandled event = {:?}", event);
+                rprintln!("handle_connect_disconnect: unhandled event = {:?}", event);
             }
         }
         None

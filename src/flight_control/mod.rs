@@ -96,25 +96,24 @@ impl DroneController {
         /// output meanings:
         /// pid_pitch_stab:  desired pitch rate in rad/s
 
-        // pid_pitch_rate.kp = 0.1;
-        // pid_pitch_stab.kp = 0.1;
-
-        // /// orders of magnitude
-        // pid_pitch_rate.set_param(crate::pid::PIDParam::Ki, 0.00001);
-
+        /// ZN method:
         /// Ku = 0.0001
         /// Tu = 0.6-0.7
-
+        ///
         /// P = 0.00006a
         /// I = 0.000185
         /// D = 0.0000049
+        pid_pitch_rate.set_param(PIDParam::Kp, 0.000_06);
+        pid_pitch_rate.set_param(PIDParam::Ki, 0.000_185);
+        pid_pitch_rate.set_param(PIDParam::Kd, 0.000_004_9);
 
-        /// With sample_time
-        {
-            // pid_pitch_rate.set_param(PIDParam::Kp, )
-        }
+        pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
 
-        // #[cfg(feature = "nope")]
+        pid_roll_rate.set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
+        pid_pitch_rate.set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
+        pid_yaw_rate.set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
+
+        #[cfg(feature = "nope")]
         /// starting point
         {
             //

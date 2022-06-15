@@ -15,9 +15,9 @@ pub struct AhrsFusion {
     quat:       UQuat,
     delta_time: f32,
 
-    alt_ref_pressure:    f32,
-    alt_ref_temperature: f32,
-    altitude:            f32,
+    // alt_ref_pressure:    f32,
+    // alt_ref_temperature: f32,
+    // altitude:            f32,
 
     // pub offset: FusionOffset,
     // pub calibration: FusionCalibration,
@@ -67,9 +67,9 @@ impl AhrsFusion {
             quat: UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
             delta_time,
 
-            alt_ref_pressure: 0.0,
-            alt_ref_temperature: 0.0,
-            altitude: 0.0,
+            // alt_ref_pressure: 0.0,
+            // alt_ref_temperature: 0.0,
+            // altitude: 0.0,
 
             // offset,
             // calibration,
@@ -101,7 +101,7 @@ impl AhrsFusion {
         rprintln!("AHRS Fusion resetting");
         // self.offset.reset();
         self.quat = UQuat::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0));
-        self.altitude = 0.0;
+        // self.altitude = 0.0;
         self.initializing = true;
         self.ramped_gain = Self::INITIAL_GAIN;
         self.half_acc_feedback = V3::zeros();
@@ -127,6 +127,7 @@ impl AhrsFusion {
 }
 
 /// altitude
+#[cfg(feature = "nope")]
 impl AhrsFusion {
     pub fn get_altitude(&self) -> f32 {
         self.altitude

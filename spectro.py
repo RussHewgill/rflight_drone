@@ -41,7 +41,7 @@ def read_csv(path):
 
     return (xs, ys, zs)
 
-def plot_spectrogram(path, ax0, ax1):
+def plot_spectrogram(path, ax0, ax1, axis):
     (xs, ys, zs) = read_csv(path)
 
     # plt.subplot(211)
@@ -50,11 +50,14 @@ def plot_spectrogram(path, ax0, ax1):
     ax0.axes.xaxis.set_visible(False)
     ax0.axes.yaxis.set_visible(False)
 
-    spec = xs
-    # spec = zs
+    if axis == 'x':
+        spec = xs
+    elif axis == 'y':
+        spec = ys
+    elif axis == 'z':
+        spec = zs
 
-    ax0.set_title(f"Spectrogram of gyro X-axis, {path}")
-    # ax0.set_title(f"Spectrogram of gyro Z-axis, {path}")
+    ax0.set_title(f"Spectrogram of gyro {axis}-axis, {path}")
     ax0.plot(spec)
     ax0.set_xlabel('Sample')
     ax0.set_ylabel('Amplitude')
@@ -232,10 +235,12 @@ def main():
     # path = "yaw_01_unfiltered.log"
     # path = "yaw_03_builtin_verynarrow.log"
     # path = "pitch_02_unfiltered.log"
-    path = "pitch_02_builtin_verynarrow.log"
+    # path = "pitch_02_builtin_verynarrow.log"
+    path = "pitch_03.log"
 
     fig, axs = plt.subplots(2)
-    plot_spectrogram(path, axs[0], axs[1])
+    plot_spectrogram(path, axs[0], axs[1], 'x')
+    # plot_spectrogram(path, axs[0], axs[1], 'z')
 
     # fig, axs = plt.subplots(2, 2)
     # plot_spectrogram("gyro.log", axs[0, 0], axs[1, 0])

@@ -238,9 +238,9 @@ mod app {
         // controller.pid_roll_rate.kp = 0.01;
         // controller.pid_roll_rate.kd = 0.01;
 
-        controller
-            .pid_pitch_rate
-            .set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
+        // controller
+        //     .pid_pitch_rate
+        //     .set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
 
         /// Fusion
         let mut ahrs_alg = AhrsFusion::new(
@@ -276,9 +276,9 @@ mod app {
         tim3.start(PID_FREQ).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start Main Loop timer
-        tim9.start(MAIN_LOOP_FREQ).unwrap();
-        tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start Main Loop timer
+        // tim9.start(MAIN_LOOP_FREQ).unwrap();
+        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
         // /// start bt_test timer
@@ -428,13 +428,21 @@ mod app {
                 //     *cx.local.counter = (0, 0, 0);
                 // }
 
-                if *dbg_gyro {
-                    let gyro = sd.imu_gyro.read_and_reset();
-                    rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
-                }
+                // if *dbg_gyro {
+                //     let gyro = sd.imu_gyro.read_and_reset();
+                //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                // }
 
                 // TODO: read baro
-                // cx.local.sensors.read_data_baro(sd);
+                let (pressure_rdy, temp_rdy) =
+                    cx.local.sensors.read_data_baro(sd, filters);
+
+                // rprintln!("pressure, temp = {:?}, {:?}", pressure_rdy, temp_rdy);
+                // let pressure = sd.baro_pressure.read_and_reset();
+                // let temp = sd.baro_temperature.read_and_reset();
+                // rprintln!("pressure = {:?}\ntemp = {:?}", pressure, temp);
+
+                //
             });
     }
 
@@ -477,6 +485,14 @@ mod app {
                     // let gyro0 = gyro;
                     // let gyro = ahrs.update(gyro, acc, mag);
                     let gyro2 = ahrs.update(gyro, acc, mag);
+
+                    if sd.baro_pressure.is_changed() && sd.baro_temperature.is_changed() {
+                        let pressure = sd.baro_pressure.read_and_reset();
+                        let temp = sd.baro_temperature.read_and_reset();
+
+                        let alt = ahrs.altitude.update_altitude(pressure, temp);
+                        rprintln!("alt = {:?}", alt);
+                    }
 
                     // cx.local.pitch.0 += gyro.y * (1.0 / PID_FREQ.to_Hz() as f32);
                     // cx.local.pitch.1 += gyro2.y * (1.0 / PID_FREQ.to_Hz() as f32);
@@ -611,22 +627,22 @@ mod app {
                     }
                 });
 
-                let gyro0 = sd.imu_gyro.read_and_reset();
-                // let acc0 = sd.imu_acc.read_and_reset();
-                // let mag0 = sd.magnetometer.read_and_reset();
+                // let gyro0 = sd.imu_gyro.read_and_reset();
+                // // let acc0 = sd.imu_acc.read_and_reset();
+                // // let mag0 = sd.magnetometer.read_and_reset();
 
-                bt.pause_interrupt(exti);
-                // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                bt.log_write_sens_gyro(gyro0).unwrap();
-                bt.unpause_interrupt(exti);
+                // bt.pause_interrupt(exti);
+                // // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                // bt.log_write_sens_gyro(gyro0).unwrap();
+                // bt.unpause_interrupt(exti);
 
-                let pids = [IdPID::PitchRate];
-                // let pids = [IdPID::YawRate];
-                for id in pids {
-                    bt.pause_interrupt(exti);
-                    bt.log_write_pid(id, &controller[id]).unwrap();
-                    bt.unpause_interrupt(exti);
-                }
+                // let pids = [IdPID::PitchRate];
+                // // let pids = [IdPID::YawRate];
+                // for id in pids {
+                //     bt.pause_interrupt(exti);
+                //     bt.log_write_pid(id, &controller[id]).unwrap();
+                //     bt.unpause_interrupt(exti);
+                // }
 
                 // unimplemented!()
             },

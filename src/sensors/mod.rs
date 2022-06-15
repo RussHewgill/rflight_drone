@@ -77,6 +77,13 @@ impl<T: Copy> DataVal<T> {
         self.changed = false;
         self.data
     }
+    pub fn read_if_changed(&self) -> Option<T> {
+        if self.changed {
+            Some(self.data)
+        } else {
+            None
+        }
+    }
     pub fn is_changed(&self) -> bool {
         self.changed
     }
@@ -310,20 +317,25 @@ impl Sensors {
         });
     }
 
-    pub fn read_data_baro(&mut self, data: &mut SensorData, filters: &mut SensorFilters) {
+    pub fn read_data_baro(
+        &mut self,
+        data: &mut SensorData,
+        filters: &mut SensorFilters,
+    ) -> (bool, bool) {
         self.with_spi_baro(|spi, baro| {
-            let (pressure, temp) = baro.read_new_data_available(spi).unwrap();
-            if pressure {
+            let (pressure_rdy, temp_rdy) = baro.read_new_data_available(spi).unwrap();
+            if pressure_rdy {
                 let pressure = baro.read_data(spi).unwrap();
                 let pressure = filters.update_baro(pressure);
                 data.baro_pressure.update(pressure);
             }
-            if temp {
+            if temp_rdy {
                 let temp = baro.read_temperature_data(spi).unwrap();
                 let temp = filters.update_baro_temp(temp);
                 data.baro_temperature.update(temp);
             }
-        });
+            (pressure_rdy, temp_rdy)
+        })
     }
 }
 

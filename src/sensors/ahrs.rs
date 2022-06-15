@@ -20,6 +20,7 @@ pub use self::fusion::*;
 pub use self::kalman::*;
 pub use self::madgwick_prev::*;
 // pub use self::st_ahrs::*;
+pub use self::altitude::*;
 pub use self::mahony::*;
 
 pub trait AHRS {
@@ -31,6 +32,8 @@ pub trait AHRS {
 #[derive(Clone, Copy)]
 pub struct AhrsController<A: AHRS> {
     pub ahrs: A,
+
+    pub altitude: AhrsAltitude,
 
     pub calibration: SensorCalibration,
     // pub biquad_cutoff:   biquad::Hertz<f32>,
@@ -46,6 +49,7 @@ impl<A: AHRS> AhrsController<A> {
     pub fn new(ahrs: A, sample_rate: HertzU32) -> Self {
         Self {
             ahrs,
+            altitude: AhrsAltitude::new(sample_rate),
             calibration: SensorCalibration::init(sample_rate),
             // biquad_cutoff: 90.hz(),
             // biquad_sampling: 1.hz(),
@@ -71,6 +75,61 @@ impl<A: AHRS> AhrsController<A> {
         self.ahrs.update(gyro, acc, mag);
 
         gyro
+    }
+}
+
+mod altitude {
+    use fugit::HertzU32;
+
+    #[derive(Clone, Copy)]
+    pub struct AhrsAltitude {
+        sample_rate: HertzU32,
+
+        alt_ref_pressure:    f32,
+        alt_ref_temperature: f32,
+        altitude:            f32,
+    }
+
+    impl AhrsAltitude {
+        pub fn new(sample_rate: HertzU32) -> Self {
+            Self {
+                sample_rate,
+                alt_ref_pressure: f32::NAN,
+                alt_ref_temperature: f32::NAN,
+                altitude: f32::NAN,
+            }
+        }
+
+        // pub fn init(&mut self, pressure: f32, temperature: f32) {
+        //     self.alt_ref_pressure = pressure;
+        //     self.alt_ref_temperature = temperature;
+        // }
+
+        pub fn update_altitude(&mut self, pressure: f32, temperature: f32) -> f32 {
+            use nalgebra::ComplexField;
+
+            if self.alt_ref_pressure.is_nan() {
+                self.alt_ref_pressure = pressure;
+            }
+            if self.alt_ref_temperature.is_nan() {
+                self.alt_ref_temperature = temperature;
+            }
+
+            const R: f32 = 8.31432; // universal gas constant
+            const G0: f32 = 9.80665;
+            const M: f32 = 0.0289644; // molar mass of Earth’s air (kg/mol)
+
+            self.altitude = (R
+                * self.alt_ref_temperature
+                * f32::ln(pressure / self.alt_ref_pressure))
+                / (-G0 * M);
+
+            self.altitude
+        }
+
+        pub fn get_altitude(&self) -> f32 {
+            self.altitude
+        }
     }
 }
 

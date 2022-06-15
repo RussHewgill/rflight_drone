@@ -261,11 +261,11 @@ pub fn init_sensors(sensors: &mut Sensors) {
             .unwrap();
     });
 
-    // sensors.with_spi_baro(|spi, baro| {
-    //     baro.init(spi).unwrap();
-    //     baro.set_data_rate(spi, crate::sensors::barometer::BaroDataRate::R75)
-    //         .unwrap();
-    // });
+    sensors.with_spi_baro(|spi, baro| {
+        baro.init(spi).unwrap();
+        baro.set_data_rate(spi, crate::sensors::barometer::BaroDataRate::R75)
+            .unwrap();
+    });
 }
 
 fn init_bt_interrupt(

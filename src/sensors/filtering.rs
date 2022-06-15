@@ -15,9 +15,9 @@ pub use self::rpm::*;
 
 #[derive(Clone, Copy)]
 pub struct SensorFilters {
-    gyro_iir:            (bool, IIRFilter),
-    gyro_biquad_lowpass: (bool, BiquadFilter),
-    gyro_biquad_notch:   [(bool, BiquadFilter); 2],
+    // gyro_iir:            (bool, IIRFilter),
+    // gyro_biquad_lowpass: (bool, BiquadFilter),
+    // gyro_biquad_notch:   [(bool, BiquadFilter); 2],
 }
 
 // pub trait SensFilter {
@@ -28,35 +28,35 @@ pub struct SensorFilters {
 /// new
 impl SensorFilters {
     pub fn new() -> Self {
-        let gyro_biquad_lowpass = (
-            true,
-            BiquadFilter::new(
-                120.hz(),
-                SENSOR_FREQ.to_Hz().hz(),
-                Type::SinglePoleLowPass,
-                Q_BUTTERWORTH_F32,
-            ),
-        );
+        // let gyro_biquad_lowpass = (
+        //     true,
+        //     BiquadFilter::new(
+        //         120.hz(),
+        //         SENSOR_FREQ.to_Hz().hz(),
+        //         Type::SinglePoleLowPass,
+        //         Q_BUTTERWORTH_F32,
+        //     ),
+        // );
 
         // /// XXX: Motor Freq filtering only works at specific throttle
         // let gyro_biquad_notch1 = BiquadFilter::new(165.hz(), SENSOR_FREQ.to_Hz().hz(), Type::Notch, 3.0);
 
-        let gyro_biquad_notch2 =
-            BiquadFilter::new(330.hz(), SENSOR_FREQ.to_Hz().hz(), Type::Notch, 10.0);
+        // let gyro_biquad_notch2 =
+        //     BiquadFilter::new(330.hz(), SENSOR_FREQ.to_Hz().hz(), Type::Notch, 10.0);
 
-        let gyro_biquad_notch3 =
-            BiquadFilter::new(810.hz(), SENSOR_FREQ.to_Hz().hz(), Type::Notch, 2.5);
+        // let gyro_biquad_notch3 =
+        //     BiquadFilter::new(810.hz(), SENSOR_FREQ.to_Hz().hz(), Type::Notch, 2.5);
 
-        let gyro_biquad_notch = [
-            // (true, gyro_biquad_notch1),
-            (true, gyro_biquad_notch2),
-            (true, gyro_biquad_notch3),
-        ];
+        // let gyro_biquad_notch = [
+        //     // (true, gyro_biquad_notch1),
+        //     (true, gyro_biquad_notch2),
+        //     (true, gyro_biquad_notch3),
+        // ];
 
         Self {
-            gyro_iir: (true, IIRFilter::default()),
-            gyro_biquad_lowpass,
-            gyro_biquad_notch,
+            // gyro_iir: (true, IIRFilter::default()),
+            // gyro_biquad_lowpass,
+            // gyro_biquad_notch,
         }
     }
 }
