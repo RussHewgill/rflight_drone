@@ -262,9 +262,13 @@ pub fn init_sensors(sensors: &mut Sensors) {
     });
 
     sensors.with_spi_baro(|spi, baro| {
+        // baro.reset(spi).unwrap();
         baro.init(spi).unwrap();
         baro.set_data_rate(spi, crate::sensors::barometer::BaroDataRate::R75)
             .unwrap();
+        // baro.set_lowpass_filter(spi, None).unwrap();
+        // baro.set_lowpass_filter(spi, Some(false)).unwrap(); // ODR / 9
+        baro.set_lowpass_filter(spi, Some(true)).unwrap(); // ODR / 20
     });
 }
 

@@ -24,6 +24,7 @@ where
     CS: OutputPin<Error = PinError>,
 {
     pub fn reset(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
+        self.write_reg(spi, BaroRegister::CTRL_REG2, 0b0000_0100)?; // software reset
         self.write_reg(spi, BaroRegister::CTRL_REG1, 0b0000_0001)?; // 3-wire mode
         self.write_reg(spi, BaroRegister::CTRL_REG2, 0b0000_1000)?;
         self.write_reg(spi, BaroRegister::CTRL_REG3, 0b0000_0000)?;
@@ -55,6 +56,23 @@ where
     pub fn one_shot(&mut self, spi: &mut Spi3) -> nb::Result<(), SpiError> {
         let current = self.read_reg(spi, BaroRegister::CTRL_REG2)?;
         self.write_reg(spi, BaroRegister::CTRL_REG2, current | 0b1)?;
+        Ok(())
+    }
+
+    pub fn set_lowpass_filter(
+        &mut self,
+        spi: &mut Spi3,
+        setting: Option<bool>,
+    ) -> nb::Result<(), SpiError> {
+        let current = self.read_reg(spi, BaroRegister::CTRL_REG1)?;
+
+        let val = match setting {
+            None => current & !0b0000_1000,
+            Some(false) => (current | 0b0000_1000) & !0b0100, // ODR / 9
+            Some(true) => current | 0b0000_1100,              // ODR / 20
+        };
+
+        self.write_reg(spi, BaroRegister::CTRL_REG1, val)?;
         Ok(())
     }
 

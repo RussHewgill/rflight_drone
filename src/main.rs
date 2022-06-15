@@ -276,9 +276,19 @@ mod app {
         tim3.start(PID_FREQ).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start Main Loop timer
-        // tim9.start(MAIN_LOOP_FREQ).unwrap();
-        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Main Loop timer
+        tim9.start(MAIN_LOOP_FREQ).unwrap();
+        tim9.listen(stm32f4xx_hal::timer::Event::Update);
+
+        // let x0 = ahrs.altitude.update_avg(1.0);
+        // let x1 = ahrs.altitude.update_avg(1.0);
+        // let x2 = ahrs.altitude.update_avg(1.0);
+        // // let x3 = ahrs.altitude.update_avg(1.0);
+
+        // rprintln!("x0 = {:?}", x0);
+        // rprintln!("x1 = {:?}", x1);
+        // rprintln!("x2 = {:?}", x2);
+        // // rprintln!("x3 = {:?}", x3);
 
         // let bt_period = 200.Hz();
         // /// start bt_test timer
@@ -490,8 +500,21 @@ mod app {
                         let pressure = sd.baro_pressure.read_and_reset();
                         let temp = sd.baro_temperature.read_and_reset();
 
+                        // let (alt, (pressure0, temp0)) =
                         let alt = ahrs.altitude.update_altitude(pressure, temp);
-                        rprintln!("alt = {:?}", alt);
+
+                        // if let Some(alt) = alt {
+                        //     rprintln!("pressure = {:?}\nalt = {:?}", pressure, alt);
+                        // }
+
+                        // rprintln!(
+                        //     "pressure = {:?}\npressure0 = {:?}\ntemp = {:?}\ntemp0 = {:?}\nalt = {:?}",
+                        //     pressure,
+                        //     pressure0,
+                        //     temp,
+                        //     temp0,
+                        //     alt,
+                        // );
                     }
 
                     // cx.local.pitch.0 += gyro.y * (1.0 / PID_FREQ.to_Hz() as f32);
@@ -558,7 +581,8 @@ mod app {
 
     #[task(
         binds = TIM1_BRK_TIM9,
-        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
+        // shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
+        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors, ahrs],
         local = [tim9, batt_counter: u32 = 0, batt_warn: u32 = 0],
         priority = 2
     )]
@@ -577,8 +601,12 @@ mod app {
         let motors = cx.shared.motors;
         let controller = cx.shared.controller;
 
-        (flight_data, sens_data, bt, exti, controller, motors).lock(
-            |fd, sd, bt, exti, controller, motors| {
+        let ahrs = cx.shared.ahrs;
+
+        // (flight_data, sens_data, bt, exti, controller, motors).lock(
+        //     |fd, sd, bt, exti, controller, motors| {
+        (flight_data, sens_data, bt, exti, controller, motors, ahrs).lock(
+            |fd, sd, bt, exti, controller, motors, ahrs| {
                 /// Write data to Bluetooth
 
                 /// send orientation
@@ -631,10 +659,14 @@ mod app {
                 // // let acc0 = sd.imu_acc.read_and_reset();
                 // // let mag0 = sd.magnetometer.read_and_reset();
 
-                // bt.pause_interrupt(exti);
-                // // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                // bt.log_write_sens_gyro(gyro0).unwrap();
-                // bt.unpause_interrupt(exti);
+                let alt = ahrs.altitude.get_altitude();
+                let alt = alt * 100.0;
+                let gyro0 = V3::new(alt, alt, 0.0);
+
+                bt.pause_interrupt(exti);
+                // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                bt.log_write_sens_gyro(gyro0).unwrap();
+                bt.unpause_interrupt(exti);
 
                 // let pids = [IdPID::PitchRate];
                 // // let pids = [IdPID::YawRate];

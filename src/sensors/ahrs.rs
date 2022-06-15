@@ -6,6 +6,7 @@ use fugit::HertzU32;
 // use ahrs::{Ahrs, Madgwick};
 use nalgebra::{Quaternion, Rotation3, UnitQuaternion, Vector2, Vector3};
 
+use crate::consts::SENSOR_FREQ_BARO;
 use crate::math::*;
 use defmt::println as rprintln;
 
@@ -29,7 +30,7 @@ pub trait AHRS {
     fn get_quat(&self) -> UQuat;
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct AhrsController<A: AHRS> {
     pub ahrs: A,
 
@@ -49,7 +50,7 @@ impl<A: AHRS> AhrsController<A> {
     pub fn new(ahrs: A, sample_rate: HertzU32) -> Self {
         Self {
             ahrs,
-            altitude: AhrsAltitude::new(sample_rate),
+            altitude: AhrsAltitude::new(SENSOR_FREQ_BARO),
             calibration: SensorCalibration::init(sample_rate),
             // biquad_cutoff: 90.hz(),
             // biquad_sampling: 1.hz(),
@@ -79,41 +80,163 @@ impl<A: AHRS> AhrsController<A> {
 }
 
 mod altitude {
+    use biquad::*;
+    use defmt::println as rprintln;
     use fugit::HertzU32;
 
-    #[derive(Clone, Copy)]
+    #[derive(Clone)]
     pub struct AhrsAltitude {
         sample_rate: HertzU32,
 
-        alt_ref_pressure:    f32,
-        alt_ref_temperature: f32,
-        altitude:            f32,
+        discard:         u32,
+        initialized:     u32,
+        ref_pressure:    f32,
+        ref_temperature: f32,
+        altitude:        f32,
+        avg:             (f32, heapless::Deque<f32, 10>),
+        // lowpass_pressure:    DirectForm2Transposed<f32>,
+        // lowpass_temperature: DirectForm2Transposed<f32>,
     }
 
     impl AhrsAltitude {
         pub fn new(sample_rate: HertzU32) -> Self {
+            // let coeffs = Coefficients::<f32>::from_params(
+            //     Type::LowPass,
+            //     sample_rate.to_Hz().hz(),
+            //     200.hz(),
+            //     Q_BUTTERWORTH_F32,
+            // )
+            // .unwrap();
+
+            // let lowpass_pressure = DirectForm2Transposed::<f32>::new(coeffs);
+            // let lowpass_temperature = DirectForm2Transposed::<f32>::new(coeffs);
+
+            /// discard 1.0 seconds
+            /// use first 0.5 seconds for measuring baseline
+            let discard = (1.0 / (1.0 / sample_rate.to_Hz() as f32)) as u32;
+            let initialized = (0.5 / (1.0 / sample_rate.to_Hz() as f32)) as u32;
+            assert!(initialized > 0);
+            rprintln!("initialized = {:?}", initialized);
+
             Self {
                 sample_rate,
-                alt_ref_pressure: f32::NAN,
-                alt_ref_temperature: f32::NAN,
+                discard,
+                initialized,
+                ref_pressure: 0.0,
+                ref_temperature: 0.0,
                 altitude: f32::NAN,
+                avg: (0.0, heapless::Deque::new()),
+                // lowpass_pressure,
+                // lowpass_temperature,
             }
         }
 
-        // pub fn init(&mut self, pressure: f32, temperature: f32) {
-        //     self.alt_ref_pressure = pressure;
-        //     self.alt_ref_temperature = temperature;
-        // }
-
-        pub fn update_altitude(&mut self, pressure: f32, temperature: f32) -> f32 {
+        pub fn update_altitude(
+            &mut self,
+            pressure: f32,
+            temperature: f32,
+        ) -> Option<f32> {
             use nalgebra::ComplexField;
 
-            if self.alt_ref_pressure.is_nan() {
-                self.alt_ref_pressure = pressure;
+            // /// convert hPa to kPa
+            // let pressure = pressure / 10.0;
+
+            /// convert hPa to Pa
+            let pressure = pressure * 100.0;
+
+            // rprintln!("pressure = {:?}\ntemp = {:?}", pressure, temperature);
+
+            if self.discard > 0 {
+                self.discard -= 1;
+                if self.discard == 0 {
+                    rprintln!("Altitude discarding done");
+                }
+                return None;
             }
-            if self.alt_ref_temperature.is_nan() {
-                self.alt_ref_temperature = temperature;
+            if self.initialized > 0 {
+                // rprintln!("Altitude initializing: {:?}", self.initialized);
+
+                // rprintln!("pressure = {:?}", pressure);
+                // rprintln!("temperature = {:?}", temperature);
+
+                // rprintln!("pressure = {:?}", pressure);
+                self.ref_pressure += pressure;
+                self.ref_temperature += temperature;
+
+                if self.initialized == 1 {
+                    rprintln!("Altitude initializing done");
+
+                    let n = (0.5 / (1.0 / self.sample_rate.to_Hz() as f32)).trunc();
+                    self.ref_pressure /= n;
+                    self.ref_temperature /= n;
+
+                    // rprintln!("self.ref_pressure = {:?}", self.ref_pressure);
+
+                    self.initialized = 0;
+                } else {
+                    self.initialized -= 1;
+                    return None;
+                }
             }
+
+            // let scaling = pressure / self.ref_pressure;
+
+            // ret = 153.8462f * temp * (1.0f - expf(0.190259f * logf(scaling))) - _field_elevation_active;
+
+            // let alt = 153.8462 * temperature * (1.0 - f32::exp(0.190259 * scaling.ln()));
+
+            // let alt = (1.0 - f32::powf(pressure / 101325.0, 0.190295)) * 4433000.0;
+
+            const R: f32 = 8.31432; // universal gas constant
+            const G0: f32 = 9.80665;
+            const M: f32 = 0.0289644; // molar mass of Earth’s air (kg/mol)
+
+            let alt = (R * self.ref_temperature * f32::ln(pressure / self.ref_pressure))
+                / (-G0 * M);
+
+            let alt2 = self.update_avg(alt);
+
+            rprintln!("alt  = {:?}\nalt2 = {:?}", alt, alt2);
+            self.altitude = alt2;
+
+            // unimplemented!()
+            // None
+            Some(alt2)
+        }
+
+        pub fn update_avg(&mut self, alt: f32) -> f32 {
+            if self.avg.1.len() == self.avg.1.capacity() {
+                let x = self.avg.1.pop_front().unwrap();
+                self.avg.0 -= x;
+
+                self.avg.0 += alt;
+                self.avg.1.push_back(alt).unwrap();
+                self.avg.0 / self.avg.1.len() as f32
+            } else {
+                self.avg.0 += alt;
+                // rprintln!("self.avg = {:?}", self.avg.0);
+                self.avg.1.push_back(alt).unwrap();
+                self.avg.0 / self.avg.1.len() as f32
+            }
+        }
+
+        #[cfg(feature = "nope")]
+        pub fn update_altitude(
+            &mut self,
+            pressure: f32,
+            temperature: f32,
+        ) -> (f32, (f32, f32)) {
+            use nalgebra::ComplexField;
+
+            // let pressure = self.lowpass_pressure.run(pressure);
+            // let temperature = self.lowpass_temperature.run(temperature);
+
+            // if self.alt_ref_pressure.is_nan() {
+            //     self.alt_ref_pressure = pressure;
+            // }
+            // if self.alt_ref_temperature.is_nan() {
+            //     self.alt_ref_temperature = temperature;
+            // }
 
             const R: f32 = 8.31432; // universal gas constant
             const G0: f32 = 9.80665;
@@ -124,7 +247,7 @@ mod altitude {
                 * f32::ln(pressure / self.alt_ref_pressure))
                 / (-G0 * M);
 
-            self.altitude
+            (self.altitude, (pressure, temperature))
         }
 
         pub fn get_altitude(&self) -> f32 {
@@ -293,7 +416,8 @@ pub mod offset {
 #[derive(Default, Clone, Copy)]
 pub struct FlightData {
     /// Rotation using North-West-Up convention
-    pub quat: UQuat,
+    pub quat:     UQuat,
+    pub altitude: f32,
 }
 
 impl FlightData {
@@ -303,6 +427,7 @@ impl FlightData {
 
     pub fn update<A: AHRS>(&mut self, ahrs: &AhrsController<A>) {
         self.quat = ahrs.ahrs.get_quat();
+        self.altitude = ahrs.altitude.get_altitude();
     }
 
     /// roll, pitch, yaw
