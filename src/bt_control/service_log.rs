@@ -119,7 +119,8 @@ where
             };
             block!(self.update_characteristic_value(&val)).unwrap();
 
-            let result = self.ignore_event_timeout(None)?;
+            // let result = self.ignore_event_timeout(None)?;
+            let result = self._read_event()?;
         }
 
         Ok(())
@@ -173,7 +174,8 @@ where
         };
         block!(self.update_characteristic_value(&val)).unwrap();
 
-        let result = self.ignore_event_timeout(None)?;
+        // let result = self.ignore_event_timeout(None)?;
+        let result = self._read_event()?;
 
         Ok(())
     }
@@ -223,7 +225,8 @@ where
         };
         block!(self.update_long_characteristic_value(&val)).unwrap();
 
-        let result = self.ignore_event_timeout(None)?;
+        // let result = self.ignore_event_timeout(None)?;
+        let result = self._read_event()?;
 
         Ok(())
     }
@@ -254,7 +257,9 @@ where
         };
         block!(self.update_characteristic_value(&val)).unwrap();
 
-        let result = self.ignore_event_timeout(None)?;
+        // let result = self.ignore_event_timeout(None)?;
+        let result = self._read_event()?;
+        // rprintln!("log_write_quat: result = {:?}", result);
 
         Ok(())
     }
@@ -279,7 +284,8 @@ where
         };
         block!(self.update_characteristic_value(&val)).unwrap();
 
-        let result = self.ignore_event_timeout(None)?;
+        // let result = self.ignore_event_timeout(None)?;
+        let result = self._read_event()?;
 
         Ok(())
     }

@@ -196,7 +196,7 @@ mod altitude {
 
             let alt2 = self.update_avg(alt);
 
-            rprintln!("alt  = {:?}\nalt2 = {:?}", alt, alt2);
+            // rprintln!("alt  = {:?}\nalt2 = {:?}", alt, alt2);
             self.altitude = alt2;
 
             // unimplemented!()

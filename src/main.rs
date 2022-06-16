@@ -135,8 +135,13 @@ mod app {
         utils::*,
     };
 
-    use bluetooth_hci_defmt::host::{
-        uart::Hci as HciUart, ConnectionIntervalBuilder, ExpectedConnectionLength, Hci,
+    use bluetooth_hci_defmt::{
+        event::CommandStatus,
+        host::{
+            uart::Hci as HciUart, ConnectionIntervalBuilder, ExpectedConnectionLength,
+            Hci,
+        },
+        ConnectionHandle,
     };
 
     use nalgebra as na;
@@ -609,6 +614,8 @@ mod app {
             |fd, sd, bt, exti, controller, motors, ahrs| {
                 /// Write data to Bluetooth
 
+                // rprintln!("sending quat");
+
                 /// send orientation
                 bt.pause_interrupt(exti);
                 bt.log_write_quat(&fd.quat).unwrap();
@@ -707,7 +714,105 @@ mod app {
         });
     }
 
-    #[task(binds = EXTI4, shared = [bt, exti, controller, motors, inputs, leds, adc, flight_data], priority = 8)]
+    #[cfg(feature = "nope")]
+    // #[task(shared = [bt, exti], priority = 9)]
+    fn bt_conn(mut cx: bt_conn::Context, conn_handle: ConnectionHandle) {
+        cx.shared.bt.lock(|bt| {
+            rprintln!("conn_handle = {:?}", conn_handle);
+
+            rprintln!("conn_handle2 = {:?}", conn_handle);
+            let conn_interval = ConnectionIntervalBuilder::new()
+                .with_range(
+                    core::time::Duration::from_micros(7500 * 2),
+                    core::time::Duration::from_micros(7500 * 2),
+                )
+                .with_latency(0)
+                .with_supervision_timeout(core::time::Duration::from_secs_f32(1.0))
+                .build()
+                .unwrap();
+            rprintln!("wat -1, conn_interval = {:?}", conn_interval);
+            let params = bluetooth_hci_defmt::host::ConnectionUpdateParameters {
+                // crate::bluetooth::gap::ConnectionUpdateParameters {
+                conn_handle,
+                conn_interval,
+                expected_connection_length: ExpectedConnectionLength::new(
+                    core::time::Duration::from_millis(32),
+                    core::time::Duration::from_millis(32),
+                )
+                .unwrap(),
+            };
+            rprintln!("wat 0");
+            block!(bt.le_connection_update(&params)).unwrap();
+            // block!(bt.start_connection_update(&params)).unwrap();
+            let ev0 = bt._read_event();
+            rprintln!("ev0 = {:?}", ev0);
+            let ev1 = bt._read_event();
+            rprintln!("ev1 = {:?}", ev1);
+            bt.read_event_uart().unwrap();
+            rprintln!("wat 3");
+
+            #[cfg(feature = "nope")]
+            for x in 0u16..0x0EFF {
+                let conn_handle = ConnectionHandle(x);
+                rprintln!("conn_handle2 = {:?}", conn_handle);
+                let conn_interval = ConnectionIntervalBuilder::new()
+                    .with_range(
+                        core::time::Duration::from_micros(7500 * 2),
+                        core::time::Duration::from_micros(7500 * 2),
+                    )
+                    .with_latency(0)
+                    .with_supervision_timeout(core::time::Duration::from_secs_f32(1.0))
+                    .build()
+                    .unwrap();
+                rprintln!("wat -1, conn_interval = {:?}", conn_interval);
+                let params = bluetooth_hci_defmt::host::ConnectionUpdateParameters {
+                    // crate::bluetooth::gap::ConnectionUpdateParameters {
+                    conn_handle,
+                    conn_interval,
+                    expected_connection_length: ExpectedConnectionLength::new(
+                        core::time::Duration::from_millis(32),
+                        core::time::Duration::from_millis(32),
+                    )
+                    .unwrap(),
+                };
+                rprintln!("wat 0");
+                block!(bt.le_connection_update(&params)).unwrap();
+                // block!(bt.start_connection_update(&params)).unwrap();
+                let ev0 = bt._read_event();
+                rprintln!("ev0 = {:?}", ev0);
+
+                match ev0 {
+                    Ok(bluetooth_hci_defmt::Event::CommandStatus(CommandStatus {
+                        status,
+                        ..
+                    })) => match status {
+                        bluetooth_hci_defmt::Status::Success => {
+                            rprintln!("Success");
+                            break;
+                        }
+                        bluetooth_hci_defmt::Status::UnknownConnectionId => {
+                            rprintln!("failed");
+                        }
+                        _ => {
+                            rprintln!("other = {:?}", status);
+                        }
+                    },
+                    _ => {}
+                }
+
+                // let ev1 = bt._read_event();
+                // rprintln!("ev1 = {:?}", ev1);
+                // bt.read_event_uart().unwrap();
+                // rprintln!("wat 3");
+            }
+        });
+    }
+
+    #[task(
+        binds = EXTI4,
+        shared = [bt, exti, controller, motors, inputs, leds, adc, flight_data],
+        priority = 8
+    )]
     fn bt_irq(mut cx: bt_irq::Context) {
         (
             cx.shared.bt,
@@ -741,44 +846,50 @@ mod app {
                     /// TODO: update connection params
                     match bt.handle_connect_disconnect(&event) {
                         // Some(ConnectionChange::NewConnection(conn_handle)) => {
-                        //     rprintln!("conn_handle = {:?}", conn_handle);
-                        //     rprintln!("wat -2");
-                        //     let conn_interval = ConnectionIntervalBuilder::new()
-                        //         .with_range(
-                        //             core::time::Duration::from_micros(7500 * 4),
-                        //             core::time::Duration::from_micros(7500 * 4),
-                        //         )
-                        //         .with_latency(0)
-                        //         .with_supervision_timeout(
-                        //             core::time::Duration::from_secs_f32(1.0),
-                        //         )
-                        //         .build()
-                        //         .unwrap();
-                        //     rprintln!("wat -1");
-                        //     let params =
-                        //         bluetooth_hci_defmt::host::ConnectionUpdateParameters {
-                        //             conn_handle,
-                        //             conn_interval,
-                        //             expected_connection_length:
-                        //                 ExpectedConnectionLength::new(
-                        //                     core::time::Duration::from_millis(32),
-                        //                     core::time::Duration::from_millis(32),
-                        //                 )
-                        //                 .unwrap(),
-                        //         };
-                        //     rprintln!("wat 0");
-                        //     block!(bt.le_connection_update(&params)).unwrap();
-                        //     // block!(bt.start_connection_update(&params)).unwrap();
-                        //     let ev0 = bt._read_event();
-                        //     rprintln!("ev0 = {:?}", ev0);
-                        //     let ev1 = bt._read_event();
-                        //     rprintln!("ev1 = {:?}", ev1);
-                        //     bt.read_event_uart().unwrap();
-                        //     rprintln!("wat 3");
+                        //     bt_conn::spawn_after(250.millis(), conn_handle).unwrap();
                         // }
+                        #[cfg(feature = "nope")]
+                        Some(ConnectionChange::NewConnection(conn_handle)) => {
+                            rprintln!("conn_handle = {:?}", conn_handle);
+                            // rprintln!("wat -2");
+                            let conn_interval = ConnectionIntervalBuilder::new()
+                                .with_range(
+                                    core::time::Duration::from_micros(7500 * 2),
+                                    core::time::Duration::from_micros(7500 * 2),
+                                )
+                                .with_latency(0)
+                                .with_supervision_timeout(
+                                    core::time::Duration::from_secs_f32(1.0),
+                                )
+                                .build()
+                                .unwrap();
+                            rprintln!("wat -1, conn_interaval = {:?}", conn_interval);
+                            let params =
+                                bluetooth_hci_defmt::host::ConnectionUpdateParameters {
+                                    // crate::bluetooth::gap::ConnectionUpdateParameters {
+                                    conn_handle,
+                                    conn_interval,
+                                    expected_connection_length:
+                                        ExpectedConnectionLength::new(
+                                            core::time::Duration::from_millis(32),
+                                            core::time::Duration::from_millis(32),
+                                        )
+                                        .unwrap(),
+                                };
+                            rprintln!("wat 0");
+                            block!(bt.le_connection_update(&params)).unwrap();
+                            // block!(bt.start_connection_update(&params)).unwrap();
+                            let ev0 = bt._read_event();
+                            rprintln!("ev0 = {:?}", ev0);
+                            let ev1 = bt._read_event();
+                            rprintln!("ev1 = {:?}", ev1);
+                            bt.read_event_uart().unwrap();
+                            rprintln!("wat 3");
+                        }
                         Some(ConnectionChange::Disconnect) => {
                             rprintln!("Disconnected, disarming motors");
-                            motors.set_armed(false, &bt.state, *inputs, fd.quat);
+                            // motors.set_armed(false, &bt.state, *inputs, fd.quat);
+                            motors.set_disarmed();
                         }
                         _ => {}
                     }
