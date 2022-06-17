@@ -35,9 +35,9 @@ impl BatteryAdc {
         let v = self.sample();
 
         if send_bt {
-            bt.pause_interrupt(exti);
+            // bt.pause_interrupt(exti);
             bt.log_write_batt(v).unwrap();
-            bt.unpause_interrupt(exti);
+            // bt.unpause_interrupt(exti);
         }
 
         // self.min_voltage_warn = 3.9;

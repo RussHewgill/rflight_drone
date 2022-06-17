@@ -617,9 +617,9 @@ mod app {
                 // rprintln!("sending quat");
 
                 /// send orientation
-                bt.pause_interrupt(exti);
+                // bt.pause_interrupt(exti);
                 bt.log_write_quat(&fd.quat).unwrap();
-                bt.unpause_interrupt(exti);
+                // bt.unpause_interrupt(exti);
 
                 // /// send battery voltage
                 // if *cx.local.batt_counter >= BATT_TIMES {
@@ -670,10 +670,10 @@ mod app {
                 let alt = alt * 100.0;
                 let gyro0 = V3::new(alt, alt, 0.0);
 
-                bt.pause_interrupt(exti);
+                // bt.pause_interrupt(exti);
                 // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                 bt.log_write_sens_gyro(gyro0).unwrap();
-                bt.unpause_interrupt(exti);
+                // bt.unpause_interrupt(exti);
 
                 // let pids = [IdPID::PitchRate];
                 // // let pids = [IdPID::YawRate];

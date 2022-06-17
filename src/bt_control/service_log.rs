@@ -119,8 +119,10 @@ where
             };
             block!(self.update_characteristic_value(&val)).unwrap();
 
-            // let result = self.ignore_event_timeout(None)?;
-            let result = self._read_event()?;
+            // // let result = self.ignore_event_timeout(None)?;
+            // let result = self._read_event()?;
+
+            //
         }
 
         Ok(())
@@ -166,16 +168,18 @@ where
         data[4..8].copy_from_slice(&gyro.y.to_be_bytes());
         data[8..12].copy_from_slice(&gyro.z.to_be_bytes());
 
-        let val = UpdateCharacteristicValueParameters {
-            service_handle:        logger.service_handle,
-            characteristic_handle: logger.char_handle_sens,
-            offset:                0,
-            value:                 &data,
-        };
-        block!(self.update_characteristic_value(&val)).unwrap();
+        self.log_write(logger.char_handle_sens, &data, false)?;
 
-        // let result = self.ignore_event_timeout(None)?;
-        let result = self._read_event()?;
+        // let val = UpdateCharacteristicValueParameters {
+        //     service_handle:        logger.service_handle,
+        //     characteristic_handle: logger.char_handle_sens,
+        //     offset:                0,
+        //     value:                 &data,
+        // };
+        // block!(self.update_characteristic_value(&val)).unwrap();
+
+        // // let result = self.ignore_event_timeout(None)?;
+        // let result = self._read_event()?;
 
         Ok(())
     }
@@ -228,6 +232,8 @@ where
         // let result = self.ignore_event_timeout(None)?;
         let result = self._read_event()?;
 
+        // self.log_write(logger.char_handle_sens, &data, false)?;
+
         Ok(())
     }
 
@@ -249,17 +255,19 @@ where
         data[8..12].copy_from_slice(&qq[2].to_be_bytes());
         data[12..16].copy_from_slice(&qq[3].to_be_bytes());
 
-        let val = UpdateCharacteristicValueParameters {
-            service_handle:        logger.service_handle,
-            characteristic_handle: logger.char_handle_quat,
-            offset:                0,
-            value:                 &data,
-        };
-        block!(self.update_characteristic_value(&val)).unwrap();
+        // let val = UpdateCharacteristicValueParameters {
+        //     service_handle:        logger.service_handle,
+        //     characteristic_handle: logger.char_handle_quat,
+        //     offset:                0,
+        //     value:                 &data,
+        // };
+        // block!(self.update_characteristic_value(&val)).unwrap();
 
-        // let result = self.ignore_event_timeout(None)?;
-        let result = self._read_event()?;
-        // rprintln!("log_write_quat: result = {:?}", result);
+        // // let result = self.ignore_event_timeout(None)?;
+        // let result = self._read_event()?;
+        // // rprintln!("log_write_quat: result = {:?}", result);
+
+        self.log_write(logger.char_handle_quat, &data, false)?;
 
         Ok(())
     }
@@ -276,16 +284,18 @@ where
 
         let data = batt.to_be_bytes();
 
-        let val = UpdateCharacteristicValueParameters {
-            service_handle:        logger.service_handle,
-            characteristic_handle: logger.char_handle_batt,
-            offset:                0,
-            value:                 &data,
-        };
-        block!(self.update_characteristic_value(&val)).unwrap();
+        // let val = UpdateCharacteristicValueParameters {
+        //     service_handle:        logger.service_handle,
+        //     characteristic_handle: logger.char_handle_batt,
+        //     offset:                0,
+        //     value:                 &data,
+        // };
+        // block!(self.update_characteristic_value(&val)).unwrap();
 
-        // let result = self.ignore_event_timeout(None)?;
-        let result = self._read_event()?;
+        // // let result = self.ignore_event_timeout(None)?;
+        // let result = self._read_event()?;
+
+        self.log_write(logger.char_handle_batt, &data, false)?;
 
         Ok(())
     }
