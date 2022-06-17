@@ -436,6 +436,53 @@ where
         }
     }
 
+    pub fn _read_event_timeout(
+        &mut self,
+        timeout: fugit::MicrosDurationU32,
+    ) -> Result<
+        Option<bluetooth_hci_defmt::Event<BlueNRGEvent>>,
+        BTError<SpiError, GpioError>,
+    > {
+        use stm32f4xx_hal::timer::Event as TimerEvent;
+
+        self.delay.clear_interrupt(TimerEvent::Update);
+        self.delay.start(timeout).unwrap();
+
+        loop {
+            match self.read() {
+                Ok(p) => {
+                    self.delay.cancel().unwrap();
+                    self.delay.clear_interrupt(TimerEvent::Update);
+                    let bluetooth_hci_defmt::host::uart::Packet::Event(e) = p;
+                    break Ok(Some(e));
+                }
+                Err(nb::Error::WouldBlock) => {
+                    if self.delay.get_interrupt().contains(TimerEvent::Update) {
+                        self.delay.cancel().unwrap();
+                        self.delay.clear_interrupt(TimerEvent::Update);
+                        return Ok(None);
+                    }
+                }
+                Err(nb::Error::Other(e)) => {
+                    match e {
+                        bluetooth_hci_defmt::host::uart::Error::Comm(e) => {
+                            rprintln!("error 0 = {:?}", e);
+                        }
+                        bluetooth_hci_defmt::host::uart::Error::BadPacketType(e) => {
+                            rprintln!("error 1 = {:?}", e);
+                        }
+                        bluetooth_hci_defmt::host::uart::Error::BLE(e) => {
+                            rprintln!("error 2 = {:?}", e);
+                        }
+                    }
+                    // unimplemented!("_read_event_timeout");
+                    return Err(BTError::BlueNRGErrorOther);
+                    // panic!("error 1 = {:?}", e);
+                }
+            }
+        }
+    }
+
     pub fn _read_event(
         &mut self,
     ) -> Result<bluetooth_hci_defmt::Event<BlueNRGEvent>, BTError<SpiError, GpioError>>

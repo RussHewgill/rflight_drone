@@ -52,7 +52,7 @@ use crate::{
 };
 
 use self::{
-    events::BlueNRGEvent,
+    events::{BlueNRGError, BlueNRGEvent},
     rx_buffer::{Buffer, Buffer2},
 };
 
@@ -139,6 +139,8 @@ pub enum BTError<SpiError, GpioError> {
     Gpio(GpioError),
 
     InsufficientResources,
+    // BlueNRGError(BlueNRGError),
+    BlueNRGErrorOther,
 }
 
 impl<SpiError, GpioError> defmt::Format for BTError<SpiError, GpioError> {
@@ -146,12 +148,33 @@ impl<SpiError, GpioError> defmt::Format for BTError<SpiError, GpioError> {
         match self {
             Self::Spi(spi) => defmt::write!(f, "SpiError: ??"),
             Self::Gpio(gpio) => defmt::write!(f, "GpioError: ??"),
+            // Self::BlueNRGError(e) => {
+            //     defmt::write!(f, "BlueNRGError: {:?}", e)
+            // }
+            Self::BlueNRGErrorOther => {
+                defmt::write!(f, "BlueNRGError: Other")
+            }
             Self::InsufficientResources => {
                 defmt::write!(f, "BTError::InsufficientResources")
             }
         }
     }
 }
+
+// impl<SpiError, GpioError> core::fmt::Debug for BTError<SpiError, GpioError> {
+//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+//         match self {
+//             Self::Spi(spi) => write!(f, "SpiError: ??"),
+//             Self::Gpio(gpio) => write!(f, "GpioError: ??"),
+//             Self::BlueNRGError(e) => {
+//                 write!(f, "BlueNRGError: {:?}", e)
+//             }
+//             Self::InsufficientResources => {
+//                 write!(f, "BTError::InsufficientResources")
+//             }
+//         }
+//     }
+// }
 
 // pub struct BluetoothSpi<'buf, SPI, CS, Reset, Input> {
 // pub struct BluetoothSpi<SPI, CS, Reset, Input> {

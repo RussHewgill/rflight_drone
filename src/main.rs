@@ -826,7 +826,7 @@ mod app {
         )
             // .lock(|bt, exti, controller, motors, inputs, adc, fd| {
             .lock(|bt, controller, motors, inputs, adc, fd| {
-                // rprintln!("bt_irq");
+                rprintln!("bt_irq");
 
                 // bt.clear_interrupt();
                 // bt.pause_interrupt(exti);
@@ -838,11 +838,16 @@ mod app {
                 }
 
                 loop {
-                    let event: BTEvent = match bt._read_event() {
-                        Ok(ev) => {
+                    // let event: BTEvent = match bt._read_event() {
+                    let event: BTEvent = match bt._read_event_timeout(10.millis()) {
+                        Ok(Some(ev)) => {
                             // rprintln!("ev = {:?}", ev);
                             bt.clear_interrupt();
                             ev
+                        }
+                        Ok(None) => {
+                            rprintln!("read event timeout");
+                            return;
                         }
                         Err(e) => {
                             rprintln!("read event error = {:?}", e);
@@ -936,7 +941,7 @@ mod app {
                 }
 
                 // bt.unpause_interrupt(exti);
-                // rprintln!("bt_irq done");
+                rprintln!("bt_irq done");
             });
     }
 

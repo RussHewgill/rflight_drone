@@ -376,6 +376,7 @@ impl From<Status> for u8 {
 }
 
 /// Enumeration of potential errors when sending commands or deserializing events.
+// #[derive(Debug, Clone, Copy, PartialEq, Format)]
 #[derive(Clone, Copy, PartialEq, Format)]
 pub enum BlueNRGError {
     /// The event is not recoginized. Includes the unknown opcode.
