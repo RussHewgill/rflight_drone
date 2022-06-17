@@ -2,13 +2,22 @@ use core::f32::consts::PI;
 
 use defmt::{println as rprintln, Format};
 
-use crate::math::rad_to_deg;
+use biquad::*;
+
+use crate::{math::rad_to_deg, motors::MotorsPWM};
 
 use super::{ControlRates, FlightLimits};
 
 /// Received from remote control
 #[derive(Clone, Copy, Format)]
 pub struct ControlInputs {
+    state: ControlInputState,
+    // lowpass_pitch: DirectForm2Transposed<f32>,
+}
+
+/// Instantaneous input settings
+#[derive(Clone, Copy, Format)]
+pub struct ControlInputState {
     /// Range: -1.0 to 1.0
     roll:         f32,
     /// Range: -1.0 to 1.0
@@ -25,35 +34,62 @@ pub struct ControlInputs {
 }
 
 impl ControlInputs {
-    pub fn set_motors_armed(&mut self, armed: bool) {
-        self.motors_armed = armed;
-    }
-    pub fn get_motors_armed(&self) -> bool {
-        self.motors_armed
-    }
-    pub fn get_level_mode(&self) -> bool {
-        self.level_mode
-    }
-}
+    pub fn new() -> Self {
+        // let sampling_freq =
 
-impl Default for ControlInputs {
-    fn default() -> Self {
+        // let coeffs = Coefficients::<f32>::from_params(
+        //     Type::LowPass,
+        //     sampling_freq.hz(),
+        //     cutoff_freq.hz(),
+        //     Q_BUTTERWORTH_F32,
+        //     // q_value,
+        // )
+        //     .unwrap();
+        // let lowpass_pitch = DirectForm2Transposed::<f32>::new(coeffs);
+
         Self {
-            roll:         0.0,
-            pitch:        0.0,
-            yaw:          0.0,
-            throttle:     0.0,
-            takeoff:      false,
-            calibrate:    false,
-            motors_armed: false,
-            level_mode:   true,
+            state: ControlInputState::default(),
+            // lowpass_pitch,
         }
     }
 }
 
-/// deserialize
+/// get, set
 impl ControlInputs {
-    pub fn deserialize(data: &[u8]) -> Option<ControlInputs> {
+    pub fn set_motors_armed(&mut self, armed: bool) {
+        self.state.motors_armed = armed;
+    }
+    pub fn get_motors_armed(&self) -> bool {
+        self.state.motors_armed
+    }
+    pub fn get_level_mode(&self) -> bool {
+        self.state.level_mode
+    }
+}
+
+impl ControlInputs {
+    pub fn update(&mut self, data: &[u8]) -> Option<bool> {
+        let input = if let Some(input) = ControlInputState::deserialize(data) {
+            input
+        } else {
+            rprintln!("ControlInputs update: failed deserialize");
+            return None;
+        };
+
+        self.state = input;
+
+        if !self.get_motors_armed() && input.motors_armed {
+            return Some(true);
+        } else if !input.motors_armed {
+            return Some(false);
+        }
+        None
+    }
+}
+
+/// deserialize
+impl ControlInputState {
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
         if data.len() != 9 {
             return None;
         }
@@ -72,7 +108,7 @@ impl ControlInputs {
 
         // eprintln!("motors_armed = {:?}", motors_armed);
 
-        Some(ControlInputs {
+        Some(Self {
             roll: Self::to_f32(roll),
             pitch: Self::to_f32(pitch),
             yaw: Self::to_f32(yaw),
@@ -89,22 +125,22 @@ impl ControlInputs {
     }
 }
 
-/// get_values /// TODO: not correct
+/// get_values /// TODO: maybe not correct?
 impl ControlInputs {
     pub fn get_roll(&self, rates: &ControlRates) -> f32 {
-        rates.roll.apply(self.roll)
+        rates.roll.apply(self.state.roll)
     }
     pub fn get_pitch(&self, rates: &ControlRates) -> f32 {
-        rates.pitch.apply(self.pitch)
+        rates.pitch.apply(self.state.pitch)
     }
     pub fn get_yaw(&self, rates: &ControlRates) -> f32 {
-        rates.yaw.apply(self.yaw)
+        rates.yaw.apply(self.state.yaw)
     }
     pub fn get_throttle(&self, rates: &ControlRates) -> f32 {
-        rates.throttle.apply(self.throttle)
+        rates.throttle.apply(self.state.throttle)
     }
     pub fn get_raw_throttle(&self) -> f32 {
-        self.throttle
+        self.state.throttle
     }
 
     pub fn get_values(
@@ -112,10 +148,10 @@ impl ControlInputs {
         rates: &ControlRates,
         // limits: &FlightLimits,
     ) -> (f32, f32, f32, f32) {
-        let roll = rates.roll.apply(self.roll);
-        let pitch = rates.pitch.apply(self.pitch);
-        let yaw = rates.yaw.apply(self.yaw);
-        let throttle = rates.throttle.apply(self.throttle);
+        let roll = rates.roll.apply(self.state.roll);
+        let pitch = rates.pitch.apply(self.state.pitch);
+        let yaw = rates.yaw.apply(self.state.yaw);
+        let throttle = rates.throttle.apply(self.state.throttle);
 
         // let roll = limits.limit_roll_rate(roll);
         // let pitch = limits.limit_pitch_rate(pitch);
@@ -143,17 +179,40 @@ impl ControlInputs {
 /// set values
 impl ControlInputs {
     pub fn set_roll(&mut self, roll: f32) {
-        self.roll = roll.clamp(-1.0, 1.0);
+        self.state.roll = roll.clamp(-1.0, 1.0);
     }
     pub fn set_pitch(&mut self, pitch: f32) {
-        self.pitch = pitch.clamp(-1.0, 1.0);
+        self.state.pitch = pitch.clamp(-1.0, 1.0);
     }
     pub fn set_yaw(&mut self, yaw: f32) {
-        self.yaw = yaw.clamp(-1.0, 1.0);
-        // self.yaw = yaw % (2.0 * PI);
+        self.state.yaw = yaw.clamp(-1.0, 1.0);
+        // self.state.yaw = yaw % (2.0 * PI);
     }
     pub fn set_throttle(&mut self, throttle: f32) {
-        // self.throttle = throttle.clamp(-1.0, 1.0);
-        self.throttle = throttle.clamp(0.0, 1.0);
+        // self.state.throttle = throttle.clamp(-1.0, 1.0);
+        self.state.throttle = throttle.clamp(0.0, 1.0);
+    }
+}
+
+// impl Default for ControlInputs {
+//     fn default() -> Self {
+//         Self {
+//             state: ControlInputState::default(),
+//         }
+//     }
+// }
+
+impl Default for ControlInputState {
+    fn default() -> Self {
+        Self {
+            roll:         0.0,
+            pitch:        0.0,
+            yaw:          0.0,
+            throttle:     0.0,
+            takeoff:      false,
+            calibrate:    false,
+            motors_armed: false,
+            level_mode:   true,
+        }
     }
 }

@@ -79,5 +79,5 @@ nalgebra = { version = "0.30.1", default-features = false, features = [ "libm" ]
 # ahrs = { version = "0.5.0", default-features = false }
 
 biquad = "0.4.2"
-# signalo = "0.6.0"
+signalo = "0.6.0"
 

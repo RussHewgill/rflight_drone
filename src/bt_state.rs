@@ -130,29 +130,46 @@ where
                 if att.attr_handle.0 == input.input_char.0 + 1 {
                     // rprintln!("input update");
                     // rprintln!("data.len() = {:?}", data.len());
-                    if let Some(ci) = ControlInputs::deserialize(att.data()) {
-                        let mut out = false;
-                        /// arm or disarm motors if changed
-                        if !control_inputs.get_motors_armed() && ci.get_motors_armed() {
-                            motors.set_armed(
-                                ci.get_motors_armed(),
-                                &self.state,
-                                *control_inputs,
-                                quat,
-                            );
+
+                    let mut out = false;
+                    match control_inputs.update(att.data()) {
+                        Some(true) => {
+                            motors.set_armed(true, &self.state, *control_inputs, quat);
                             out = true;
-                        } else if control_inputs.get_motors_armed()
-                            && !ci.get_motors_armed()
-                        {
+                        }
+                        Some(false) => {
                             motors.set_disarmed();
                             out = true;
                         }
-                        /// set new inputs
-                        *control_inputs = ci;
-                        if out {
-                            return Some(out);
-                        }
+                        None => {}
                     }
+                    if out {
+                        return Some(out);
+                    }
+
+                    // if let Some(ci) = ControlInputs::deserialize(att.data()) {
+                    //     let mut out = false;
+                    //     /// arm or disarm motors if changed
+                    //     if !control_inputs.get_motors_armed() && ci.get_motors_armed() {
+                    //         motors.set_armed(
+                    //             ci.get_motors_armed(),
+                    //             &self.state,
+                    //             *control_inputs,
+                    //             quat,
+                    //         );
+                    //         out = true;
+                    //     } else if control_inputs.get_motors_armed()
+                    //         && !ci.get_motors_armed()
+                    //     {
+                    //         motors.set_disarmed();
+                    //         out = true;
+                    //     }
+                    //     /// set new inputs
+                    //     *control_inputs = ci;
+                    //     if out {
+                    //         return Some(out);
+                    //     }
+                    // }
                 }
 
                 if att.attr_handle.0 == input.input_pid_cfg_char.0 + 1 {

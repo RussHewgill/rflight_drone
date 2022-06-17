@@ -321,7 +321,7 @@ mod app {
             leds: init_struct.leds,
             motors: init_struct.motors,
             motor_outputs: MotorOutputs::default(),
-            inputs: ControlInputs::default(),
+            inputs: ControlInputs::new(),
             controller,
             dbg_gyro: false,
         };
