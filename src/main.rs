@@ -610,8 +610,9 @@ mod app {
 
         // (flight_data, sens_data, bt, exti, controller, motors).lock(
         //     |fd, sd, bt, exti, controller, motors| {
-        (flight_data, sens_data, bt, exti, controller, motors, ahrs).lock(
-            |fd, sd, bt, exti, controller, motors, ahrs| {
+        // (flight_data, sens_data, bt, exti, controller, motors, ahrs).lock(
+        (flight_data, sens_data, bt, controller, motors, ahrs).lock(
+            |fd, sd, bt, controller, motors, ahrs| {
                 /// Write data to Bluetooth
 
                 // rprintln!("sending quat");
@@ -652,7 +653,7 @@ mod app {
                 cx.shared.adc.lock(|adc| {
                     if adc.battery_warning(
                         bt,
-                        exti,
+                        // exti,
                         cx.local.batt_warn,
                         motors.is_armed(),
                         send_bt,
@@ -662,26 +663,26 @@ mod app {
                     }
                 });
 
-                // let gyro0 = sd.imu_gyro.read_and_reset();
-                // // let acc0 = sd.imu_acc.read_and_reset();
-                // // let mag0 = sd.magnetometer.read_and_reset();
+                let gyro0 = sd.imu_gyro.read_and_reset();
+                // let acc0 = sd.imu_acc.read_and_reset();
+                // let mag0 = sd.magnetometer.read_and_reset();
 
-                let alt = ahrs.altitude.get_altitude();
-                let alt = alt * 100.0;
-                let gyro0 = V3::new(alt, alt, 0.0);
+                // let alt = ahrs.altitude.get_altitude();
+                // let alt = alt * 100.0;
+                // let gyro0 = V3::new(alt, alt, 0.0);
 
                 // bt.pause_interrupt(exti);
                 // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                 bt.log_write_sens_gyro(gyro0).unwrap();
                 // bt.unpause_interrupt(exti);
 
-                // let pids = [IdPID::PitchRate];
-                // // let pids = [IdPID::YawRate];
-                // for id in pids {
-                //     bt.pause_interrupt(exti);
-                //     bt.log_write_pid(id, &controller[id]).unwrap();
-                //     bt.unpause_interrupt(exti);
-                // }
+                let pids = [IdPID::PitchRate];
+                // let pids = [IdPID::YawRate];
+                for id in pids {
+                    // bt.pause_interrupt(exti);
+                    bt.log_write_pid(id, &controller[id]).unwrap();
+                    // bt.unpause_interrupt(exti);
+                }
 
                 // unimplemented!()
             },
@@ -816,29 +817,42 @@ mod app {
     fn bt_irq(mut cx: bt_irq::Context) {
         (
             cx.shared.bt,
-            cx.shared.exti,
+            // cx.shared.exti,
             cx.shared.controller,
             cx.shared.motors,
             cx.shared.inputs,
             cx.shared.adc,
             cx.shared.flight_data,
         )
-            .lock(|bt, exti, controller, motors, inputs, adc, fd| {
-                rprintln!("bt_irq");
+            // .lock(|bt, exti, controller, motors, inputs, adc, fd| {
+            .lock(|bt, controller, motors, inputs, adc, fd| {
+                // rprintln!("bt_irq");
 
-                bt.clear_interrupt();
-                bt.pause_interrupt(exti);
+                // bt.clear_interrupt();
+                // bt.pause_interrupt(exti);
+
+                if !bt.data_ready().unwrap() {
+                    bt.clear_interrupt();
+                    rprintln!("bt_irq: no interrupt");
+                    return;
+                }
 
                 loop {
                     let event: BTEvent = match bt._read_event() {
                         Ok(ev) => {
-                            rprintln!("ev = {:?}", ev);
+                            // rprintln!("ev = {:?}", ev);
+                            bt.clear_interrupt();
                             ev
                         }
                         Err(e) => {
                             rprintln!("read event error = {:?}", e);
                             // unimplemented!()
-                            bt.unpause_interrupt(exti);
+
+                            // if bt.data_ready().unwrap() {
+                            //     bt.set_pending();
+                            // }
+
+                            // bt.unpause_interrupt(exti);
                             return;
                         }
                     };
@@ -921,7 +935,7 @@ mod app {
                     }
                 }
 
-                bt.unpause_interrupt(exti);
+                // bt.unpause_interrupt(exti);
                 // rprintln!("bt_irq done");
             });
     }

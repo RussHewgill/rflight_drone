@@ -216,6 +216,10 @@ where
     CS: OutputPin<Error = GpioError>,
     Reset: OutputPin<Error = GpioError>,
 {
+    pub fn set_pending(&mut self) {
+        cortex_m::peripheral::NVIC::pend(self.input.interrupt());
+    }
+
     pub fn unpend(&mut self) {
         cortex_m::peripheral::NVIC::unpend(self.input.interrupt());
     }

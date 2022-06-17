@@ -727,6 +727,46 @@ where
     }
 }
 
+/// print filtered
+impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
+where
+    CS: OutputPin<Error = GpioError>,
+    Reset: OutputPin<Error = GpioError>,
+    Input: InputPin<Error = GpioError>,
+    GpioError: core::fmt::Debug,
+{
+    pub fn print_event_filtered(event: bluetooth_hci_defmt::Event<BlueNRGEvent>) {
+        match event {
+            Event::ConnectionComplete(params) => {}
+            Event::CommandComplete(ref params) => {
+                if params.num_hci_command_packets == 0 {
+                    rprintln!("controller required halting packets");
+                }
+                match &params.return_params {
+                    ReturnParameters::Vendor(
+                        VReturnParameters::GattUpdateLongCharacteristicValue(status),
+                    ) => {
+                        if *status != bluetooth_hci_defmt::Status::Success {
+                            rprintln!("status 0 = {:?}", status);
+                        } else {
+                            // rprintln!("status 1 = {:?}", status);
+                        }
+                    }
+                    ReturnParameters::Vendor(vparams) => {
+                        unimplemented!()
+                    }
+                    _ => {
+                        rprintln!("print_event_filtered: other params: {:?}", event);
+                    }
+                }
+            }
+            _ => {
+                rprintln!("print_event_filtered unhandled: {:?}", event);
+            }
+        }
+    }
+}
+
 /// Specific events
 impl<CS, Reset, Input, GpioError> BluetoothSpi<CS, Reset, Input>
 where

@@ -22,7 +22,7 @@ impl BatteryAdc {
     pub fn battery_warning(
         &mut self,
         bt: &mut BTController,
-        exti: &mut EXTI,
+        // exti: &mut EXTI,
         warn_counter: &mut u32,
         armed: bool,
         send_bt: bool,
