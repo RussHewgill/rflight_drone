@@ -643,6 +643,7 @@ mod app {
                 /// send battery voltage
                 let send_bt = if *cx.local.batt_counter >= BATT_TIMES {
                     *cx.local.batt_counter = 0;
+                    // rprintln!("sending battery");
                     true
                 } else {
                     *cx.local.batt_counter += 1;
@@ -651,6 +652,7 @@ mod app {
 
                 /// check battery levels, disarm if below threshold
                 cx.shared.adc.lock(|adc| {
+                    // rprintln!("checking battery, sending = {}", send_bt);
                     if adc.battery_warning(
                         bt,
                         // exti,
