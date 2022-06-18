@@ -4,15 +4,24 @@ use defmt::{println as rprintln, Format};
 
 use biquad::*;
 
+use signalo::filters::convolve::{
+    savitzky_golay::SavitzkyGolay, Config as ConvolveConfig, Convolve,
+};
+use signalo::filters::mean::mean::Mean;
+use signalo::traits::{Filter, WithConfig};
+
 use crate::{math::rad_to_deg, motors::MotorsPWM};
 
 use super::{ControlRates, FlightLimits};
 
 /// Received from remote control
-#[derive(Clone, Copy, Format)]
+#[derive(Clone)]
 pub struct ControlInputs {
     state: ControlInputState,
     // lowpass_pitch: DirectForm2Transposed<f32>,
+    // filter_roll:  Convolve<f32, 3>,
+    // filter_pitch: Convolve<f32, 3>,
+    // filter_yaw:   Convolve<f32, 3>,
 }
 
 /// Instantaneous input settings
@@ -50,6 +59,9 @@ impl ControlInputs {
         Self {
             state: ControlInputState::default(),
             // lowpass_pitch,
+            // filter_roll:  Convolve::savitzky_golay(),
+            // filter_pitch: Convolve::savitzky_golay(),
+            // filter_yaw:   Convolve::savitzky_golay(),
         }
     }
 }
@@ -67,14 +79,24 @@ impl ControlInputs {
     }
 }
 
+/// update
 impl ControlInputs {
     pub fn update(&mut self, data: &[u8]) -> Option<bool> {
-        let input = if let Some(input) = ControlInputState::deserialize(data) {
+        let mut input = if let Some(input) = ControlInputState::deserialize(data) {
             input
         } else {
             rprintln!("ControlInputs update: failed deserialize");
+            // let mut input = self.state;
+            // input.roll = self.filter_roll.filter(input.roll);
+            // input.pitch = self.filter_pitch.filter(input.pitch);
+            // input.yaw = self.filter_yaw.filter(input.yaw);
+            // self.state = input;
             return None;
         };
+
+        // input.roll = self.filter_roll.filter(input.roll);
+        // input.pitch = self.filter_pitch.filter(input.pitch);
+        // input.yaw = self.filter_yaw.filter(input.yaw);
 
         self.state = input;
 

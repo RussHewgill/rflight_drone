@@ -3,9 +3,15 @@
 use biquad::*;
 use nalgebra::{self as na};
 
+// use signalo::filters::mean::mean::Mean;
+use signalo::filters::convolve::{
+    savitzky_golay::SavitzkyGolay, Config as ConvolveConfig, Convolve,
+};
+use signalo::traits::{Filter, WithConfig};
+
 use defmt::{println as rprintln, Format};
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PID {
     kp: f32,
     ki: f32,
@@ -24,11 +30,14 @@ pub struct PID {
 
     integral:   f32,
     prev_input: Option<f32>,
+    prev_error: Option<f32>,
 
     pub prev_output: PIDOutput,
 
     deriv_lowpass: Option<DirectForm2Transposed<f32>>,
 
+    // deriv_filter:  Mean<f32, 3>,
+    // deriv_filter:  Convolve<f32, 5>,
     setpoint: f32,
 }
 
@@ -39,12 +48,6 @@ pub struct PIDOutput {
     pub d:      f32,
     pub output: f32,
 }
-
-// impl Default for PID {
-//     fn default() -> Self {
-//         Self::new(0.0, 0.0, 0.0)
-//     }
-// }
 
 /// new
 impl PID {
@@ -79,11 +82,13 @@ impl PID {
 
             integral: 0.0,
             prev_input: None,
+            prev_error: None,
 
             prev_output: PIDOutput::default(),
 
             deriv_lowpass: None,
-
+            // deriv_filter: Mean::default(),
+            // deriv_filter: Convolve::savitzky_golay(),
             setpoint: 0.0,
         }
     }
@@ -157,15 +162,20 @@ impl PID {
 
         let d_filtered = if let Some(lowpass) = self.deriv_lowpass.as_mut() {
             lowpass.run(d_unbounded)
+            // self.deriv_filter.filter(d_unbounded)
         } else {
             d_unbounded
         };
+
+        // let d_filtered = self.deriv_filter.filter(d_unbounded);
+        // let d_filtered = d_unbounded;
 
         let d = Self::apply_limit(self.d_limit, d_filtered);
 
         let output = p + self.integral + d;
         let output = Self::apply_limit(self.output_limit, output);
 
+        self.prev_error = Some(error);
         self.prev_input = Some(input);
         let out = PIDOutput {
             p,

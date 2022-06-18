@@ -116,7 +116,7 @@ impl MotorsPWM {
 impl MotorsPWM {
     pub fn motor_arming_check(
         bt: &BTState,
-        inputs: ControlInputs,
+        inputs: &ControlInputs,
         quat: UQuat,
         //
     ) -> bool {
@@ -165,7 +165,7 @@ impl MotorsPWM {
         &mut self,
         armed: bool,
         bt: &BTState,
-        inputs: ControlInputs,
+        inputs: &ControlInputs,
         quat: UQuat,
     ) {
         if Self::motor_arming_check(bt, inputs, quat) {

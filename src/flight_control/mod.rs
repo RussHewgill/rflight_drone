@@ -54,8 +54,7 @@ impl IdPID {
     }
 }
 
-/// size: each PID is 60 bytes
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct DroneController {
     /// Roll
     pub pid_roll_stab:     PID,
@@ -106,6 +105,8 @@ impl DroneController {
         pid_pitch_rate.set_param(PIDParam::Kp, 0.000_06);
         pid_pitch_rate.set_param(PIDParam::Ki, 0.000_185);
         pid_pitch_rate.set_param(PIDParam::Kd, 0.000_004_9);
+
+        pid_pitch_rate.set_param(PIDParam::KdLimit, 0.001);
 
         pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
 
@@ -258,7 +259,7 @@ impl DroneController {
     /// +yaw   = nose right
     pub fn update(
         &mut self,
-        inputs: ControlInputs,
+        inputs: &ControlInputs,
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
@@ -279,7 +280,7 @@ impl DroneController {
 impl DroneController {
     pub fn update_level_mode(
         &mut self,
-        inputs: ControlInputs,
+        inputs: &ControlInputs,
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
@@ -365,7 +366,7 @@ impl DroneController {
 impl DroneController {
     pub fn update_acro_mode(
         &mut self,
-        inputs: ControlInputs,
+        inputs: &ControlInputs,
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {

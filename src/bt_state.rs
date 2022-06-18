@@ -134,7 +134,7 @@ where
                     let mut out = false;
                     match control_inputs.update(att.data()) {
                         Some(true) => {
-                            motors.set_armed(true, &self.state, *control_inputs, quat);
+                            motors.set_armed(true, &self.state, control_inputs, quat);
                             out = true;
                         }
                         Some(false) => {

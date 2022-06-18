@@ -533,7 +533,7 @@ mod app {
                     /// update PIDs
                     /// XXX: use offset adjusted gyro?
                     // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
-                    let motor_outputs = controller.update(*inputs, &fd.quat, gyro2);
+                    let motor_outputs = controller.update(inputs, &fd.quat, gyro2);
 
                     /// apply mixed PID outputs to motors
                     motor_outputs.apply(motors);
@@ -826,14 +826,14 @@ mod app {
         )
             // .lock(|bt, exti, controller, motors, inputs, adc, fd| {
             .lock(|bt, controller, motors, inputs, adc, fd| {
-                rprintln!("bt_irq");
+                // rprintln!("bt_irq");
 
                 // bt.clear_interrupt();
                 // bt.pause_interrupt(exti);
 
                 if !bt.data_ready().unwrap() {
                     bt.clear_interrupt();
-                    rprintln!("bt_irq: no interrupt");
+                    // rprintln!("bt_irq: no interrupt");
                     return;
                 }
 
@@ -941,7 +941,7 @@ mod app {
                 }
 
                 // bt.unpause_interrupt(exti);
-                rprintln!("bt_irq done");
+                // rprintln!("bt_irq done");
             });
     }
 
