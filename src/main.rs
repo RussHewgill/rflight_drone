@@ -535,6 +535,8 @@ mod app {
                     // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
                     let motor_outputs = controller.update(inputs, &fd.quat, gyro2);
 
+                    rprintln!("kd = {:?}", controller.pid_pitch_rate.prev_output.d);
+
                     /// apply mixed PID outputs to motors
                     motor_outputs.apply(motors);
 
@@ -596,7 +598,8 @@ mod app {
             .tim9
             .clear_interrupt(stm32f4xx_hal::timer::Event::Update);
 
-        const BATT_TIMES: u32 = 20; // 10 hz => 1 hz
+        // const BATT_TIMES: u32 = 20;
+        const BATT_TIMES: u32 = 10;
 
         let flight_data = cx.shared.flight_data;
         let sens_data = cx.shared.sens_data;

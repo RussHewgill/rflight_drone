@@ -7,6 +7,43 @@ from scipy import linalg, optimize
 import math
 from scipy.io import wavfile
 
+def plot_dterm(path):
+    ds = np.empty([0])
+
+    names = ["D"]
+
+    with open("".join(["../rflight_drone/logs/", path])) as csv_file:
+        csv_reader = csv.DictReader(csv_file, fieldnames=names)
+        for row in csv_reader:
+            try:
+                d = float(row["D"])
+                ds = np.append(ds, d)
+            except:
+                pass
+
+    plt.subplot(211)
+    ax = plt.gca()
+
+    ax.xaxis.set_visible(False)
+
+    plt.plot(ds)
+
+    samplingFrequency = 3330
+
+    plt.subplot(212)
+    powerSpectrum, freqenciesFound, time, imageAxis = plt.specgram(
+        ds, Fs=samplingFrequency, NFFT=256
+    )
+    ax = plt.gca()
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Frequency')
+
+    plt.show()
+
+# plot_dterm("d_term01.log")
+# plot_dterm("d_term02.log")
+plot_dterm("d_term03.log")
+
 def read_csv(path):
     xs = np.empty([0])
     ys = np.empty([0])
@@ -252,5 +289,5 @@ def main():
     # path = "gyro05_off.log"
     # plot_allen(path)
 
-main()
+# main()
 

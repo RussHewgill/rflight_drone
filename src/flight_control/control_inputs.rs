@@ -42,6 +42,7 @@ pub struct ControlInputState {
     level_mode:   bool,
 }
 
+/// new
 impl ControlInputs {
     pub fn new() -> Self {
         // let sampling_freq =
@@ -63,19 +64,6 @@ impl ControlInputs {
             // filter_pitch: Convolve::savitzky_golay(),
             // filter_yaw:   Convolve::savitzky_golay(),
         }
-    }
-}
-
-/// get, set
-impl ControlInputs {
-    pub fn set_motors_armed(&mut self, armed: bool) {
-        self.state.motors_armed = armed;
-    }
-    pub fn get_motors_armed(&self) -> bool {
-        self.state.motors_armed
-    }
-    pub fn get_level_mode(&self) -> bool {
-        self.state.level_mode
     }
 }
 
@@ -104,7 +92,11 @@ impl ControlInputs {
         self.state.pitch = input.pitch;
         self.state.yaw = input.yaw;
         self.state.throttle = input.throttle;
-        self.state.level_mode = input.level_mode;
+
+        if self.state.level_mode != input.level_mode {
+            rprintln!("setting level_mode = {:?}", input.level_mode);
+            self.state.level_mode = input.level_mode;
+        }
 
         if !self.get_motors_armed() && input.motors_armed {
             return Some(true);
@@ -170,6 +162,12 @@ impl ControlInputs {
     pub fn get_raw_throttle(&self) -> f32 {
         self.state.throttle
     }
+    pub fn get_motors_armed(&self) -> bool {
+        self.state.motors_armed
+    }
+    pub fn get_level_mode(&self) -> bool {
+        self.state.level_mode
+    }
 
     pub fn get_values(
         &self,
@@ -206,6 +204,9 @@ impl ControlInputs {
 
 /// set values
 impl ControlInputs {
+    pub fn set_motors_armed(&mut self, armed: bool) {
+        self.state.motors_armed = armed;
+    }
     pub fn set_roll(&mut self, roll: f32) {
         self.state.roll = roll.clamp(-1.0, 1.0);
     }
