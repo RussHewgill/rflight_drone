@@ -51,7 +51,7 @@ impl MotorsPWM {
     // /// from ST firmware, probably not very accurate
     // pub const MOTOR_MIN_THROTTLE: f32 = 200.0;
 
-    pub const MOTOR_MIN_THROTTLE: f32 = 0.02;
+    pub const MOTOR_MIN_THROTTLE: f32 = 0.04;
 
     /// 0.23 is nearly enough to take off
     pub const MOTOR_MAX_THROTTLE: f32 = 1.0;
@@ -167,10 +167,14 @@ impl MotorsPWM {
         bt: &BTState,
         inputs: &ControlInputs,
         quat: UQuat,
-    ) {
+    ) -> bool {
         if Self::motor_arming_check(bt, inputs, quat) {
-            self.set_armed_unchecked(armed)
+            rprintln!("MotorsPWM: set_armed success");
+            self.set_armed_unchecked(armed);
+            true
         } else {
+            rprintln!("MotorsPWM: set_armed failed");
+            false
         }
     }
 

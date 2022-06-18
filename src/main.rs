@@ -679,6 +679,7 @@ mod app {
                 // bt.unpause_interrupt(exti);
 
                 let pids = [IdPID::PitchRate];
+                // let pids = [IdPID::PitchStab];
                 // let pids = [IdPID::YawRate];
                 for id in pids {
                     // bt.pause_interrupt(exti);
@@ -835,7 +836,7 @@ mod app {
 
                 if !bt.data_ready().unwrap() {
                     bt.clear_interrupt();
-                    // rprintln!("bt_irq: no interrupt");
+                    rprintln!("bt_irq: no interrupt");
                     return;
                 }
 

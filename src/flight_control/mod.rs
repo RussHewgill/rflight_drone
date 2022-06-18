@@ -106,9 +106,10 @@ impl DroneController {
         pid_pitch_rate.set_param(PIDParam::Ki, 0.000_185);
         pid_pitch_rate.set_param(PIDParam::Kd, 0.000_004_9);
 
+        pid_pitch_rate.set_param(PIDParam::KiLimit, 0.2);
         pid_pitch_rate.set_param(PIDParam::KdLimit, 0.001);
 
-        pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
+        // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
 
         pid_roll_rate.set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
         pid_pitch_rate.set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
@@ -263,14 +264,14 @@ impl DroneController {
         ahrs_quat: &UQuat,
         gyro: V3,
     ) -> MotorOutputs {
-        // if inputs.get_level_mode() {
-        //     self.update_level_mode(inputs, ahrs_quat, gyro)
-        // } else {
-        //     self.update_acro_mode(inputs, ahrs_quat, gyro)
-        // }
+        if inputs.get_level_mode() {
+            self.update_level_mode(inputs, ahrs_quat, gyro)
+        } else {
+            self.update_acro_mode(inputs, ahrs_quat, gyro)
+        }
 
-        defmt::warn!("overriding level mode, using acro mode");
-        self.update_acro_mode(inputs, ahrs_quat, gyro)
+        // defmt::warn!("overriding level mode, using acro mode");
+        // self.update_acro_mode(inputs, ahrs_quat, gyro)
 
         //
     }

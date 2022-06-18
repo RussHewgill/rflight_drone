@@ -98,7 +98,13 @@ impl ControlInputs {
         // input.pitch = self.filter_pitch.filter(input.pitch);
         // input.yaw = self.filter_yaw.filter(input.yaw);
 
-        self.state = input;
+        // self.state = input;
+
+        self.state.roll = input.roll;
+        self.state.pitch = input.pitch;
+        self.state.yaw = input.yaw;
+        self.state.throttle = input.throttle;
+        self.state.level_mode = input.level_mode;
 
         if !self.get_motors_armed() && input.motors_armed {
             return Some(true);

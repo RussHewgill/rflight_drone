@@ -134,11 +134,16 @@ where
                     let mut out = false;
                     match control_inputs.update(att.data()) {
                         Some(true) => {
-                            motors.set_armed(true, &self.state, control_inputs, quat);
+                            rprintln!("Setting motors armed");
+                            if motors.set_armed(true, &self.state, control_inputs, quat) {
+                                control_inputs.set_motors_armed(true);
+                            }
                             out = true;
                         }
                         Some(false) => {
+                            rprintln!("Setting motors disarmed");
                             motors.set_disarmed();
+                            control_inputs.set_motors_armed(false);
                             out = true;
                         }
                         None => {}
