@@ -836,7 +836,7 @@ mod app {
 
                 if !bt.data_ready().unwrap() {
                     bt.clear_interrupt();
-                    rprintln!("bt_irq: no interrupt");
+                    // rprintln!("bt_irq: no interrupt");
                     return;
                 }
 

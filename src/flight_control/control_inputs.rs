@@ -108,7 +108,7 @@ impl ControlInputs {
 
         if !self.get_motors_armed() && input.motors_armed {
             return Some(true);
-        } else if !input.motors_armed {
+        } else if self.get_motors_armed() && !input.motors_armed {
             return Some(false);
         }
         None
