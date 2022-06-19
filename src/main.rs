@@ -285,16 +285,6 @@ mod app {
         tim9.start(MAIN_LOOP_FREQ).unwrap();
         tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // let x0 = ahrs.altitude.update_avg(1.0);
-        // let x1 = ahrs.altitude.update_avg(1.0);
-        // let x2 = ahrs.altitude.update_avg(1.0);
-        // // let x3 = ahrs.altitude.update_avg(1.0);
-
-        // rprintln!("x0 = {:?}", x0);
-        // rprintln!("x1 = {:?}", x1);
-        // rprintln!("x2 = {:?}", x2);
-        // // rprintln!("x3 = {:?}", x3);
-
         // let bt_period = 200.Hz();
         // /// start bt_test timer
         // tim9.start(bt_period).unwrap();
@@ -305,8 +295,6 @@ mod app {
 
         // let v = init_struct.adc.sample_avg(5);
         // rprintln!("Battery/5 = {:?} V", v);
-
-        // controller.pid_pitch_rate.kp = 0.005;
 
         let shared = Shared {
             dwt,
@@ -448,9 +436,9 @@ mod app {
                 //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
                 // }
 
-                // TODO: read baro
-                let (pressure_rdy, temp_rdy) =
-                    cx.local.sensors.read_data_baro(sd, filters);
+                // // TODO: read baro
+                // let (pressure_rdy, temp_rdy) =
+                //     cx.local.sensors.read_data_baro(sd, filters);
 
                 // rprintln!("pressure, temp = {:?}, {:?}", pressure_rdy, temp_rdy);
                 // let pressure = sd.baro_pressure.read_and_reset();
@@ -535,7 +523,7 @@ mod app {
                     // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
                     let motor_outputs = controller.update(inputs, &fd.quat, gyro2);
 
-                    rprintln!("kd = {:?}", controller.pid_pitch_rate.prev_output.d);
+                    // rprintln!("kd = {:?}", controller.pid_pitch_rate.prev_output.d);
 
                     /// apply mixed PID outputs to motors
                     motor_outputs.apply(motors);
@@ -611,19 +599,12 @@ mod app {
 
         let ahrs = cx.shared.ahrs;
 
-        // (flight_data, sens_data, bt, exti, controller, motors).lock(
-        //     |fd, sd, bt, exti, controller, motors| {
-        // (flight_data, sens_data, bt, exti, controller, motors, ahrs).lock(
         (flight_data, sens_data, bt, controller, motors, ahrs).lock(
             |fd, sd, bt, controller, motors, ahrs| {
                 /// Write data to Bluetooth
 
-                // rprintln!("sending quat");
-
                 /// send orientation
-                // bt.pause_interrupt(exti);
                 bt.log_write_quat(&fd.quat).unwrap();
-                // bt.unpause_interrupt(exti);
 
                 // /// send battery voltage
                 // if *cx.local.batt_counter >= BATT_TIMES {
@@ -658,7 +639,6 @@ mod app {
                     // rprintln!("checking battery, sending = {}", send_bt);
                     if adc.battery_warning(
                         bt,
-                        // exti,
                         cx.local.batt_warn,
                         motors.is_armed(),
                         send_bt,
@@ -668,26 +648,23 @@ mod app {
                     }
                 });
 
-                let gyro0 = sd.imu_gyro.read_and_reset();
-                // let acc0 = sd.imu_acc.read_and_reset();
-                // let mag0 = sd.magnetometer.read_and_reset();
-
                 // let alt = ahrs.altitude.get_altitude();
                 // let alt = alt * 100.0;
                 // let gyro0 = V3::new(alt, alt, 0.0);
 
-                // bt.pause_interrupt(exti);
-                // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                bt.log_write_sens_gyro(gyro0).unwrap();
-                // bt.unpause_interrupt(exti);
+                // let gyro0 = sd.imu_gyro.read_and_reset();
+                // // let acc0 = sd.imu_acc.read_and_reset();
+                // // let mag0 = sd.magnetometer.read_and_reset();
 
-                let pids = [IdPID::PitchRate];
+                // // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                // bt.log_write_sens_gyro(gyro0).unwrap();
+
+                // let pids = [IdPID::PitchRate];
                 // let pids = [IdPID::PitchStab];
+                let pids = [IdPID::PitchRate, IdPID::PitchStab];
                 // let pids = [IdPID::YawRate];
                 for id in pids {
-                    // bt.pause_interrupt(exti);
                     bt.log_write_pid(id, &controller[id]).unwrap();
-                    // bt.unpause_interrupt(exti);
                 }
 
                 // unimplemented!()

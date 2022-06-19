@@ -42,7 +42,7 @@ def plot_dterm(path):
 
 # plot_dterm("d_term01.log")
 # plot_dterm("d_term02.log")
-plot_dterm("d_term03.log")
+# plot_dterm("d_term03.log")
 
 def read_csv(path):
     xs = np.empty([0])
@@ -273,7 +273,7 @@ def main():
     # path = "yaw_03_builtin_verynarrow.log"
     # path = "pitch_02_unfiltered.log"
     # path = "pitch_02_builtin_verynarrow.log"
-    path = "pitch_03.log"
+    path = "pitch_04.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1], 'x')
@@ -289,5 +289,5 @@ def main():
     # path = "gyro05_off.log"
     # plot_allen(path)
 
-# main()
+main()
 

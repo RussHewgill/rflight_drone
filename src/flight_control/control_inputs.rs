@@ -169,7 +169,36 @@ impl ControlInputs {
         self.state.level_mode
     }
 
-    pub fn get_values(
+    // pub fn get_values(
+    //     &self,
+    //     rates: &ControlRates,
+    //     // limits: &FlightLimits,
+    // ) -> (f32, f32, f32, f32) {
+    //     if self.get_level_mode() {
+    //         self.get_values_level(rates)
+    //     } else {
+    //         self.get_values_acro(rates)
+    //     }
+    // }
+
+    /// returns values in degrees away from level (roll, pitch)
+    /// deg/sec for yaw
+    pub fn get_values_level(
+        &self,
+        rates: &ControlRates,
+        limits: &FlightLimits,
+    ) -> (f32, f32, f32, f32) {
+        let roll = limits.get_roll_angle(self.state.roll);
+        let pitch = limits.get_pitch_angle(self.state.pitch);
+
+        let yaw = rates.yaw.apply(self.state.yaw);
+        let throttle = rates.throttle.apply(self.state.throttle);
+
+        (roll, pitch, yaw, throttle)
+    }
+
+    /// returns values in deg/sec
+    pub fn get_values_acro(
         &self,
         rates: &ControlRates,
         // limits: &FlightLimits,

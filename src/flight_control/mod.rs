@@ -116,43 +116,6 @@ impl DroneController {
         pid_yaw_rate.set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
 
         #[cfg(feature = "nope")]
-        /// starting point
-        {
-            //
-
-            // pid_roll_rate.kp = 1.0;
-            // pid_roll_rate.ki = 0.0;
-            // pid_roll_rate.kd = 0.0;
-            // pid_roll_rate.i_limit = 0.0;
-
-            // pid_roll_stab.kp = 1.0;
-            // pid_roll_stab.ki = 0.0;
-            // pid_roll_stab.kd = 0.0;
-            // pid_roll_stab.i_limit = 0.0;
-
-            // pid_pitch_rate.kp = 0.1;
-            // pid_pitch_stab.kp = 0.1;
-
-            // pid_pitch_stab.kp = 0.001579; // kp1
-            // pid_pitch_stab.i_limit = 0.001053; // XXX: ST firmware says this is 5 degrees ??
-
-            // pid_pitch_rate.kp = 0.04211; // kp2
-            // pid_pitch_rate.ki = 0.04211; // ki2
-            // pid_pitch_rate.kd = 0.005263; // kd2
-            // pid_pitch_rate.i_limit = 0.01053;
-
-            // pid_yaw_rate.kp = 1.0;
-
-            // pid_yaw_stab.kp = 1.0;
-
-            // /// PID and roll should be the same
-            // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
-            // pid_roll_stab.copy_settings_to(&mut pid_pitch_stab);
-
-            //
-        }
-
-        #[cfg(feature = "nope")]
         /// ST values, divided by 1900 (from PWM)
         /// too low
         {
@@ -266,14 +229,14 @@ impl DroneController {
     ) -> MotorOutputs {
         //
 
-        // if inputs.get_level_mode() {
-        //     self.update_level_mode(inputs, ahrs_quat, gyro)
-        // } else {
-        //     self.update_acro_mode(inputs, ahrs_quat, gyro)
-        // }
+        if inputs.get_level_mode() {
+            self.update_level_mode(inputs, ahrs_quat, gyro)
+        } else {
+            self.update_acro_mode(inputs, ahrs_quat, gyro)
+        }
 
-        defmt::warn!("overriding level mode, using acro mode");
-        self.update_acro_mode(inputs, ahrs_quat, gyro)
+        // defmt::warn!("overriding level mode, using acro mode");
+        // self.update_acro_mode(inputs, ahrs_quat, gyro)
 
         //
     }
@@ -296,7 +259,10 @@ impl DroneController {
             rad_to_deg(ahrs_yaw),
         );
 
-        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values(&self.rates);
+        let (i_roll, i_pitch, i_yaw, i_throttle) =
+            inputs.get_values_level(&self.rates, &self.limits);
+
+        // rprintln!("i_pitch = {:?}", i_pitch);
 
         // /// XXX: testing PID
         // let i_pitch = 15.0;
@@ -382,7 +348,7 @@ impl DroneController {
             rad_to_deg(ahrs_yaw),
         );
 
-        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values(&self.rates);
+        let (i_roll, i_pitch, i_yaw, i_throttle) = inputs.get_values_acro(&self.rates);
 
         // rprintln!("i_pitch = {:?}", i_pitch);
 
@@ -524,43 +490,6 @@ impl core::ops::IndexMut<IdPID> for DroneController {
             AltitudeStab => &mut self.pid_altitude_stab,
             AltitudeRate => &mut self.pid_altitude_rate,
         }
-    }
-}
-
-#[derive(Clone, Copy, Format)]
-pub struct FlightLimits {
-    pub max_pitch: f32,
-    pub max_roll:  f32,
-
-    pub max_rate_roll:  f32,
-    pub max_rate_pitch: f32,
-    pub max_rate_yaw:   f32,
-}
-
-impl Default for FlightLimits {
-    fn default() -> Self {
-        Self {
-            max_pitch: 60.0,
-            max_roll:  60.0,
-
-            max_rate_roll:  180.0,
-            max_rate_pitch: 180.0,
-            // max_rate_pitch: 250.0,
-            // max_rate_roll: 250.0,
-            max_rate_yaw:   270.0,
-        }
-    }
-}
-
-impl FlightLimits {
-    pub fn limit_roll_rate(&self, roll: f32) -> f32 {
-        roll.clamp(-self.max_rate_roll, self.max_rate_roll)
-    }
-    pub fn limit_pitch_rate(&self, pitch: f32) -> f32 {
-        pitch.clamp(-self.max_rate_pitch, self.max_rate_pitch)
-    }
-    pub fn limit_yaw_rate(&self, yaw: f32) -> f32 {
-        yaw.clamp(-self.max_rate_yaw, self.max_rate_yaw)
     }
 }
 

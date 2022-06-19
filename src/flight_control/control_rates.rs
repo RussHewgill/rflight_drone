@@ -71,3 +71,53 @@ impl ControlRateThrottle {
         input
     }
 }
+
+#[derive(Clone, Copy, Format)]
+pub struct FlightLimits {
+    pub max_pitch: f32,
+    pub max_roll:  f32,
+
+    pub max_rate_roll:  f32,
+    pub max_rate_pitch: f32,
+    pub max_rate_yaw:   f32,
+}
+
+impl Default for FlightLimits {
+    fn default() -> Self {
+        Self {
+            max_pitch: 60.0,
+            max_roll:  60.0,
+
+            max_rate_roll:  180.0,
+            max_rate_pitch: 180.0,
+            // max_rate_pitch: 250.0,
+            // max_rate_roll: 250.0,
+            max_rate_yaw:   270.0,
+        }
+    }
+}
+
+impl FlightLimits {
+    pub fn get_roll_angle(&self, input: f32) -> f32 {
+        // debug_assert!(input >= -1.0);
+        // debug_assert!(input <= 1.0);
+        (input * self.max_roll).clamp(-self.max_roll, self.max_roll)
+    }
+    pub fn get_pitch_angle(&self, input: f32) -> f32 {
+        // debug_assert!(input >= -1.0);
+        // debug_assert!(input <= 1.0);
+        (input * self.max_pitch).clamp(-self.max_pitch, self.max_pitch)
+    }
+}
+
+impl FlightLimits {
+    pub fn limit_roll_rate(&self, roll: f32) -> f32 {
+        roll.clamp(-self.max_rate_roll, self.max_rate_roll)
+    }
+    pub fn limit_pitch_rate(&self, pitch: f32) -> f32 {
+        pitch.clamp(-self.max_rate_pitch, self.max_rate_pitch)
+    }
+    pub fn limit_yaw_rate(&self, yaw: f32) -> f32 {
+        yaw.clamp(-self.max_rate_yaw, self.max_rate_yaw)
+    }
+}
