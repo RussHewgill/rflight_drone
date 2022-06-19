@@ -159,7 +159,7 @@ mod app {
         flight_data:   FlightData,
         sens_filters:  SensorFilters,
         bt:            BTController,
-        tim9_flag:     bool,
+        // tim9_flag:     bool,
         adc:           BatteryAdc,
         leds:          LEDs,
         motors:        MotorsPWM,
@@ -304,7 +304,7 @@ mod app {
             flight_data: FlightData::default(),
             sens_filters,
             bt,
-            tim9_flag: false,
+            // tim9_flag: false,
             adc: init_struct.adc,
             leds: init_struct.leds,
             motors: init_struct.motors,
@@ -451,7 +451,8 @@ mod app {
 
     #[task(
         binds = TIM3,
-        shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller, dwt],
+        // shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller, dwt],
+        shared = [ahrs, sens_data, flight_data, motors, inputs, controller, dwt],
         local = [tim3, counter: u32 = 0, pitch: (f32,f32) = (0.0, 0.0)],
         priority = 5,
         // priority = 3,
@@ -467,7 +468,7 @@ mod app {
             cx.shared.ahrs,
             cx.shared.sens_data,
             cx.shared.flight_data,
-            cx.shared.tim9_flag,
+            // cx.shared.tim9_flag,
             cx.shared.motors,
             cx.shared.inputs,
             cx.shared.controller,
@@ -475,7 +476,7 @@ mod app {
         )
             .lock(
                 // |ahrs, sd, fd, tim9_flag, motors, inputs, controller| {
-                |ahrs, sd, fd, tim9_flag, motors, inputs, controller, dwt| {
+                |ahrs, sd, fd, motors, inputs, controller, dwt| {
                     /// update AHRS
                     let gyro = sd.imu_gyro.read_and_reset();
                     let acc = sd.imu_acc.read_and_reset();
@@ -523,7 +524,17 @@ mod app {
                     // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
                     let motor_outputs = controller.update(inputs, &fd.quat, gyro2);
 
-                    // rprintln!("kd = {:?}", controller.pid_pitch_rate.prev_output.d);
+                    // if motors.is_armed() {
+                    //     let (roll, pitch, yaw) = fd.get_euler_angles();
+                    //     rprintln!(
+                    //         "{:?}, {:?}, {:?}, {:?}, {:?}",
+                    //         controller.pid_pitch_rate.prev_output.p,
+                    //         controller.pid_pitch_rate.prev_output.i,
+                    //         controller.pid_pitch_rate.prev_output.d,
+                    //         gyro2.x,
+                    //         pitch,
+                    //     );
+                    // }
 
                     /// apply mixed PID outputs to motors
                     motor_outputs.apply(motors);
@@ -569,15 +580,15 @@ mod app {
                         *cx.local.counter += 1;
                     }
 
-                    *tim9_flag = true;
+                    // *tim9_flag = true;
                 },
             );
     }
 
     #[task(
         binds = TIM1_BRK_TIM9,
-        // shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors],
-        shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors, ahrs],
+        // shared = [bt, exti, flight_data, sens_data, dwt, adc, tim9_flag, inputs, controller, motors, ahrs],
+        shared = [bt, exti, flight_data, sens_data, dwt, adc, inputs, controller, motors, ahrs],
         local = [tim9, batt_counter: u32 = 0, batt_warn: u32 = 0],
         priority = 2
     )]
@@ -659,9 +670,9 @@ mod app {
                 // // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                 // bt.log_write_sens_gyro(gyro0).unwrap();
 
-                // let pids = [IdPID::PitchRate];
+                let pids = [IdPID::PitchRate];
                 // let pids = [IdPID::PitchStab];
-                let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                // let pids = [IdPID::PitchRate, IdPID::PitchStab];
                 // let pids = [IdPID::YawRate];
                 for id in pids {
                     bt.log_write_pid(id, &controller[id]).unwrap();

@@ -2,7 +2,7 @@ mod control_inputs;
 mod control_rates;
 
 use crate::{
-    consts::PID_FREQ,
+    consts::{pid_vals, PID_FREQ},
     math::rad_to_deg,
     motors::MotorsPWM,
     pid::{PIDParam, PID},
@@ -102,9 +102,9 @@ impl DroneController {
         /// P = 0.00006a
         /// I = 0.000185
         /// D = 0.0000049
-        pid_pitch_rate.set_param(PIDParam::Kp, 0.000_06);
-        pid_pitch_rate.set_param(PIDParam::Ki, 0.000_185);
-        pid_pitch_rate.set_param(PIDParam::Kd, 0.000_004_9);
+        pid_pitch_rate.set_param(PIDParam::Kp, pid_vals::PID_PITCH_RATE_P);
+        pid_pitch_rate.set_param(PIDParam::Ki, pid_vals::PID_PITCH_RATE_I);
+        pid_pitch_rate.set_param(PIDParam::Kd, pid_vals::PID_PITCH_RATE_D);
 
         pid_pitch_rate.set_param(PIDParam::KiLimit, 0.2);
         pid_pitch_rate.set_param(PIDParam::KdLimit, 0.001);
@@ -229,14 +229,14 @@ impl DroneController {
     ) -> MotorOutputs {
         //
 
-        if inputs.get_level_mode() {
-            self.update_level_mode(inputs, ahrs_quat, gyro)
-        } else {
-            self.update_acro_mode(inputs, ahrs_quat, gyro)
-        }
+        // if inputs.get_level_mode() {
+        //     self.update_level_mode(inputs, ahrs_quat, gyro)
+        // } else {
+        //     self.update_acro_mode(inputs, ahrs_quat, gyro)
+        // }
 
-        // defmt::warn!("overriding level mode, using acro mode");
-        // self.update_acro_mode(inputs, ahrs_quat, gyro)
+        defmt::warn!("overriding level mode, using acro mode");
+        self.update_acro_mode(inputs, ahrs_quat, gyro)
 
         //
     }

@@ -40,9 +40,57 @@ def plot_dterm(path):
 
     plt.show()
 
+def plot_pid(path):
+    ps = np.empty([0])
+    iis = np.empty([0])
+    ds = np.empty([0])
+    gyro = np.empty([0])
+    pitch = np.empty([0])
+
+    names = ["P","I","D","Gyro","Pitch"]
+
+    with open("".join(["../rflight_drone/logs/", path])) as csv_file:
+        csv_reader = csv.DictReader(csv_file, fieldnames=names)
+        row_count = 0
+        for row in csv_reader:
+            try:
+                p = float(row["P"])
+                i = float(row["I"])
+                d = float(row["D"])
+                g = float(row["Gyro"])
+                pi = float(row["Pitch"])
+
+                ps = np.append(ps, p)
+                iis = np.append(iis, i)
+                ds = np.append(ds, d)
+                gyro = np.append(gyro, g)
+                pitch = np.append(pitch, pi)
+            except:
+                pass
+
+    ds = ds[500:]
+
+    plt.subplot(211)
+    ax = plt.gca()
+
+    ax.xaxis.set_visible(False)
+
+    plt.plot(pitch)
+
+    # samplingFrequency = 3330
+
+    # plt.subplot(212)
+    # powerSpectrum, freqenciesFound, time, imageAxis = plt.specgram(
+    #     ds, Fs=samplingFrequency, NFFT=256
+    # )
+    # ax = plt.gca()
+    # ax.set_xlabel('Time')
+    # ax.set_ylabel('Frequency')
+
+    plt.show()
+
 # plot_dterm("d_term01.log")
-# plot_dterm("d_term02.log")
-# plot_dterm("d_term03.log")
+plot_pid("pid_02.log")
 
 def read_csv(path):
     xs = np.empty([0])
@@ -289,5 +337,5 @@ def main():
     # path = "gyro05_off.log"
     # plot_allen(path)
 
-main()
+# main()
 
