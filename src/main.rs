@@ -277,13 +277,13 @@ mod app {
         tim10.start(SENSOR_FREQ).unwrap();
         tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start PID timer
-        // tim3.start(PID_FREQ).unwrap();
-        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start PID timer
+        tim3.start(PID_FREQ).unwrap();
+        tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start Main Loop timer
-        // tim9.start(MAIN_LOOP_FREQ).unwrap();
-        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Main Loop timer
+        tim9.start(MAIN_LOOP_FREQ).unwrap();
+        tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
         // /// start bt_test timer
@@ -329,12 +329,12 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        set_dbg_gyro::spawn(true).unwrap();
-        test_motors::spawn(0.05).unwrap();
-        test_motors::spawn_after(2_500.millis(), 0.1).unwrap();
-        test_motors::spawn_after(5_000.millis(), 0.15).unwrap();
-        test_motors::spawn_after(7_500.millis(), 0.2).unwrap();
-        kill_motors::spawn_after(8_000.millis()).unwrap();
+        // set_dbg_gyro::spawn(true).unwrap();
+        // test_motors::spawn(0.05).unwrap();
+        // test_motors::spawn_after(2_500.millis(), 0.1).unwrap();
+        // test_motors::spawn_after(5_000.millis(), 0.15).unwrap();
+        // test_motors::spawn_after(7_500.millis(), 0.2).unwrap();
+        // kill_motors::spawn_after(8_000.millis()).unwrap();
 
         // let throttle = 0.1;
         // test_motors::spawn(throttle).unwrap();
@@ -438,12 +438,12 @@ mod app {
                 //     *cx.local.counter = (0, 0, 0);
                 // }
 
-                if *dbg_gyro {
-                    let gyro = sd.imu_gyro.read_and_reset();
-                    // rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
-                    rprintln!("{}", gyro.x);
-                    // rprintln!("0.0, 0.0, 0.0");
-                }
+                // if *dbg_gyro {
+                //     let gyro = sd.imu_gyro.read_and_reset();
+                //     // rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                //     rprintln!("{}", gyro.x);
+                //     // rprintln!("0.0, 0.0, 0.0");
+                // }
 
                 // // TODO: read baro
                 // let (pressure_rdy, temp_rdy) =
@@ -675,16 +675,16 @@ mod app {
                 // let alt = alt * 100.0;
                 // let gyro0 = V3::new(alt, alt, 0.0);
 
-                // let gyro0 = sd.imu_gyro.read_and_reset();
-                // // let acc0 = sd.imu_acc.read_and_reset();
-                // // let mag0 = sd.magnetometer.read_and_reset();
+                let gyro0 = sd.imu_gyro.read_and_reset();
+                // let acc0 = sd.imu_acc.read_and_reset();
+                // let mag0 = sd.magnetometer.read_and_reset();
 
-                // // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
-                // bt.log_write_sens_gyro(gyro0).unwrap();
+                // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
+                bt.log_write_sens_gyro(gyro0).unwrap();
 
-                let pids = [IdPID::PitchRate];
+                // let pids = [IdPID::PitchRate];
                 // let pids = [IdPID::PitchStab];
-                // let pids = [IdPID::PitchRate, IdPID::PitchStab];
+                let pids = [IdPID::PitchRate, IdPID::PitchStab];
                 // let pids = [IdPID::YawRate];
                 for id in pids {
                     bt.log_write_pid(id, &controller[id]).unwrap();

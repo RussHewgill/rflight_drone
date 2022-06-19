@@ -229,14 +229,14 @@ impl DroneController {
     ) -> MotorOutputs {
         //
 
-        // if inputs.get_level_mode() {
-        //     self.update_level_mode(inputs, ahrs_quat, gyro)
-        // } else {
-        //     self.update_acro_mode(inputs, ahrs_quat, gyro)
-        // }
+        if inputs.get_level_mode() {
+            self.update_level_mode(inputs, ahrs_quat, gyro)
+        } else {
+            self.update_acro_mode(inputs, ahrs_quat, gyro)
+        }
 
-        defmt::warn!("overriding level mode, using acro mode");
-        self.update_acro_mode(inputs, ahrs_quat, gyro)
+        // defmt::warn!("overriding level mode, using acro mode");
+        // self.update_acro_mode(inputs, ahrs_quat, gyro)
 
         //
     }
