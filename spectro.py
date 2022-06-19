@@ -6,6 +6,7 @@ import csv
 from scipy import linalg, optimize
 import math
 from scipy.io import wavfile
+from scipy.fft import fft, ifft, fftfreq
 
 def plot_dterm(path):
     ds = np.empty([0])
@@ -68,14 +69,28 @@ def plot_pid(path):
             except:
                 pass
 
-    ds = ds[500:]
+    start = 150
+
+    ps = ps[start:]
+    iis = iis[start:]
+    ds = ds[start:]
+    gyro = gyro[start:]
+    pitch = pitch[start:]
 
     plt.subplot(211)
     ax = plt.gca()
 
-    ax.xaxis.set_visible(False)
+    # ax.xaxis.set_visible(False)
 
-    plt.plot(pitch)
+    gyro = gyro * 0.001
+
+    # plt.plot(ps, label='P')
+    # plt.plot(iis, label='I')
+    plt.plot(ds, label='D')
+    # plt.plot(pitch, label='pitch')
+    plt.plot(gyro, label='gyro')
+
+    ax.legend()
 
     # samplingFrequency = 3330
 
@@ -90,14 +105,17 @@ def plot_pid(path):
     plt.show()
 
 # plot_dterm("d_term01.log")
-plot_pid("pid_02.log")
+# plot_pid("pid_02.log")
 
-def read_csv(path):
+def read_csv(path, one=False):
     xs = np.empty([0])
     ys = np.empty([0])
     zs = np.empty([0])
 
-    names = ["X", "Y", "Z"]
+    if one:
+        names = ["X"]
+    else:
+        names = ["X", "Y", "Z"]
 
     with open("".join(["../rflight_drone/logs/", path])) as csv_file:
         csv_reader = csv.DictReader(csv_file, fieldnames=names)
@@ -109,15 +127,23 @@ def read_csv(path):
             # elif line_count >= 100:
             #     break
             # else:
-            try:
-                x = float(row["X"])
-                y = float(row["Y"])
-                z = float(row["Z"])
-                xs = np.append(xs, float(row["X"]))
-                ys = np.append(ys, y)
-                zs = np.append(zs, z)
-            except:
-                pass
+
+            if one:
+                try:
+                    x = float(row["X"])
+                    xs = np.append(xs, float(row["X"]))
+                except:
+                    pass
+            else:
+                try:
+                    x = float(row["X"])
+                    y = float(row["Y"])
+                    z = float(row["Z"])
+                    xs = np.append(xs, float(row["X"]))
+                    ys = np.append(ys, y)
+                    zs = np.append(zs, z)
+                except:
+                    pass
 
                 # xs.append(row["X"])
                 # ys.append(row["Y"])
@@ -127,31 +153,41 @@ def read_csv(path):
     return (xs, ys, zs)
 
 def plot_spectrogram(path, ax0, ax1, axis):
-    (xs, ys, zs) = read_csv(path)
+    # (xs, ys, zs) = read_csv(path)
+    (xs, ys, zs) = read_csv(path, one=True)
 
     # plt.subplot(211)
     # plt.subplot(p0)
     # ax = plt.gca()
-    ax0.axes.xaxis.set_visible(False)
-    ax0.axes.yaxis.set_visible(False)
+
+    # ax0.axes.xaxis.set_visible(False)
+    # ax0.axes.yaxis.set_visible(False)
+
+    # start = 0
+    start = 3000
+
+    # end = -1
+    end = 50000
 
     if axis == 'x':
-        spec = xs
+        spec = xs[start:end]
     elif axis == 'y':
-        spec = ys
+        spec = ys[start:end]
     elif axis == 'z':
-        spec = zs
+        spec = zs[start:end]
 
     ax0.set_title(f"Spectrogram of gyro {axis}-axis, {path}")
     ax0.plot(spec)
     ax0.set_xlabel('Sample')
     ax0.set_ylabel('Amplitude')
 
-    samplingFrequency = 3330
+    # samplingFrequency = 3330
+    samplingFrequency = 6660
 
     # nfft = 128
-    nfft = 256
+    # nfft = 256
     # nfft = 512
+    nfft = 1024
 
     # plt.subplot(212)
     # plt.subplot(p1)
@@ -159,16 +195,17 @@ def plot_spectrogram(path, ax0, ax1, axis):
     # # ax1.set_yscale('log')
 
     powerSpectrum, freqenciesFound, time, imageAxis = ax1.specgram(
-        spec, Fs=samplingFrequency, NFFT=nfft
+        spec,
+        Fs=samplingFrequency,
+        NFFT=nfft,
+        # pad_to=1024
+        noverlap=512
     )
     ax1.set_xlabel('Time')
     ax1.set_ylabel('Frequency')
-    # ax1.set_ylim([0, 600])
 
-    # ax1.hist(xs, bins='auto')
-    # ax1.set_ylabel('Frequency')
-
-    # plt.show()
+    ax1.set_ylim([0, 1000])
+    # ax1.set_ylim([300, 450])
 
 def plot_wav(path):
     samplingFrequency, signalData = wavfile.read(path)
@@ -309,7 +346,8 @@ def main2():
 
 def main():
 
-    path = "gyro_post.log"
+    # path = "gyro_post.log"
+    path = "pitch_post.log"
     # path = "gyro09_nofilters.log"
     # path = "gyro10_lp_3notch.log"
 
@@ -321,7 +359,8 @@ def main():
     # path = "yaw_03_builtin_verynarrow.log"
     # path = "pitch_02_unfiltered.log"
     # path = "pitch_02_builtin_verynarrow.log"
-    path = "pitch_04.log"
+    # path = "pitch_05.log"
+    path = "pitch_09.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1], 'x')
@@ -337,5 +376,5 @@ def main():
     # path = "gyro05_off.log"
     # plot_allen(path)
 
-# main()
+main()
 

@@ -277,13 +277,13 @@ mod app {
         tim10.start(SENSOR_FREQ).unwrap();
         tim10.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start PID timer
-        tim3.start(PID_FREQ).unwrap();
-        tim3.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start PID timer
+        // tim3.start(PID_FREQ).unwrap();
+        // tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        /// start Main Loop timer
-        tim9.start(MAIN_LOOP_FREQ).unwrap();
-        tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        // /// start Main Loop timer
+        // tim9.start(MAIN_LOOP_FREQ).unwrap();
+        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
         // /// start bt_test timer
@@ -329,10 +329,17 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
+        set_dbg_gyro::spawn(true).unwrap();
+        test_motors::spawn(0.05).unwrap();
+        test_motors::spawn_after(2_500.millis(), 0.1).unwrap();
+        test_motors::spawn_after(5_000.millis(), 0.15).unwrap();
+        test_motors::spawn_after(7_500.millis(), 0.2).unwrap();
+        kill_motors::spawn_after(8_000.millis()).unwrap();
+
         // let throttle = 0.1;
         // test_motors::spawn(throttle).unwrap();
         // set_dbg_gyro::spawn(true).unwrap();
-        // kill_motors::spawn_after(10_000.millis()).unwrap();
+        // kill_motors::spawn_after(5_000.millis()).unwrap();
 
         // bt_test::spawn_after(100.millis()).unwrap();
 
@@ -355,7 +362,7 @@ mod app {
         show_battery::spawn_after(250.millis()).unwrap();
     }
 
-    #[task(shared = [motors, inputs, dbg_gyro], priority = 6, capacity = 2)]
+    #[task(shared = [motors, inputs, dbg_gyro], priority = 6, capacity = 5)]
     fn test_motors(mut cx: test_motors::Context, throttle: f32) {
         (cx.shared.motors, cx.shared.inputs, cx.shared.dbg_gyro).lock(
             |motors, inputs, dbg_gyro| {
@@ -415,7 +422,7 @@ mod app {
 
                 // if gyro_rdy {
                 //     cx.local.counter.0 += 1;
-                //     print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
+                //     // print_v3("gyro = ", sd.imu_gyro.read_and_reset(), 5);
                 // }
                 // if acc_rdy {
                 //     cx.local.counter.1 += 1;
@@ -431,10 +438,12 @@ mod app {
                 //     *cx.local.counter = (0, 0, 0);
                 // }
 
-                // if *dbg_gyro {
-                //     let gyro = sd.imu_gyro.read_and_reset();
-                //     rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
-                // }
+                if *dbg_gyro {
+                    let gyro = sd.imu_gyro.read_and_reset();
+                    // rprintln!("{},{},{}", gyro.x, gyro.y, gyro.z);
+                    rprintln!("{}", gyro.x);
+                    // rprintln!("0.0, 0.0, 0.0");
+                }
 
                 // // TODO: read baro
                 // let (pressure_rdy, temp_rdy) =
@@ -451,11 +460,10 @@ mod app {
 
     #[task(
         binds = TIM3,
-        // shared = [ahrs, sens_data, flight_data, tim9_flag, motors, inputs, controller, dwt],
         shared = [ahrs, sens_data, flight_data, motors, inputs, controller, dwt],
         local = [tim3, counter: u32 = 0, pitch: (f32,f32) = (0.0, 0.0)],
-        priority = 5,
-        // priority = 3,
+        // priority = 5,
+        priority = 3,
     )]
     fn timer_pid(mut cx: timer_pid::Context) {
         cx.local
@@ -523,6 +531,10 @@ mod app {
                     /// XXX: use offset adjusted gyro?
                     // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
                     let motor_outputs = controller.update(inputs, &fd.quat, gyro2);
+
+                    // if motors.is_armed() {
+                    //     rprintln!("gyro2.x = {:?}", gyro2.x);
+                    // }
 
                     // if motors.is_armed() {
                     //     let (roll, pitch, yaw) = fd.get_euler_angles();
