@@ -119,7 +119,10 @@ mod app {
         bluetooth::gap::Commands as GapCommands,
         bluetooth::{events::BlueNRGEvent, hal_bt::Commands as HalCommands},
         bluetooth::{gap::ConnectionUpdateParameters, gatt::Commands as GattCommands},
-        bt_control::{service_log::BTMessQueue, BTController, BTEvent},
+        bt_control::{
+            service_log::{BTMessQueue, BTMessage},
+            BTController, BTEvent,
+        },
         bt_state::{BTState, ConnectionChange},
         consts::*,
         flight_control::{ControlInputs, DroneController, IdPID, MotorOutputs},
@@ -184,7 +187,7 @@ mod app {
     #[monotonic(binds = TIM5, default = true)]
     type MonoTick = MonoTimer<TIM5, 1_000_000>; // 1 MHz
 
-    // static BT_MESS_QUEUE: BTMessQueue = BTMessQueue::new();
+    static BT_MESS_QUEUE: BTMessQueue = BTMessQueue::new();
 
     #[init(local = [])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -653,6 +656,7 @@ mod app {
                 let send_bt = if *cx.local.batt_counter >= BATT_TIMES {
                     *cx.local.batt_counter = 0;
                     // rprintln!("sending battery");
+                    BT_MESS_QUEUE.enqueue(BTMessage::Test);
                     true
                 } else {
                     *cx.local.batt_counter += 1;
@@ -690,6 +694,10 @@ mod app {
                 // let pids = [IdPID::YawRate];
                 for id in pids {
                     bt.log_write_pid(id, &controller[id]).unwrap();
+                }
+
+                while let Some(mess) = BT_MESS_QUEUE.dequeue() {
+                    bt.log_write_mess(mess).unwrap();
                 }
 
                 // unimplemented!()

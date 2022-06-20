@@ -26,7 +26,8 @@ use crate::{
         gatt::UpdateLongCharacteristicValueParameters, hal_bt::Commands as HalCommands,
     },
     bt_control::{
-        UUID_LOG_BATT_CHAR, UUID_LOG_PID_CHAR, UUID_LOG_QUAT_CHAR, UUID_LOG_SENS_CHAR,
+        UUID_LOG_BATT_CHAR, UUID_LOG_MESS_CHAR, UUID_LOG_PID_CHAR, UUID_LOG_QUAT_CHAR,
+        UUID_LOG_SENS_CHAR,
     },
     flight_control::IdPID,
     pid::{PIDOutput, PID},
@@ -61,10 +62,28 @@ pub struct SvLogger {
 }
 
 mod messages {
-    use defmt::println as rprintln;
+    use defmt::{println as rprintln, Format};
+
+    #[derive(Clone, Copy, Format)]
+    #[repr(u8)]
+    pub enum BTMessage {
+        Test,
+        ArmingFailed,
+        LowBatteryShutoff,
+    }
+
+    impl BTMessage {
+        pub fn to_array(self) -> [u8; 12] {
+            let mut out = [0; 12];
+            match self {
+                _ => out[0] = self as u8,
+            }
+            out
+        }
+    }
 
     pub struct BTMessQueue {
-        queue: heapless::mpmc::Q16<u32>,
+        queue: heapless::mpmc::Q16<BTMessage>,
     }
 
     impl BTMessQueue {
@@ -74,10 +93,14 @@ mod messages {
             }
         }
 
-        pub fn enqueue(&self, message: u32) {
-            self.queue
-                .enqueue(message)
-                .unwrap_or_else(|_| rprintln!("BTMessQueue::enqueue failed"));
+        pub fn enqueue(&self, message: BTMessage) {
+            self.queue.enqueue(message).unwrap_or_else(|_| {
+                rprintln!("BTMessQueue::enqueue failed: {:?}", message)
+            });
+        }
+
+        pub fn dequeue(&self) -> Option<BTMessage> {
+            self.queue.dequeue()
         }
     }
 }
@@ -124,6 +147,19 @@ where
 
             //
         }
+
+        Ok(())
+    }
+
+    pub fn log_write_mess(
+        &mut self,
+        mess: BTMessage,
+    ) -> Result<(), BTError<SpiError, GpioError>> {
+        let logger = self.services.logger.expect("no logger?");
+
+        let data = mess.to_array();
+
+        self.log_write(logger.char_handle_message, &data, false)?;
 
         Ok(())
     }
@@ -434,7 +470,7 @@ where
 
         let handle_message = self.add_log_char(
             service.service_handle,
-            UUID_LOG_BATT_CHAR,
+            UUID_LOG_MESS_CHAR,
             4,
             CharacteristicProperty::NOTIFY,
             4,
