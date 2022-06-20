@@ -163,11 +163,12 @@ def plot_spectrogram(path, ax0, ax1, axis):
     # ax0.axes.xaxis.set_visible(False)
     # ax0.axes.yaxis.set_visible(False)
 
-    # start = 0
-    start = 3000
+    start = 0
+    # start = 1000
 
-    # end = -1
-    end = 50000
+    end = -1
+    # end = 50000
+    # end = 15000
 
     if axis == 'x':
         spec = xs[start:end]
@@ -181,8 +182,8 @@ def plot_spectrogram(path, ax0, ax1, axis):
     ax0.set_xlabel('Sample')
     ax0.set_ylabel('Amplitude')
 
-    # samplingFrequency = 3330
-    samplingFrequency = 6660
+    samplingFrequency = 3330
+    # samplingFrequency = 6660
 
     # nfft = 128
     # nfft = 256
@@ -360,7 +361,15 @@ def main():
     # path = "pitch_02_unfiltered.log"
     # path = "pitch_02_builtin_verynarrow.log"
     # path = "pitch_05.log"
-    path = "pitch_09.log"
+    # path = "pitch_09.log"
+    # path = "gyro10.log"
+    # path = "gyro12_none.log"
+    # path = "gyro12_P.log"
+    path = "gyro13_nofilter.log"
+    path = "gyro13_lowpass.log"
+    # path = "gyro13_notches.log"
+    # path = "d_term05.log"
+    # path = "acc_02.log"
 
     fig, axs = plt.subplots(2)
     plot_spectrogram(path, axs[0], axs[1], 'x')

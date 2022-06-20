@@ -115,8 +115,11 @@ mod altitude {
             /// use first 0.5 seconds for measuring baseline
             let discard = (1.0 / (1.0 / sample_rate.to_Hz() as f32)) as u32;
             let initialized = (0.5 / (1.0 / sample_rate.to_Hz() as f32)) as u32;
-            assert!(initialized > 0);
-            rprintln!("initialized = {:?}", initialized);
+            /// use at least 5 samples
+            let initialized = initialized.max(5);
+
+            // assert!(initialized > 0);
+            // rprintln!("altitude initialized = {:?}", initialized);
 
             Self {
                 sample_rate,

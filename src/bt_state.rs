@@ -136,6 +136,7 @@ where
                         Some(true) => {
                             rprintln!("Setting motors armed");
                             if motors.set_armed(true, &self.state, control_inputs, quat) {
+                                controller.reset_integrals();
                                 control_inputs.set_motors_armed(true);
                             }
                             out = true;
