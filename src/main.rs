@@ -281,9 +281,9 @@ mod app {
         tim3.start(PID_FREQ).unwrap();
         tim3.listen(stm32f4xx_hal::timer::Event::Update);
 
-        // /// start Main Loop timer
-        // tim9.start(MAIN_LOOP_FREQ).unwrap();
-        // tim9.listen(stm32f4xx_hal::timer::Event::Update);
+        /// start Main Loop timer
+        tim9.start(MAIN_LOOP_FREQ).unwrap();
+        tim9.listen(stm32f4xx_hal::timer::Event::Update);
 
         // let bt_period = 200.Hz();
         // /// start bt_test timer
@@ -329,12 +329,12 @@ mod app {
 
         // main_loop::spawn_after(100.millis()).unwrap();
 
-        set_dbg_gyro::spawn(true).unwrap();
-        test_motors::spawn(0.05).unwrap();
-        test_motors::spawn_after(2_500.millis(), 0.1).unwrap();
-        test_motors::spawn_after(5_000.millis(), 0.15).unwrap();
-        test_motors::spawn_after(7_500.millis(), 0.2).unwrap();
-        kill_motors::spawn_after(8_000.millis()).unwrap();
+        // set_dbg_gyro::spawn(true).unwrap();
+        // test_motors::spawn(0.05).unwrap();
+        // test_motors::spawn_after(2_500.millis(), 0.1).unwrap();
+        // test_motors::spawn_after(5_000.millis(), 0.15).unwrap();
+        // test_motors::spawn_after(7_500.millis(), 0.2).unwrap();
+        // kill_motors::spawn_after(8_000.millis()).unwrap();
 
         // let throttle = 0.1;
         // test_motors::spawn(throttle).unwrap();
@@ -533,10 +533,10 @@ mod app {
                     // let motor_outputs = controller.update(*inputs, &fd.quat, gyro);
                     let motor_outputs = controller.update(inputs, &fd.quat, gyro2);
 
-                    if motors.is_armed() {
-                        rprintln!("{:?}", gyro2.x);
-                        // rprintln!("{:?}", controller.pid_pitch_rate.prev_output.d);
-                    }
+                    // if motors.is_armed() {
+                    //     rprintln!("{:?}", gyro2.x);
+                    //     // rprintln!("{:?}", controller.pid_pitch_rate.prev_output.d);
+                    // }
 
                     // if motors.is_armed() {
                     //     let (roll, pitch, yaw) = fd.get_euler_angles();
