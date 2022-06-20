@@ -65,18 +65,22 @@ mod messages {
     use defmt::{println as rprintln, Format};
 
     #[derive(Clone, Copy, Format)]
-    #[repr(u8)]
     pub enum BTMessage {
-        Test,
+        Test(u8),
         ArmingFailed,
         LowBatteryShutoff,
     }
 
     impl BTMessage {
-        pub fn to_array(self) -> [u8; 12] {
-            let mut out = [0; 12];
+        pub fn to_array(self) -> [u8; 4] {
+            let mut out = [0; 4];
             match self {
-                _ => out[0] = self as u8,
+                BTMessage::Test(x) => {
+                    out[0] = 0;
+                    out[1] = x;
+                }
+                BTMessage::ArmingFailed => out[0] = 1,
+                BTMessage::LowBatteryShutoff => out[0] = 2,
             }
             out
         }

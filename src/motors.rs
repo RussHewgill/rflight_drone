@@ -168,11 +168,14 @@ impl MotorsPWM {
         inputs: &ControlInputs,
         quat: UQuat,
     ) -> bool {
+        use crate::BT_MESS_QUEUE;
         if Self::motor_arming_check(bt, inputs, quat) {
             rprintln!("MotorsPWM: set_armed success");
             self.set_armed_unchecked(armed);
             true
         } else {
+            BT_MESS_QUEUE
+                .enqueue(crate::bt_control::service_log::BTMessage::ArmingFailed);
             rprintln!("MotorsPWM: set_armed failed");
             false
         }

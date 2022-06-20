@@ -51,6 +51,7 @@ use crate::{
     sensors::magneto::*, sensors::*, spi::*, time::*, utils::*,
 };
 
+use bt_control::service_log::BTMessQueue;
 use byteorder::ByteOrder;
 
 // pick a panicking behavior
@@ -94,6 +95,8 @@ use crate::bluetooth::{
 use bluetooth_hci_defmt::{host::uart::Hci as HciUart, host::Hci};
 use core::convert::Infallible;
 
+static BT_MESS_QUEUE: BTMessQueue = BTMessQueue::new();
+
 // #[cfg(feature = "nope")]
 #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [SPI3,SPI4,EXTI0])]
 mod app {
@@ -136,6 +139,7 @@ mod app {
         time::MonoTimer,
         utils::round_to,
         utils::*,
+        BT_MESS_QUEUE,
     };
 
     use bluetooth_hci_defmt::{
@@ -186,8 +190,6 @@ mod app {
 
     #[monotonic(binds = TIM5, default = true)]
     type MonoTick = MonoTimer<TIM5, 1_000_000>; // 1 MHz
-
-    static BT_MESS_QUEUE: BTMessQueue = BTMessQueue::new();
 
     #[init(local = [])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -656,7 +658,7 @@ mod app {
                 let send_bt = if *cx.local.batt_counter >= BATT_TIMES {
                     *cx.local.batt_counter = 0;
                     // rprintln!("sending battery");
-                    BT_MESS_QUEUE.enqueue(BTMessage::Test);
+                    // BT_MESS_QUEUE.enqueue(BTMessage::Test(*cx.local.batt_counter as u8));
                     true
                 } else {
                     *cx.local.batt_counter += 1;
@@ -697,6 +699,7 @@ mod app {
                 }
 
                 while let Some(mess) = BT_MESS_QUEUE.dequeue() {
+                    rprintln!("sending mess = {:?}", mess);
                     bt.log_write_mess(mess).unwrap();
                 }
 
