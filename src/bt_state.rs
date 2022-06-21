@@ -132,7 +132,7 @@ where
                     // rprintln!("data.len() = {:?}", data.len());
 
                     let mut out = false;
-                    match control_inputs.update(att.data()) {
+                    match control_inputs.update(controller, att.data()) {
                         Some(true) => {
                             rprintln!("Setting motors armed");
                             if motors.set_armed(true, &self.state, control_inputs, quat) {
@@ -144,6 +144,7 @@ where
                         Some(false) => {
                             rprintln!("Setting motors disarmed");
                             motors.set_disarmed();
+                            controller.reset_integrals();
                             control_inputs.set_motors_armed(false);
                             out = true;
                         }

@@ -100,19 +100,26 @@ impl DroneController {
         // // let tu = 0.65;
         // let ku = 0.0000_9;
         // let tu = 1.6;
+
+        // let ku = 0.0000_9;
+        // let tu = 1.6;
         // let (kp, ki, kd) = Self::ziegler_nichols(ku, tu);
         // rprintln!("kp = {:?}", kp);
         // rprintln!("ki = {:?}", ki);
         // rprintln!("kd = {:?}", kd);
 
-        pid_pitch_rate.set_param(PIDParam::Kp, pid_vals::PID_PITCH_RATE_P);
-        pid_pitch_rate.set_param(PIDParam::Ki, pid_vals::PID_PITCH_RATE_I);
-        pid_pitch_rate.set_param(PIDParam::Kd, pid_vals::PID_PITCH_RATE_D);
+        // pid_pitch_rate.set_param(PIDParam::Kp, kp);
+        // pid_pitch_rate.set_param(PIDParam::Ki, ki);
+        // pid_pitch_rate.set_param(PIDParam::Kd, kd);
+
+        // pid_pitch_rate.set_param(PIDParam::Kp, pid_vals::PID_PITCH_RATE_P);
+        // pid_pitch_rate.set_param(PIDParam::Ki, pid_vals::PID_PITCH_RATE_I);
+        // pid_pitch_rate.set_param(PIDParam::Kd, pid_vals::PID_PITCH_RATE_D);
 
         pid_pitch_rate.set_param(PIDParam::KiLimit, 0.1);
         pid_pitch_rate.set_param(PIDParam::KdLimit, 0.01);
 
-        pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
+        // pid_roll_rate.copy_settings_to(&mut pid_pitch_rate);
 
         pid_roll_rate.set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
         pid_pitch_rate.set_d_lowpass(PID_FREQ.to_Hz() as f32, 100.0);
@@ -222,6 +229,7 @@ impl DroneController {
 /// reset PID Integrals
 impl DroneController {
     pub fn reset_integrals(&mut self) {
+        rprintln!("DroneController reset_integrals");
         for pid in IdPID::ITER {
             self[pid].reset_integral();
         }
@@ -247,10 +255,46 @@ impl DroneController {
             self.update_acro_mode(inputs, ahrs_quat, gyro)
         }
 
+        // // defmt::warn!("overriding level mode, using acro mode");
+        // self.update_combined_mode(inputs, ahrs_quat, gyro)
+
         // defmt::warn!("overriding level mode, using acro mode");
         // self.update_acro_mode(inputs, ahrs_quat, gyro)
 
         //
+    }
+}
+
+/// Single PID mode
+#[cfg(feature = "nope")]
+impl DroneController {
+    pub fn update_combined_mode(
+        &mut self,
+        inputs: &ControlInputs,
+        ahrs_quat: &UQuat,
+        gyro: V3,
+    ) -> MotorOutputs {
+        /// in radians
+        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = ahrs_quat.euler_angles();
+        /// convert to degrees since gyro is in deg/s
+        let (ahrs_roll, ahrs_pitch, ahrs_yaw) = (
+            rad_to_deg(ahrs_roll),
+            rad_to_deg(ahrs_pitch),
+            rad_to_deg(ahrs_yaw),
+        );
+
+        let (i_roll, i_pitch, i_yaw, i_throttle) =
+            inputs.get_values_level(&self.rates, &self.limits);
+
+        let err1_roll = i_roll - ahrs_roll;
+        let err1_pitch = i_pitch - ahrs_pitch;
+        let err1_yaw = 0.0;
+
+        let out1_roll = self.pid_roll_rate.step(err1_roll);
+        let out1_pitch = self.pid_pitch_rate.step(err1_pitch);
+        let out1_yaw = self.pid_yaw_rate.step(err1_yaw);
+
+        self.mix(i_throttle, out1_roll, out1_pitch, out1_yaw)
     }
 }
 

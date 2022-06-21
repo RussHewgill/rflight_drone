@@ -4,11 +4,13 @@ use biquad::*;
 use nalgebra::{self as na};
 
 // use signalo::filters::mean::mean::Mean;
-use signalo::filters::convolve::{
-    savitzky_golay::SavitzkyGolay, Config as ConvolveConfig, Convolve,
+use signalo::{
+    filters::convolve::{
+        savitzky_golay::SavitzkyGolay, Config as ConvolveConfig, Convolve,
+    },
+    filters::median::Median,
+    traits::{Filter, WithConfig},
 };
-use signalo::signalo_filters::median::Median;
-use signalo::traits::{Filter, WithConfig};
 
 use defmt::{println as rprintln, Format};
 
@@ -39,8 +41,7 @@ pub struct PID {
 
     // deriv_filter:  Mean<f32, 3>,
     // deriv_filter:  Convolve<f32, 5>,
-    deriv_filter: Median<f32, 3>,
-
+    // deriv_filter: Median<f32, 3>,
     setpoint: f32,
 }
 
@@ -92,8 +93,7 @@ impl PID {
             deriv_lowpass: None,
             // deriv_filter: Mean::default(),
             // deriv_filter: Convolve::savitzky_golay(),
-            deriv_filter: Median::default(),
-
+            // deriv_filter: Median::default(),
             setpoint: 0.0,
         }
     }
@@ -164,8 +164,8 @@ impl PID {
         let d_filtered = if let Some(lowpass) = self.deriv_lowpass.as_mut() {
             let d0 = lowpass.run(d_unbounded);
             // self.deriv_filter.filter(d_unbounded)
-            let d1 = self.deriv_filter.filter(d0);
-            d1
+            // let d1 = self.deriv_filter.filter(d0);
+            d0
         } else {
             d_unbounded
         };

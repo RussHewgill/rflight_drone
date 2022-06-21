@@ -6,23 +6,29 @@ use stm32f4xx_hal::{
     gpio::{Analog, Pin, PB1},
 };
 
-use crate::{bt_control::BTController, consts::MAIN_LOOP_FREQ};
+// use signalo::{
+//     filters::median::Median,
+//     traits::{Filter, WithConfig},
+// };
 
 use defmt::{println as rprintln, Format};
+
+use crate::{bt_control::BTController, consts::MAIN_LOOP_FREQ};
 
 pub struct BatteryAdc {
     pub adc:              Adc<ADC1>,
     pub voltage:          Pin<'B', 1, Analog>,
     pub last_reading:     f32,
+    // pub avg_filter:       Median<f32, 5>,
     pub min_voltage_warn: f32,
     pub min_voltage_halt: f32,
 }
 
+/// warning
 impl BatteryAdc {
     pub fn battery_warning(
         &mut self,
         bt: &mut BTController,
-        // exti: &mut EXTI,
         warn_counter: &mut u32,
         armed: bool,
         send_bt: bool,
@@ -36,6 +42,7 @@ impl BatteryAdc {
 
         if send_bt {
             // bt.pause_interrupt(exti);
+            // rprintln!("batt = {:?}", v);
             bt.log_write_batt(v).unwrap();
             // bt.unpause_interrupt(exti);
         }
@@ -74,6 +81,7 @@ impl BatteryAdc {
             adc,
             voltage,
             last_reading: 0.0,
+            // avg_filter: Median::default(),
             min_voltage_warn: 3.6,
             min_voltage_halt: 3.5,
         };
@@ -102,7 +110,9 @@ impl BatteryAdc {
         let v_bat: f32 = v_bat * ((R_UP + R_DOWN) / R_DOWN);
 
         self.last_reading = v_bat;
+        // let out = self.avg_filter.filter(v_bat);
 
+        // out
         v_bat
     }
 }

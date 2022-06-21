@@ -12,7 +12,7 @@ use signalo::traits::{Filter, WithConfig};
 
 use crate::{math::rad_to_deg, motors::MotorsPWM};
 
-use super::{ControlRates, FlightLimits};
+use super::{ControlRates, DroneController, FlightLimits};
 
 /// Received from remote control
 #[derive(Clone)]
@@ -69,7 +69,11 @@ impl ControlInputs {
 
 /// update
 impl ControlInputs {
-    pub fn update(&mut self, data: &[u8]) -> Option<bool> {
+    pub fn update(
+        &mut self,
+        controller: &mut DroneController,
+        data: &[u8],
+    ) -> Option<bool> {
         let mut input = if let Some(input) = ControlInputState::deserialize(data) {
             input
         } else {
@@ -96,6 +100,7 @@ impl ControlInputs {
         if self.state.level_mode != input.level_mode {
             rprintln!("setting level_mode = {:?}", input.level_mode);
             self.state.level_mode = input.level_mode;
+            controller.reset_integrals();
         }
 
         if !self.get_motors_armed() && input.motors_armed {
