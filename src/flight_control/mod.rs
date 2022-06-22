@@ -101,16 +101,16 @@ impl DroneController {
         // let ku = 0.0000_9;
         // let tu = 1.6;
 
-        // let ku = 0.0000_9;
-        // let tu = 1.6;
-        // let (kp, ki, kd) = Self::ziegler_nichols(ku, tu);
-        // rprintln!("kp = {:?}", kp);
-        // rprintln!("ki = {:?}", ki);
-        // rprintln!("kd = {:?}", kd);
+        let ku = 0.0000_9;
+        let tu = 1.6;
+        let (kp, ki, kd) = Self::ziegler_nichols(ku, tu);
+        rprintln!("kp = {:?}", kp);
+        rprintln!("ki = {:?}", ki);
+        rprintln!("kd = {:?}", kd);
 
-        // pid_pitch_rate.set_param(PIDParam::Kp, kp);
-        // pid_pitch_rate.set_param(PIDParam::Ki, ki);
-        // pid_pitch_rate.set_param(PIDParam::Kd, kd);
+        pid_pitch_rate.set_param(PIDParam::Kp, kp);
+        pid_pitch_rate.set_param(PIDParam::Ki, ki);
+        pid_pitch_rate.set_param(PIDParam::Kd, kd);
 
         // pid_pitch_rate.set_param(PIDParam::Kp, pid_vals::PID_PITCH_RATE_P);
         // pid_pitch_rate.set_param(PIDParam::Ki, pid_vals::PID_PITCH_RATE_I);
@@ -199,31 +199,6 @@ impl DroneController {
             limits: FlightLimits::default(),
         }
     }
-
-    #[cfg(feature = "nope")]
-    pub fn new(
-        pid_roll_stab: PID,
-        pid_roll_rate: PID,
-        pid_pitch_stab: PID,
-        pid_pitch_rate: PID,
-        pid_yaw_stab: PID,
-        pid_yaw_rate: PID,
-        pid_altitude_stab: PID,
-        pid_altitude_rate: PID,
-    ) -> Self {
-        Self {
-            pid_roll_stab,
-            pid_roll_rate,
-            pid_pitch_stab,
-            pid_pitch_rate,
-            pid_yaw_stab,
-            pid_yaw_rate,
-            pid_altitude_stab,
-            pid_altitude_rate,
-            rates: ControlRates::default(),
-            config: FlightLimits::default(),
-        }
-    }
 }
 
 /// reset PID Integrals
@@ -266,7 +241,7 @@ impl DroneController {
 }
 
 /// Single PID mode
-#[cfg(feature = "nope")]
+// #[cfg(feature = "nope")]
 impl DroneController {
     pub fn update_combined_mode(
         &mut self,
@@ -288,6 +263,8 @@ impl DroneController {
 
         let err1_roll = i_roll - ahrs_roll;
         let err1_pitch = i_pitch - ahrs_pitch;
+        // let err1_roll = ahrs_roll - i_roll;
+        // let err1_pitch = ahrs_pitch - i_pitch;
         let err1_yaw = 0.0;
 
         let out1_roll = self.pid_roll_rate.step(err1_roll);

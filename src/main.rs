@@ -690,8 +690,8 @@ mod app {
                 // bt.log_write_sens(gyro0, acc0, mag0).unwrap();
                 bt.log_write_sens_gyro(gyro0).unwrap();
 
-                // let pids = [IdPID::PitchRate];
                 // let pids = [IdPID::PitchStab];
+                // let pids = [IdPID::PitchRate];
                 let pids = [IdPID::PitchRate, IdPID::PitchStab];
                 // let pids = [IdPID::YawRate];
                 for id in pids {
