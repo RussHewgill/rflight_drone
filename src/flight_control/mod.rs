@@ -104,14 +104,14 @@ impl DroneController {
         let ku = 0.0000_9;
         let tu = 1.6;
 
-        let (kp, ki, kd) = Self::ziegler_nichols(ku, tu);
-        rprintln!("kp = {:?}", kp);
-        rprintln!("ki = {:?}", ki);
-        rprintln!("kd = {:?}", kd);
+        // let (kp, ki, kd) = Self::ziegler_nichols(ku, tu);
+        // rprintln!("kp = {:?}", kp);
+        // rprintln!("ki = {:?}", ki);
+        // rprintln!("kd = {:?}", kd);
 
-        pid_pitch_rate.set_param(PIDParam::Kp, kp);
-        pid_pitch_rate.set_param(PIDParam::Ki, ki);
-        pid_pitch_rate.set_param(PIDParam::Kd, kd);
+        // pid_pitch_rate.set_param(PIDParam::Kp, kp);
+        // pid_pitch_rate.set_param(PIDParam::Ki, ki);
+        // pid_pitch_rate.set_param(PIDParam::Kd, kd);
 
         // pid_pitch_rate.set_param(PIDParam::Kp, pid_vals::PID_PITCH_RATE_P);
         // pid_pitch_rate.set_param(PIDParam::Ki, pid_vals::PID_PITCH_RATE_I);
@@ -225,14 +225,14 @@ impl DroneController {
     ) -> MotorOutputs {
         //
 
-        if inputs.get_level_mode() {
-            self.update_level_mode(inputs, ahrs_quat, gyro)
-        } else {
-            self.update_acro_mode(inputs, ahrs_quat, gyro)
-        }
+        // if inputs.get_level_mode() {
+        //     self.update_level_mode(inputs, ahrs_quat, gyro)
+        // } else {
+        //     self.update_acro_mode(inputs, ahrs_quat, gyro)
+        // }
 
-        // // defmt::warn!("overriding level mode, using acro mode");
-        // self.update_combined_mode(inputs, ahrs_quat, gyro)
+        // defmt::warn!("overriding level mode, using acro mode");
+        self.update_combined_mode(inputs, ahrs_quat, gyro)
 
         // defmt::warn!("overriding level mode, using acro mode");
         // self.update_acro_mode(inputs, ahrs_quat, gyro)
@@ -262,10 +262,11 @@ impl DroneController {
         let (i_roll, i_pitch, i_yaw, i_throttle) =
             inputs.get_values_level(&self.rates, &self.limits);
 
-        let err1_roll = i_roll - ahrs_roll;
-        let err1_pitch = i_pitch - ahrs_pitch;
-        // let err1_roll = ahrs_roll - i_roll;
-        // let err1_pitch = ahrs_pitch - i_pitch;
+        // let err1_roll = i_roll - ahrs_roll;
+        // let err1_pitch = i_pitch - ahrs_pitch;
+        /// XXX: backwards for some reason?
+        let err1_roll = ahrs_roll - i_roll;
+        let err1_pitch = ahrs_pitch - i_pitch;
         let err1_yaw = 0.0;
 
         let out1_roll = self.pid_roll_rate.step(err1_roll);
